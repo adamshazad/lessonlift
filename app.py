@@ -1,12 +1,11 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- Sidebar: API Key ---
-st.sidebar.title("🔑 API Key Setup")
-api_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
+# --- Get API Key from Streamlit Secrets ---
+api_key = st.secrets["GEMINI_API_KEY"]
 
 if not api_key:
-    st.warning("Please enter your Gemini API key in the sidebar.")
+    st.error("❌ No Gemini API key found. Please add it to Streamlit secrets.")
     st.stop()
 
 # --- Configure Gemini ---
