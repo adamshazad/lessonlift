@@ -4,6 +4,9 @@ import google.generativeai as genai
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
+# --- Display Logo ---
+st.image("20250721_234720958_iOS.png", use_column_width=True)
+
 # --- Force Light Mode ---
 st.markdown("""
     <style>
@@ -14,6 +17,11 @@ st.markdown("""
             border: 1px solid #ccc !important;
             padding: 8px !important;
             border-radius: 5px !important;
+        }
+        img {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
     </style>
 """, unsafe_allow_html=True)
