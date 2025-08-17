@@ -1,8 +1,14 @@
 import streamlit as st
 import google.generativeai as genai
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
+
+# Try importing reportlab (for PDF export)
+pdf_enabled = True
+try:
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+except ImportError:
+    pdf_enabled = False
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -13,35 +19,6 @@ st.markdown(
     <div style="text-align: center; margin-bottom: 20px;">
         <img src="20250721_234720958_iOS.png" width="200">
     </div>
-    """,
-    unsafe_allow_html=True
-)
-
-# --- Custom Styling ---
-st.markdown(
-    """
-    <style>
-        body {background-color: white; color: black;}
-        .stTextInput>div>div>input, textarea, select {
-            background-color: white !important;
-            color: black !important;
-            border: 1px solid #ccc !important;
-            padding: 8px !important;
-            border-radius: 5px !important;
-        }
-        .lesson-card {
-            background-color: #f9f9f9;
-            border-left: 6px solid #2E7D32; /* green accent */
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 8px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-        }
-        .lesson-card h3 {
-            color: #1565C0; /* blue accent */
-            margin-top: 0;
-        }
-    </style>
     """,
     unsafe_allow_html=True
 )
@@ -100,57 +77,94 @@ Provide:
 - Differentiation ideas
 - Assessment methods
 
-Format the output clearly with markdown headings (###) and bullet points.
+Return each section as markdown starting with ### followed by content.
 """
-
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
 
             st.success("✅ Lesson Plan Ready!")
 
-            # --- Render each section inside styled cards ---
+            # --- Split sections into cards ---
             sections = output.split("### ")
             for section in sections:
-                if section.strip():
-                    lines = section.split("\n", 1)
-                    heading = lines[0].strip()
-                    body = lines[1].strip() if len(lines) > 1 else ""
-                    st.markdown(
-                        f"""
-                        <div class="lesson-card">
-                            <h3>{heading}</h3>
-                            <p>{body.replace('-', '•')}</p>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                if not section.strip():
+                    continue
+                title, *content = section.split("\n", 1)
+                body = content[0] if content else ""
 
-            # --- Download as TXT ---
+                # Pick an emoji for known sections
+                emoji_map = {
+                    "Lesson title": "📘",
+                    "Learning outcomes": "🎯",
+                    "Starter activity": "🚀",
+                    "Main activity": "📖",
+                    "Plenary activity": "📝",
+                    "Resources needed": "📦",
+                    "Differentiation ideas": "🌈",
+                    "Assessment methods": "✅"
+                }
+                emoji = emoji_map.get(title.strip().lower(), "🔹")
+
+                # Display in card style
+                st.markdown(
+                    f"""
+                    <div style="background-color:#f9f9f9; padding:15px; 
+                                border-radius:10px; margin-bottom:15px; 
+                                box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <h4>{emoji} {title.strip()}</h4>
+                        <p>{body.strip().replace("\n", "<br>")}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            # --- Download as TXT (always available) ---
             st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
 
-            # --- Download as PDF ---
-            buffer = BytesIO()
-            doc = SimpleDocTemplate(buffer)
-            styles = getSampleStyleSheet()
-            story = []
+            # --- Download as PDF (only if reportlab is installed) ---
+            if pdf_enabled:
+                buffer = BytesIO()
+                doc = SimpleDocTemplate(buffer)
+                styles = getSampleStyleSheet()
+                story = []
 
-            for line in output.split("\n"):
-                if line.strip().startswith("###"):
-                    story.append(Paragraph(f"<b>{line.replace('###', '').strip()}</b>", styles["Heading3"]))
-                else:
-                    story.append(Paragraph(line, styles["Normal"]))
-                story.append(Spacer(1, 6))
+                for line in output.split("\n"):
+                    if line.strip().startswith("###"):
+                        story.append(Paragraph(f"<b>{line.replace('###', '').strip()}</b>", styles["Heading3"]))
+                    else:
+                        story.append(Paragraph(line, styles["Normal"]))
+                    story.append(Spacer(1, 6))
 
-            doc.build(story)
-            pdf_data = buffer.getvalue()
+                doc.build(story)
+                pdf_data = buffer.getvalue()
 
-            st.download_button(
-                "⬇ Download as PDF",
-                data=pdf_data,
-                file_name="lesson_plan.pdf",
-                mime="application/pdf"
+                st.download_button(
+                    "⬇ Download as PDF",
+                    data=pdf_data,
+                    file_name="lesson_plan.pdf",
+                    mime="application/pdf"
+                )
+            else:
+                st.info("📄 PDF export not available (install `reportlab` to enable).")
+
+            # --- Coming Soon Features ---
+            st.markdown("---")
+            st.markdown(
+                """
+                <div style="text-align: center; padding: 15px; 
+                            background-color: #eef6ff; 
+                            border-radius: 10px; margin-top: 20px;">
+                    <h4>✨ Coming Soon to LessonLift</h4>
+                    <p>Save all your lesson plans securely in your LessonLift account, 
+                    accessible anytime, anywhere.</p>
+                </div>
+                """,
+                unsafe_allow_html=True
             )
+
+            if st.button("💾 Save to My Account"):
+                st.info("🔒 Account saving is coming soon! For now, download as TXT or PDF.")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
