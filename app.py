@@ -9,8 +9,45 @@ col1, col2, col3 = st.columns([1,2,1])
 with col2:
     st.image("logo.png", width=200)
 
-# --- Force Light Mode ---
-st.markdown("""<style>...</style>""", unsafe_allow_html=True)  # Keep your CSS
+# --- Custom CSS for Professional Look ---
+st.markdown("""
+    <style>
+        /* Force light mode */
+        body {background-color: #ffffff; color: #111;}
+
+        /* Inputs styling */
+        .stTextInput>div>div>input, textarea, select {
+            background-color: #ffffff !important;
+            color: #111 !important;
+            border: 1px solid #ccc !important;
+            padding: 10px !important;
+            border-radius: 8px !important;
+        }
+
+        /* Card styling */
+        .stCard {
+            background-color: #fefefe !important;
+            color: #111 !important;
+            border-radius: 15px !important;
+            padding: 20px !important;
+            margin-bottom: 15px !important;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.12) !important;
+        }
+
+        /* Scrollable card */
+        .scroll-card {
+            max-height: 650px;
+            overflow-y: auto;
+        }
+
+        /* Headings inside Markdown */
+        .stCard h1 { font-size: 1.8em; margin-bottom: 10px; }
+        .stCard h2 { font-size: 1.5em; margin-top: 15px; margin-bottom: 8px; color: #222; }
+        .stCard h3 { font-size: 1.3em; margin-top: 12px; margin-bottom: 6px; color: #444; }
+        .stCard ul { margin-left: 20px; margin-bottom: 10px; }
+        .stCard li { margin-bottom: 6px; }
+    </style>
+""", unsafe_allow_html=True)
 
 # --- Sidebar: API Key ---
 st.sidebar.title("🔑 API Key Setup")
@@ -27,7 +64,7 @@ model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
-st.write("Easily generate **tailored UK primary school lesson plans** in seconds.")
+st.write("Generate **tailored UK primary school lesson plans** in seconds.")
 
 # --- Input Form ---
 with st.form("lesson_form"):
@@ -36,12 +73,12 @@ with st.form("lesson_form"):
     subject = st.text_input("Subject", placeholder="e.g. Maths, English, Science")
     topic = st.text_input("Topic", placeholder="e.g. Fractions, Plants, Persuasive Writing")
     learning_objective = st.text_area("Learning Objective (optional)", placeholder="Describe what pupils should learn...")
-    
-    # Suggest objective if blank
+
+    # Suggested objective if blank
     suggested_obj = ""
     if subject and topic and not learning_objective.strip():
         suggested_obj = f"Understand the key concepts of {topic} in {subject} for {year_group}."
-        st.info(f"Suggested Objective: *{suggested_obj}* (You can edit it if you want)")
+        st.info(f"Suggested Objective: *{suggested_obj}* (You can edit it)")
 
     ability_level = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
     lesson_duration = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
@@ -81,15 +118,22 @@ Provide:
             output = getattr(response, "text", None) or getattr(response, "output_text", None) or response.candidates[0].content
             output = output.strip()
 
+            # Save to session state
             if "plans" not in st.session_state:
                 st.session_state.plans = []
             st.session_state.plans.append(output)
 
             st.success("✅ Lesson Plan Ready!")
+
+            # Display latest lesson plan with Markdown inside scrollable card
             st.markdown(
-                f"<div class='stCard' style='max-height:600px; overflow-y:auto'>{output.replace(chr(10), '<br>')}</div>",
+                f"<div class='stCard scroll-card'>", 
                 unsafe_allow_html=True
             )
+            st.markdown(output)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            # Download buttons
             st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
             st.download_button("⬇ Download as Markdown", data=output, file_name="lesson_plan.md")
 
@@ -98,9 +142,10 @@ Provide:
                 st.subheader("📜 Previously Generated Plans")
                 for i, plan in enumerate(st.session_state.plans[:-1][::-1], start=1):
                     st.markdown(
-                        f"<div class='stCard' style='max-height:300px; overflow-y:auto'><b>Plan #{len(st.session_state.plans)-i}</b><br>{plan.replace(chr(10), '<br>')}</div>",
+                        f"<div class='stCard scroll-card' style='max-height:300px; padding:12px'><b>Plan #{len(st.session_state.plans)-i}</b></div>",
                         unsafe_allow_html=True
                     )
+                    st.markdown(plan)
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
