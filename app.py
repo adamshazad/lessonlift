@@ -1,5 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -14,8 +17,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- Force Light Mode ---
-st.markdown("""
+# --- Custom Styling ---
+st.markdown(
+    """
     <style>
         body {background-color: white; color: black;}
         .stTextInput>div>div>input, textarea, select {
@@ -25,13 +29,22 @@ st.markdown("""
             padding: 8px !important;
             border-radius: 5px !important;
         }
-        img {
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
+        .lesson-card {
+            background-color: #f9f9f9;
+            border-left: 6px solid #2E7D32; /* green accent */
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        .lesson-card h3 {
+            color: #1565C0; /* blue accent */
+            margin-top: 0;
         }
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
 # --- Sidebar: API Key ---
 st.sidebar.title("🔑 API Key Setup")
@@ -86,12 +99,58 @@ Provide:
 - Resources needed
 - Differentiation ideas
 - Assessment methods
+
+Format the output clearly with markdown headings (###) and bullet points.
 """
+
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
+
             st.success("✅ Lesson Plan Ready!")
-            st.text_area("Lesson Plan", value=output, height=500)
+
+            # --- Render each section inside styled cards ---
+            sections = output.split("### ")
+            for section in sections:
+                if section.strip():
+                    lines = section.split("\n", 1)
+                    heading = lines[0].strip()
+                    body = lines[1].strip() if len(lines) > 1 else ""
+                    st.markdown(
+                        f"""
+                        <div class="lesson-card">
+                            <h3>{heading}</h3>
+                            <p>{body.replace('-', '•')}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+            # --- Download as TXT ---
             st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
+
+            # --- Download as PDF ---
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer)
+            styles = getSampleStyleSheet()
+            story = []
+
+            for line in output.split("\n"):
+                if line.strip().startswith("###"):
+                    story.append(Paragraph(f"<b>{line.replace('###', '').strip()}</b>", styles["Heading3"]))
+                else:
+                    story.append(Paragraph(line, styles["Normal"]))
+                story.append(Spacer(1, 6))
+
+            doc.build(story)
+            pdf_data = buffer.getvalue()
+
+            st.download_button(
+                "⬇ Download as PDF",
+                data=pdf_data,
+                file_name="lesson_plan.pdf",
+                mime="application/pdf"
+            )
+
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
