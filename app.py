@@ -4,23 +4,17 @@ import google.generativeai as genai
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# --- Display Logo with subtle shadow and perfect centering ---
+# --- Display Logo perfectly centered with shadow ---
 col1, col2, col3 = st.columns([1, 1, 1])  # equal columns for centering
 with col2:
+    st.image("logo.png", width=200)  # transparent PNG displays correctly
     st.markdown("""
-        <div style="
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-            border-radius: 12px;
-            background-color: white;
-            width: fit-content;
-            margin: auto;
-        ">
-            <img src='logo.png' width='200'/>
-        </div>
+        <style>
+            div[data-testid="stImage"] img {
+                box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+                border-radius: 12px;
+            }
+        </style>
         """, unsafe_allow_html=True)
 
 # --- Force Light Mode ---
