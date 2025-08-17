@@ -4,12 +4,12 @@ import google.generativeai as genai
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# --- Display Logo (make sure the file is in the same GitHub repo folder as app.py) ---
+# --- Display Logo ---
 st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-st.image("20250721_234720958_iOS.png", width=200)  # replace with URL if needed
+st.image("logo.png", width=200)  # <- Make sure file is named logo.png and in GitHub repo
 st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Force Light Mode + Style ---
+# --- Force Light Mode ---
 st.markdown("""
     <style>
         body {background-color: white; color: black;}
@@ -24,6 +24,14 @@ st.markdown("""
             display: block;
             margin-left: auto;
             margin-right: auto;
+        }
+        .stCard {
+            background-color: #f9f9f9 !important;
+            color: black !important;
+            border-radius: 12px !important;
+            padding: 16px !important;
+            margin-bottom: 12px !important;
+            box-shadow: 0px 2px 5px rgba(0,0,0,0.1) !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -55,7 +63,7 @@ with st.form("lesson_form"):
     ability_level = st.selectbox("Ability Level", ["Mixed ability", "Lower ability", "Higher ability"])
     lesson_duration = st.selectbox("Lesson Duration", ["30 min", "45 min", "60 min"])
     sen_notes = st.text_area("SEN or EAL Notes (optional)", placeholder="Any special considerations...")
-
+    
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
 # --- Generate Plan ---
@@ -85,63 +93,11 @@ Provide:
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
-
             st.success("✅ Lesson Plan Ready!")
-
-            # --- Format into card-style sections ---
-            sections = output.split("\n\n")
-            for section in sections:
-                if ":" in section:
-                    title, body = section.split(":", 1)
-                else:
-                    title, body = "Section", section
-
-                # Emoji mapping for fun
-                emoji_map = {
-                    "Lesson title": "📖",
-                    "Learning outcomes": "🎯",
-                    "Starter activity": "🚀",
-                    "Main activity": "📝",
-                    "Plenary activity": "🎤",
-                    "Resources needed": "📦",
-                    "Differentiation ideas": "🌈",
-                    "Assessment methods": "✅"
-                }
-                emoji = emoji_map.get(title.lower().strip(), "📌")
-
-                st.markdown(
-                    f"""
-                    <div style="background-color:#f0f7ff; padding:15px; 
-                                border-radius:12px; margin-bottom:15px; 
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-                                color: #222; text-align:left;">
-                        <h4 style="color:#111;">{emoji} {title.strip()}</h4>
-                        <p style="color:#222;">{body.strip().replace("\n", "<br>")}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-            # --- Download buttons ---
+            
+            # Display lesson plan inside a styled card
+            st.markdown(f"<div class='stCard'>{output}</div>", unsafe_allow_html=True)
+            
             st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
-
-            # --- Coming Soon Banner ---
-            st.markdown("---")
-            st.markdown(
-                """
-                <div style="text-align: center; padding: 15px; 
-                            background-color: #eef6ff; 
-                            border-radius: 10px; margin-top: 20px;">
-                    <h4>✨ Coming Soon to LessonLift</h4>
-                    <p>Save all your lesson plans securely in your LessonLift account, 
-                    accessible anytime, anywhere.</p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            if st.button("💾 Save to My Account"):
-                st.info("🔒 Account saving is coming soon! For now, download as TXT.")
-
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
