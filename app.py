@@ -4,10 +4,10 @@ import google.generativeai as genai
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# --- Display Logo ---
+# --- Display Logo (supports transparent PNG) ---
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    st.image("logo.png", width=200)
+    st.image("logo.png", width=200, use_column_width=False)  # transparent logo stays clean
 
 # --- Force Light Mode ---
 st.markdown("""
