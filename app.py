@@ -5,9 +5,9 @@ import google.generativeai as genai
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # --- Display Logo ---
-st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-st.image("logo.png", width=200)  # <- Make sure file is named logo.png and in GitHub repo
-st.markdown("</div>", unsafe_allow_html=True)
+col1, col2, col3 = st.columns([1,2,1])  # creates 3 columns (middle one is wider)
+with col2:
+    st.image("logo.png", width=200)  # centered in the middle column
 
 # --- Force Light Mode ---
 st.markdown("""
