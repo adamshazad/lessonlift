@@ -5,12 +5,12 @@ with st.form("lesson_form"):
     subject = st.text_input("Subject", placeholder="e.g. Maths, English, Science")
     topic = st.text_input("Topic", placeholder="e.g. Fractions, Plants, Persuasive Writing")
     
-    # Optional: auto-suggest learning objective
     learning_objective = st.text_area(
         "Learning Objective (optional)",
         placeholder="Describe what pupils should learn..."
     )
     
+    # Auto-suggest objective if blank
     suggested_obj = ""
     if subject and topic and not learning_objective.strip():
         suggested_obj = f"Understand the key concepts of {topic} in {subject} for {year_group}."
@@ -23,7 +23,7 @@ with st.form("lesson_form"):
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
 
-# --- Generate Plan with auto-filled objective if blank ---
+# --- Generate Fully Adaptive Lesson Plan ---
 if submitted:
     with st.spinner("✨ Creating your lesson plan..."):
         learning_objective_clean = learning_objective.strip() or suggested_obj or "Not specified"
@@ -47,8 +47,8 @@ Provide:
 - Main activity
 - Plenary activity
 - Resources needed
-- Differentiation ideas
-- Assessment methods
+- Differentiation ideas (customized for ability level and SEN/EAL notes)
+- Assessment methods (tailored to the topic and lesson type)
 """
 
         try:
@@ -56,18 +56,24 @@ Provide:
             output = getattr(response, "text", None) or getattr(response, "output_text", None) or response.candidates[0].content
             output = output.strip()
 
+            # Store in session for history
             if "plans" not in st.session_state:
                 st.session_state.plans = []
             st.session_state.plans.append(output)
 
             st.success("✅ Lesson Plan Ready!")
+
+            # Display latest lesson plan
             st.markdown(
                 f"<div class='stCard' style='max-height:600px; overflow-y:auto'>{output.replace(chr(10), '<br>')}</div>",
                 unsafe_allow_html=True
             )
+
+            # Download buttons
             st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
             st.download_button("⬇ Download as Markdown", data=output, file_name="lesson_plan.md")
 
+            # Display previous plans
             if len(st.session_state.plans) > 1:
                 st.subheader("📜 Previously Generated Plans")
                 for i, plan in enumerate(st.session_state.plans[:-1][::-1], start=1):
