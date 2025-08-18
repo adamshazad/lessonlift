@@ -24,6 +24,7 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
+    white-space: pre-line; /* preserves line breaks */
 }
 .copy-btn {
     background-color:#4CAF50;
@@ -34,15 +35,14 @@ body {background-color: white; color: black;}
     cursor:pointer;
     margin-top:5px;
 }
-.stImage img {
-    max-width: 250px;  /* limit logo size */
-    width: 100%;
-    height: auto;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-    border-radius: 12px;
+.print-btn {
+    background-color:#2196F3;
+    color:white;
+    border:none;
+    padding:5px 10px;
+    border-radius:5px;
+    cursor:pointer;
+    margin-top:5px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -56,12 +56,8 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo (center + shadow, works on phone too) ---
-st.markdown("""
-<div class='stImage'>
-    <img src="logo.png" alt="LessonLift Logo">
-</div>
-""", unsafe_allow_html=True)
+# --- Logo (centered + shadow, works on laptop & phone) ---
+st.image("logo.png", use_column_width=False, width=250, caption=None)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -101,36 +97,42 @@ SEN/EAL Notes: {sen_notes or 'None'}
             output = response.text.strip()
             st.success("✅ Lesson Plan Ready!")
 
-            # Display in cards (with neat line-by-line formatting)
+            # Display in cards neatly
             sections = ["Lesson title", "Learning outcomes", "Starter activity", "Main activity", 
                         "Plenary activity", "Resources needed", "Differentiation ideas", "Assessment methods"]
+            
             for sec in sections:
-                start_idx = output.find(sec)
+                start_idx = output.lower().find(sec.lower())
                 if start_idx == -1:
                     continue
                 end_idx = len(output)
                 for next_sec in sections:
                     if next_sec == sec: 
                         continue
-                    next_idx = output.find(next_sec, start_idx + 1)
+                    next_idx = output.lower().find(next_sec.lower(), start_idx + 1)
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
                 section_text = output[start_idx:end_idx].strip()
-                # split sentences for readability
-                section_text = section_text.replace('. ', '.<br><br>')
-                st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
+                # Split into lines by sentence for neat formatting
+                lines = section_text.replace("•", "\n•").replace(".", ".\n").replace("\n\n","\n").strip()
+                st.markdown(f"<div class='stCard'>{lines}</div>", unsafe_allow_html=True)
 
             # Copy-to-clipboard button
             escaped_output = html.escape(output)
             st.markdown(f"""
-                <button class="copy-btn" onclick="navigator.clipboard.writeText('{escaped_output}')">
-                📋 Copy to Clipboard
+                <button class="copy-btn" onclick="navigator.clipboard.writeText(`{escaped_output}`)">
+                📋 Copy Lesson Plan
                 </button>
             """, unsafe_allow_html=True)
 
-            # Print button
+            # Print lesson plan button
             st.markdown(f"""
-                <button class="copy-btn" onclick="var w = window.open(); w.document.write('{escaped_output}'); w.document.close(); w.print();">
+                <button class="print-btn" onclick="
+                    var w = window.open();
+                    w.document.write(`<pre>{escaped_output}</pre>`);
+                    w.document.close();
+                    w.print();
+                ">
                 🖨 Print Lesson Plan
                 </button>
             """, unsafe_allow_html=True)
