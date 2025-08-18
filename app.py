@@ -54,8 +54,24 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo ---
-st.image("logo.png", width=200, output_format="PNG")  # <-- make sure the file is named exactly logo.png in the same folder
+# --- Logo with shadow and centered ---
+st.markdown("""
+<style>
+.logo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 10px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    background-color: white;
+}
+</style>
+<div class="logo-container">
+    <img src="logo.png" width="200">
+</div>
+""", unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
