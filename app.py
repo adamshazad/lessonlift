@@ -47,10 +47,7 @@ body {background-color: white; color: black; font-family: Arial, sans-serif;}
     max-height: 120px;
     object-fit: contain;
 }
-ul {
-    margin: 0;
-    padding-left: 20px;
-}
+ul {margin: 0; padding-left: 20px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -64,11 +61,11 @@ genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- Logo ---
-st.markdown("""
-<div class="logo-container">
-    <img src="logo.png" alt="LessonLift Logo">
-</div>
-""", unsafe_allow_html=True)
+# Make sure logo.png is in the same folder as app.py
+try:
+    st.image("logo.png", use_column_width=False, width=220, caption=None)
+except:
+    st.warning("Logo image not found. Make sure 'logo.png' is in the same folder as app.py.")
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -84,7 +81,6 @@ with st.form("lesson_form"):
     ability_level = st.selectbox("Ability Level", ["Mixed ability", "Lower ability", "Higher ability"])
     lesson_duration = st.selectbox("Lesson Duration", ["30 min", "45 min", "60 min"])
     sen_notes = st.text_area("SEN/EAL Notes (optional)")
-
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
 # --- Generate Lesson Plan ---
@@ -132,15 +128,11 @@ Format:
                         end_idx = min(end_idx, next_idx)
                 section_text = output[start_idx:end_idx].strip()
                 
-                # Clean symbols
                 clean_text = section_text.replace("**", "").replace("##", "").replace("_", "")
-                
-                # Split title and body
                 lines = clean_text.split("\n", 1)
                 title = lines[0].strip()
                 body = lines[1].strip() if len(lines) > 1 else ""
                 
-                # Split body into sentences for bullets
                 bullets = [f"<li>{b.strip().rstrip('.')}.</li>" for b in body.split(". ") if b.strip()]
                 bullets_html = "<ul>" + "".join(bullets) + "</ul>" if bullets else ""
                 
