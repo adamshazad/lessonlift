@@ -1,7 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import re
-from PIL import Image
+import base64
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -38,19 +38,24 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo (centered with shadow) ---
-try:
-    logo = Image.open("logo.png")  # Make sure 'logo.png' is in your app folder
-    st.markdown(
-        """
+# --- Function to show logo properly ---
+def show_logo(path, width=200):
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        b64 = base64.b64encode(data).decode()
+        st.markdown(f"""
         <div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
             <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
-        """, unsafe_allow_html=True
-    )
-    st.image(logo, width=200)
-    st.markdown("</div></div>", unsafe_allow_html=True)
-except FileNotFoundError:
-    st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
+                <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
+
+# Show logo
+show_logo("logo.png", width=200)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
