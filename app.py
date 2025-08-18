@@ -12,7 +12,7 @@ WATERMARK_COLOR = (200, 200, 200)
 
 # --- App UI ---
 st.set_page_config(page_title="LessonLift Ultra", page_icon="📘")
-st.title("📘 LessonLift Ultra - Sale-Ready Lesson Plan Generator")
+st.title("📘 LessonLift - AI Lesson Plan Generator")
 
 # Inputs
 subject = st.text_input("Subject")
