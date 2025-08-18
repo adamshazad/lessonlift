@@ -1,7 +1,5 @@
 import streamlit as st
 import google.generativeai as genai
-import html
-import re
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -66,11 +64,6 @@ with st.form("lesson_form"):
 
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-# --- Helper function to format sentences ---
-def format_sentences(text):
-    sentences = re.split(r'(?<=[.!?]) +', text)
-    return '\n'.join(f"** {s.strip()}" for s in sentences)
-
 # --- Generate and display lesson plan outside form ---
 if submitted:
     prompt = f"""
@@ -103,15 +96,13 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                     if next_idx != -1 and next_idx>start_idx:
                         end_idx = min(end_idx, next_idx)
                 section_text = output[start_idx:end_idx].strip()
-                section_text = format_sentences(section_text)
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
             # Full lesson plan in copyable text area
-            formatted_output = format_sentences(output)
-            st.text_area("Full Lesson Plan (copyable)", value=formatted_output, height=400)
+            st.text_area("Full Lesson Plan (copyable)", value=output, height=400)
 
             # Download button
-            st.download_button("⬇ Download as TXT", data=formatted_output, file_name="lesson_plan.txt")
+            st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
