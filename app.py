@@ -12,7 +12,7 @@ WATERMARK_COLOR = (200, 200, 200)
 
 # --- App UI ---
 st.set_page_config(page_title="LessonLift Ultra", page_icon="📘")
-st.title("📘 LessonLift - AI Lesson Plan Generator")
+st.title("📘 LessonLift Ultra - Sale-Ready Lesson Plan Generator")
 
 # Inputs
 subject = st.text_input("Subject")
@@ -68,13 +68,26 @@ if st.button("Generate Ultra Lesson Plan PDF"):
                     pdf.multi_cell(0, 8, f"• {line}")
             pdf.ln(3)
 
-        # --- Add Page ---
+        # --- Cover Page ---
+        pdf.add_page()
+        if logo_file:
+            pdf.image(logo_file, x=60, y=50, w=90)
+        pdf.set_y(160)
+        pdf.set_font("Arial", "B", 28)
+        pdf.set_text_color(*HEADER_COLOR)
+        pdf.cell(0, 15, f"{subject} - {topic}", align="C", ln=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(10)
+        pdf.set_font("Arial", "", 16)
+        pdf.multi_cell(0, 10, "LessonLift Ultra Professional Lesson Plan", align="C")
+
+        # --- Main Content Page ---
         pdf.add_page()
 
-        # Logo
+        # Logo in header if provided
         if logo_file:
-            pdf.image(logo_file, x=80, y=10, w=50)
-            pdf.ln(25)
+            pdf.image(logo_file, x=10, y=10, w=30)
+            pdf.ln(20)
 
         # Title
         pdf.set_font("Arial", "B", 18)
