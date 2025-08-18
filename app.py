@@ -19,14 +19,35 @@ body {background-color: white; color: black;}
     background-color: #f9f9f9 !important;
     color: black !important;
     border-radius: 12px !important;
-    padding: 16px !important;
+    padding: 12px !important;
     margin-bottom: 12px !important;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25) !important;
     line-height: 1.5em;
 }
-h2.section-title {
-    margin-top: 20px;
-    margin-bottom: 8px;
+.section-title {
+    font-weight: bold;
+    font-size: 18px;
+    margin-top: 12px;
+    margin-bottom: 6px;
+}
+.section-body {
+    font-size: 15px;
+    margin-left: 15px;
+}
+.logo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.logo-container img {
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    width: 200px;
+}
+ul {
+    margin: 0;
+    padding-left: 20px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -40,10 +61,12 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo (st.image version for reliability) ---
-st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
-st.image("logo.png", width=200)
-st.markdown("</div>", unsafe_allow_html=True)
+# --- Logo ---
+st.markdown("""
+<div class="logo-container">
+    <img src="logo.png">
+</div>
+""", unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -66,7 +89,7 @@ with st.form("lesson_form"):
 if submitted:
     with st.spinner("✨ Creating lesson plan..."):
         prompt = f"""
-Create a detailed UK primary school lesson plan with clearly separated sections and proper sentences:
+Create a detailed UK primary school lesson plan with clearly separated sections:
 
 Year Group: {year_group}
 Subject: {subject}
@@ -77,9 +100,10 @@ Lesson Duration: {lesson_duration}
 SEN/EAL Notes: {sen_notes or 'None'}
 
 Format:
-- Use clear section titles (Lesson title, Learning outcomes, Starter activity, Main activity, Plenary activity, Resources needed, Differentiation ideas, Assessment methods)
-- Under each section, write sentences as bullet points or short paragraphs.
-- Do not use markdown symbols like ** or ## in the text.
+- Use clear section titles: Lesson title, Learning outcomes, Starter activity, Main activity, Plenary activity, Resources needed, Differentiation ideas, Assessment methods
+- Under each section, write short sentences.
+- Format the body as bullet points (each sentence is a separate bullet).
+- Do not use markdown symbols like ** or ##.
 """
         try:
             response = model.generate_content(prompt)
@@ -105,15 +129,24 @@ Format:
                         end_idx = min(end_idx, next_idx)
                 section_text = output[start_idx:end_idx].strip()
                 
-                # Remove markdown symbols
+                # Remove unwanted markdown symbols
                 clean_text = section_text.replace("**", "").replace("##", "").replace("_", "")
                 
-                # Split first line as title
+                # Split title and body
                 lines = clean_text.split("\n", 1)
                 title = lines[0].strip()
                 body = lines[1].strip() if len(lines) > 1 else ""
                 
-                st.markdown(f"<div class='stCard'><h2 class='section-title'>{title}</h2>{body}</div>", unsafe_allow_html=True)
+                # Split body into sentences for bullets
+                bullets = [f"<li>{b.strip()}</li>" for b in body.split(". ") if b.strip()]
+                bullets_html = "<ul>" + "".join(bullets) + "</ul>" if bullets else ""
+                
+                st.markdown(f"""
+                    <div class='stCard'>
+                        <div class='section-title'>{title}</div>
+                        <div class='section-body'>{bullets_html}</div>
+                    </div>
+                """, unsafe_allow_html=True)
 
             # --- Full lesson plan textarea ---
             st.subheader("📋 Full Lesson Plan")
