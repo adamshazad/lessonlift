@@ -1,3 +1,2 @@
-fpdf2
-openai
 streamlit
+fpdf2
