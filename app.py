@@ -61,9 +61,34 @@ model = genai.GenerativeModel("gemini-1.5-flash-latest")
 # --- Logo ---
 from PIL import Image
 logo = Image.open("logo.png")
-st.markdown('<div class="logo-box">', unsafe_allow_html=True)
+
+st.markdown(
+    """
+    <div style="
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 20px;
+    ">
+        <div style="
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 10px;
+            background-color: white;
+        ">
+    """,
+    unsafe_allow_html=True
+)
+
 st.image(logo, width=200)
-st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown(
+    """
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
