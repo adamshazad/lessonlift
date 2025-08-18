@@ -7,33 +7,36 @@ st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered
 # --- Custom CSS ---
 st.markdown("""
 <style>
-body {background-color: white; color: black; font-family: Arial, sans-serif;}
+body {background-color: #ffffff; color: #111; font-family: Arial, sans-serif;}
 .stTextInput>div>div>input, textarea, select {
-    background-color: white !important;
-    color: black !important;
+    background-color: #ffffff !important;
+    color: #111 !important;
     border: 1px solid #ccc !important;
     padding: 8px !important;
     border-radius: 5px !important;
 }
 .stCard {
+    background-color: #fdfdfd !important;
+    border: 1px solid #eee !important;
     border-radius: 12px !important;
-    padding: 16px !important;
-    margin-bottom: 16px !important;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important;
+    padding: 18px !important;
+    margin-bottom: 18px !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important;
     line-height: 1.6em;
 }
-.stCard:nth-child(odd) { background-color: #f0f8ff !important; } /* AliceBlue */
-.stCard:nth-child(even) { background-color: #fffaf0 !important; } /* FloralWhite */
 .section-title {
     font-weight: bold;
-    font-size: 20px;
-    margin-top: 12px;
-    margin-bottom: 8px;
+    font-size: 17px;
+    margin-top: 8px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4px;
 }
 .section-body {
     font-size: 15px;
-    margin-left: 20px;
+    margin-left: 10px;
 }
+ul {margin: 0; padding-left: 20px; list-style-type: disc;}
 .logo-container {
     display: flex;
     justify-content: center;
@@ -43,11 +46,11 @@ body {background-color: white; color: black; font-family: Arial, sans-serif;}
 .logo-container img {
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-    max-width: 220px;
-    max-height: 120px;
+    max-width: 180px;
+    height: auto;
     object-fit: contain;
 }
-ul {margin: 0; padding-left: 20px;}
+textarea, .stTextArea>div>div>textarea {font-family: Arial, sans-serif;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -61,11 +64,11 @@ genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- Logo ---
-# Make sure logo.png is in the same folder as app.py
-try:
-    st.image("logo.png", use_column_width=False, width=220, caption=None)
-except:
-    st.warning("Logo image not found. Make sure 'logo.png' is in the same folder as app.py.")
+st.markdown("""
+<div class="logo-container">
+    <img src="logo.png">
+</div>
+""", unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -87,7 +90,7 @@ with st.form("lesson_form"):
 if submitted:
     with st.spinner("✨ Creating lesson plan..."):
         prompt = f"""
-Create a professional UK primary school lesson plan with clearly separated sections:
+Create a professional UK primary school lesson plan:
 
 Year Group: {year_group}
 Subject: {subject}
@@ -97,12 +100,13 @@ Ability Level: {ability_level}
 Lesson Duration: {lesson_duration}
 SEN/EAL Notes: {sen_notes or 'None'}
 
-Format:
+Format guidelines:
 - Section titles: Lesson title, Learning outcomes, Starter activity, Main activity, Plenary activity, Resources needed, Differentiation ideas, Assessment methods
-- Each section body should be concise sentences, formatted as bullet points
+- Learning outcomes: short paragraph
+- Activities (Starter/Main/Plenary), Resources, Differentiation, Assessment: bullet points
 - Each bullet should be one complete sentence ending with a period
-- No markdown symbols like ** or ##
-- Make the lesson plan clean, professional, and teacher-ready
+- No markdown symbols (** or ##)
+- Clean, professional, teacher-ready formatting
 """
         try:
             response = model.generate_content(prompt)
@@ -133,13 +137,17 @@ Format:
                 title = lines[0].strip()
                 body = lines[1].strip() if len(lines) > 1 else ""
                 
-                bullets = [f"<li>{b.strip().rstrip('.')}.</li>" for b in body.split(". ") if b.strip()]
-                bullets_html = "<ul>" + "".join(bullets) + "</ul>" if bullets else ""
+                # Different formatting for Learning Outcomes vs Activities
+                if title.lower() == "learning outcomes":
+                    body_html = f"<p>{body}</p>"
+                else:
+                    bullets = [f"<li>{b.strip().rstrip('.')}.</li>" for b in body.split(". ") if b.strip()]
+                    body_html = "<ul>" + "".join(bullets) + "</ul>" if bullets else ""
                 
                 st.markdown(f"""
                     <div class='stCard'>
                         <div class='section-title'>{title}</div>
-                        <div class='section-body'>{bullets_html}</div>
+                        <div class='section-body'>{body_html}</div>
                     </div>
                 """, unsafe_allow_html=True)
 
