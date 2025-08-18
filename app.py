@@ -62,9 +62,11 @@ genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- Logo with shadow and centered ---
-st.markdown('<div class="logo-shadow">', unsafe_allow_html=True)
-st.image("logo.png", width=200)
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown("""
+<div class="logo-shadow">
+    <img src="logo.png" width="200">
+</div>
+""", unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
