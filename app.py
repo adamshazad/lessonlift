@@ -1,63 +1,64 @@
 import streamlit as st
-from openai import OpenAI
+import openai
+from io import BytesIO
+from PIL import Image
 
-# --- Page Config ---
-st.set_page_config(page_title="LessonLift", page_icon="📚", layout="wide")
+# Set page configuration
+st.set_page_config(page_title="LessonLift", page_icon="📚")
 
-# --- Custom CSS ---
-st.markdown("""
-<style>
-.stCard {
-    background-color: #f9f9f9 !important;
-    color: black !important;
-    border-radius: 12px !important;
-    padding: 16px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
-    white-space: pre-wrap;
-}
-button {
-    margin-left: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
+# OpenAI API key
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# --- Logo ---
-st.markdown("""
-<div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px; box-shadow:0 4px 12px rgba(0,0,0,0.25); border-radius:20px; padding:10px;">
-    <img src="logo.png" style="max-width:200px; height:auto; display:block; margin:0 auto;">
-</div>
-""", unsafe_allow_html=True)
-
-# --- Lesson Plan Form ---
-with st.form("lesson_form"):
-    lesson_title = st.text_input("Lesson Title")
-    year_group = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
-    subject = st.selectbox("Subject", ["Maths","English","Science","History","Geography","Other"])
-    submitted = st.form_submit_button("Generate Lesson Plan")
-
-# --- OpenAI Client ---
-client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY"))
-
-# --- Generate Lesson Plan ---
-if submitted:
+# Function to generate lesson plan
+def generate_lesson_plan(topic):
+    prompt = f"Create a clear and concise lesson plan for: {topic}"
     try:
-        prompt = f"Create a detailed lesson plan for {lesson_title} for {year_group} in {subject} without using markdown symbols like ## or **."
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=1000
         )
-        lesson_plan = response.choices[0].message.content.strip()
-
-        # --- Display Lesson Plan ---
-        st.markdown(f"<div class='stCard'>{lesson_plan}</div>", unsafe_allow_html=True)
-
-        # --- Copy to Clipboard Button ---
-        st.markdown(f"""
-        <button onclick="navigator.clipboard.writeText(`{lesson_plan}`)">📋 Copy to Clipboard</button>
-        """, unsafe_allow_html=True)
-
+        lesson_plan = response['choices'][0]['message']['content'].strip()
+        return lesson_plan
     except Exception as e:
-        st.error(f"Error generating lesson plan: {e}")
+        return f"Error generating lesson plan: {e}"
+
+# --- Logo Section ---
+st.markdown(
+    """
+    <div style="text-align:center;">
+        <img src="logo.png" style="width:200px; box-shadow: 0px 4px 10px rgba(0,0,0,0.3); border-radius:10px;">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.title("LessonLift: AI Lesson Plan Generator")
+
+# --- Input Form ---
+with st.form("lesson_form"):
+    topic = st.text_input("Enter your lesson topic or title:")
+    col1, col2 = st.columns([1,1])
+    with col1:
+        submit = st.form_submit_button("📄 Generate Lesson Plan")
+    with col2:
+        retry = st.form_submit_button("🔄 Try Again")
+
+# --- Generate / Display Lesson Plan ---
+if submit or retry:
+    if not topic:
+        st.warning("Please enter a lesson topic first!")
+    else:
+        lesson_plan = generate_lesson_plan(topic)
+        # Remove extra ** or ## if they appear
+        lesson_plan = lesson_plan.replace("**", "").replace("##", "")
+        st.subheader("Generated Lesson Plan")
+        st.text_area("Lesson Plan", lesson_plan, height=400)
+
+        # Copy to clipboard button
+        st.markdown(
+            f"""
+            <button onclick="navigator.clipboard.writeText(`{lesson_plan}`)">📋 Copy to Clipboard</button>
+            """,
+            unsafe_allow_html=True
+        )
