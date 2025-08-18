@@ -20,8 +20,8 @@ body {background-color: white; color: black;}
     justify-content: center;
     align-items: center;
     margin-bottom: 20px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    border-radius: 20px;
     padding: 10px;
 }
 .stCard {
@@ -32,6 +32,7 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
+    white-space: pre-wrap;  /* preserve line breaks */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -46,7 +47,7 @@ genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- Logo ---
-st.image("logo.png", width=200)  # make sure logo.png is in the same folder
+st.markdown('<div class="logo-container"><img src="logo.png" width="200"></div>', unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -84,6 +85,10 @@ SEN/EAL Notes: {sen_notes or 'None'}
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
+
+            # Remove ## and ** automatically
+            output = output.replace("##", "").replace("**", "")
+
             st.success("✅ Lesson Plan Ready!")
 
             # Display in cards
@@ -102,7 +107,7 @@ SEN/EAL Notes: {sen_notes or 'None'}
                 section_text = output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # Native Streamlit copy-to-clipboard button
+            # Copy to clipboard via native Streamlit
             st.text_area("Copy Lesson Plan", value=output, height=300)
             st.button("📋 Copy All Text Above", on_click=lambda: st.experimental_set_query_params(copy="done"))
 
