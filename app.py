@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+import html
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -33,14 +34,6 @@ body {background-color: white; color: black;}
     cursor:pointer;
     margin-top:5px;
 }
-
-/* Center & shadow the Streamlit image element (works on desktop + mobile) */
-div[data-testid="stImage"] img {
-    display: block;
-    margin: 0 auto; /* centers the image */
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-    border-radius: 12px;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,10 +46,13 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo (centered with shadow) ---
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    st.image("logo.png", width=200)
+# --- Logo ---
+st.markdown("""
+<div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
+    <img src="logo.png" width="200" 
+         style="display:block; box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px;">
+</div>
+""", unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -113,9 +109,10 @@ SEN/EAL Notes: {sen_notes or 'None'}
                 section_text = output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # Copy-to-clipboard button
+            # ✅ Safe Copy Button using hidden textarea
             st.markdown(f"""
-                <button class="copy-btn" onclick="navigator.clipboard.writeText(`{output.replace('`','\\`')}`)">
+                <textarea id="lesson_text" style="display:none;">{html.escape(output)}</textarea>
+                <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('lesson_text').value)">
                 📋 Copy to Clipboard
                 </button>
             """, unsafe_allow_html=True)
