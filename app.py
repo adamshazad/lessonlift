@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import re
+from PIL import Image
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -37,13 +38,12 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo ---
-st.markdown("""
-<div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
-    <img src="logo.png" width="200" 
-         style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px;">
-</div>
-""", unsafe_allow_html=True)
+# --- Logo (st.image) ---
+try:
+    logo = Image.open("logo.png")
+    st.image(logo, width=200)
+except FileNotFoundError:
+    st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
