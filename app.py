@@ -24,6 +24,10 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
 }
+h2.section-title {
+    margin-top: 20px;
+    margin-bottom: 8px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -36,13 +40,10 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo ---
-st.markdown("""
-<div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
-    <img src="logo.png" width="200" 
-         style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px;">
-</div>
-""", unsafe_allow_html=True)
+# --- Logo (st.image version for reliability) ---
+st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+st.image("logo.png", width=200)
+st.markdown("</div>", unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -65,7 +66,7 @@ with st.form("lesson_form"):
 if submitted:
     with st.spinner("✨ Creating lesson plan..."):
         prompt = f"""
-Create a detailed UK primary school lesson plan:
+Create a detailed UK primary school lesson plan with clearly separated sections and proper sentences:
 
 Year Group: {year_group}
 Subject: {subject}
@@ -74,18 +75,23 @@ Learning Objective: {learning_objective or 'Not specified'}
 Ability Level: {ability_level}
 Lesson Duration: {lesson_duration}
 SEN/EAL Notes: {sen_notes or 'None'}
+
+Format:
+- Use clear section titles (Lesson title, Learning outcomes, Starter activity, Main activity, Plenary activity, Resources needed, Differentiation ideas, Assessment methods)
+- Under each section, write sentences as bullet points or short paragraphs.
+- Do not use markdown symbols like ** or ## in the text.
 """
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
             st.success("✅ Lesson Plan Ready!")
 
-            # --- Split into sections ---
+            # --- Sections ---
             sections = ["Lesson title", "Learning outcomes", "Starter activity", 
                         "Main activity", "Plenary activity", "Resources needed", 
                         "Differentiation ideas", "Assessment methods"]
-
             output_lower = output.lower()
+
             for sec in sections:
                 start_idx = output_lower.find(sec.lower())
                 if start_idx == -1:
@@ -98,10 +104,18 @@ SEN/EAL Notes: {sen_notes or 'None'}
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
                 section_text = output[start_idx:end_idx].strip()
-                # Render markdown inside card for headings and bold
-                st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
+                
+                # Remove markdown symbols
+                clean_text = section_text.replace("**", "").replace("##", "").replace("_", "")
+                
+                # Split first line as title
+                lines = clean_text.split("\n", 1)
+                title = lines[0].strip()
+                body = lines[1].strip() if len(lines) > 1 else ""
+                
+                st.markdown(f"<div class='stCard'><h2 class='section-title'>{title}</h2>{body}</div>", unsafe_allow_html=True)
 
-            # --- Full lesson plan text area ---
+            # --- Full lesson plan textarea ---
             st.subheader("📋 Full Lesson Plan")
             st.text_area("Lesson Plan", value=output, height=400, key="lesson_text")
 
