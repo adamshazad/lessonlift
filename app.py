@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-import html  # ✅ for escaping text safely
+import html
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -46,11 +46,11 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo (center + shadow, works on phone too) ---
+# --- Logo ---
 st.markdown("""
 <div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
     <img src="logo.png" width="200" 
-         style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px;">
+         style="display:block; box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px;">
 </div>
 """, unsafe_allow_html=True)
 
@@ -109,10 +109,10 @@ SEN/EAL Notes: {sen_notes or 'None'}
                 section_text = output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # ✅ Fixed Copy-to-clipboard button (no errors with quotes/backticks)
-            escaped_output = html.escape(output)
+            # ✅ Safe Copy Button using hidden textarea
             st.markdown(f"""
-                <button class="copy-btn" onclick="navigator.clipboard.writeText('{escaped_output}')">
+                <textarea id="lesson_text" style="display:none;">{html.escape(output)}</textarea>
+                <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('lesson_text').value)">
                 📋 Copy to Clipboard
                 </button>
             """, unsafe_allow_html=True)
