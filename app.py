@@ -1,25 +1,25 @@
 import streamlit as st
 import google.generativeai as genai
-from pathlib import Path
-import base64
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# --- Display Logo (centered and mobile-friendly) ---
-logo_path = Path(__file__).parent / "logo.png"
-if logo_path.exists():
-    encoded_logo = base64.b64encode(logo_path.read_bytes()).decode()
-    st.markdown(
-        f"""
-        <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 20px;">
-            <img src="data:image/png;base64,{encoded_logo}" width="200">
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-else:
-    st.warning("Logo not found. Make sure 'logo.png' is in the same folder as app.py.")
+# --- Display Logo with shadow and centered ---
+st.markdown("""
+    <style>
+        .logo-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .logo-container img {
+            width: 200px;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.2);
+            border-radius: 12px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown('<div class="logo-container"><img src="logo.png" alt="Logo"></div>', unsafe_allow_html=True)
 
 # --- Force Light Mode ---
 st.markdown("""
@@ -76,7 +76,7 @@ with st.form("lesson_form"):
     with col2:
         retry = st.form_submit_button("🔄 Try Again")
 
-# --- Generate Plan ---
+# --- Generate / Retry Plan ---
 if submitted or retry:
     with st.spinner("✨ Creating your lesson plan..."):
         prompt = f"""
@@ -99,23 +99,28 @@ Provide:
 - Resources needed
 - Differentiation ideas
 - Assessment methods
-Output it as plain text without any markdown symbols.
 """
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
             st.success("✅ Lesson Plan Ready!")
 
-            # Display lesson plan inside a styled card
-            st.markdown(f"<div class='stCard'>{output.replace('\n', '<br>')}</div>", unsafe_allow_html=True)
-            
-            # Download button
-            st.download_button("⬇ Download as TXT", data=output.encode("utf-8"), file_name="lesson_plan.txt")
-            
-            # Copy to clipboard button
-            st.markdown(f"""
-                <button onclick="navigator.clipboard.writeText(`{output}`)">📋 Copy to Clipboard</button>
-            """, unsafe_allow_html=True)
+            # Display lesson plan in a card
+            st.markdown(f"<div class='stCard'>{output}</div>", unsafe_allow_html=True)
+
+            # Text area for easy copy
+            st.subheader("Copy / Download")
+            st.text_area("Lesson Plan:", value=output, height=400, key="lesson_plan_area")
+
+            if st.button("📋 Copy to Clipboard"):
+                st.success("✅ The lesson plan is shown above. Select all the text and copy it (Ctrl+C / Cmd+C).")
+
+            st.download_button(
+                label="⬇ Download as TXT",
+                data=output,
+                file_name="lesson_plan.txt",
+                mime="text/plain"
+            )
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
