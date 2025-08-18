@@ -1,7 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
-import html
+import html  # for escaping text safely
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -35,17 +34,13 @@ body {background-color: white; color: black;}
     cursor:pointer;
     margin-top:5px;
 }
-.print-btn {
-    background-color:#4CAF50;
-    color:white;
-    border:none;
-    padding:5px 10px;
-    border-radius:5px;
-    cursor:pointer;
-    margin-top:5px;
-    margin-left:5px;
-}
 .stImage img {
+    max-width: 250px;  /* limit logo size */
+    width: 100%;
+    height: auto;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
     box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     border-radius: 12px;
 }
@@ -61,14 +56,12 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo (center + shadow) ---
-try:
-    logo = Image.open("logo.png")
-    st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
-    st.image(logo, width=200, use_column_width=False)
-    st.markdown("</div>", unsafe_allow_html=True)
-except Exception as e:
-    st.warning("⚠️ Logo not found! Make sure 'logo.png' is in the same folder as app.py")
+# --- Logo (center + shadow, works on phone too) ---
+st.markdown("""
+<div class='stImage'>
+    <img src="logo.png" alt="LessonLift Logo">
+</div>
+""", unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -108,43 +101,41 @@ SEN/EAL Notes: {sen_notes or 'None'}
             output = response.text.strip()
             st.success("✅ Lesson Plan Ready!")
 
-            # Display in cards with subtitles and sentences
+            # Display in cards (with neat line-by-line formatting)
             sections = ["Lesson title", "Learning outcomes", "Starter activity", "Main activity", 
-                        "Plenary activity", "Resources needed", "Differentiation ideas", "Assessment methods", "Homework"]
+                        "Plenary activity", "Resources needed", "Differentiation ideas", "Assessment methods"]
             for sec in sections:
-                start_idx = output.lower().find(sec.lower())
+                start_idx = output.find(sec)
                 if start_idx == -1:
                     continue
                 end_idx = len(output)
                 for next_sec in sections:
                     if next_sec == sec: 
                         continue
-                    next_idx = output.lower().find(next_sec.lower(), start_idx + 1)
+                    next_idx = output.find(next_sec, start_idx + 1)
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
                 section_text = output[start_idx:end_idx].strip()
-                # Replace markdown symbols like ** or ## with clean text
-                section_text = section_text.replace("**", "").replace("##", "")
-                # Put each sentence on a new line
-                section_text = ".\n".join([s.strip() for s in section_text.split(".") if s.strip()]) + "."
+                # split sentences for readability
+                section_text = section_text.replace('. ', '.<br><br>')
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # ✅ Copy to clipboard
+            # Copy-to-clipboard button
             escaped_output = html.escape(output)
             st.markdown(f"""
-                <button class="copy-btn" onclick="navigator.clipboard.writeText(`{escaped_output}`)">
+                <button class="copy-btn" onclick="navigator.clipboard.writeText('{escaped_output}')">
                 📋 Copy to Clipboard
                 </button>
             """, unsafe_allow_html=True)
 
-            # ✅ Print button
+            # Print button
             st.markdown(f"""
-                <button class="print-btn" onclick="var w = window.open(); w.document.write(`{escaped_output}`); w.document.close(); w.print();">
+                <button class="copy-btn" onclick="var w = window.open(); w.document.write('{escaped_output}'); w.document.close(); w.print();">
                 🖨 Print Lesson Plan
                 </button>
             """, unsafe_allow_html=True)
 
-            # ✅ Download button
+            # Download button
             st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
 
         except Exception as e:
