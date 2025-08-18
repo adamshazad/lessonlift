@@ -35,19 +35,16 @@ body {background-color: white; color: black;}
 }
 
 /* Logo shadow and centering */
-.logo-shadow {
+.logo-box {
     display: flex;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    border-radius: 12px;
-    padding: 10px;
-    background-color: white;
     margin-bottom: 20px;
 }
-.logo-shadow img {
-    display: block;
-    margin: 0 auto;
+.logo-box img {
+    width: 200px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border-radius: 12px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -61,10 +58,15 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo with shadow and centered ---
-st.markdown('<div style="display:flex; justify-content:center;">', unsafe_allow_html=True)
-st.image("logo.png", width=200)
-st.markdown('</div>', unsafe_allow_html=True)
+# --- Logo ---
+st.markdown(
+    """
+    <div class="logo-box">
+        <img src="logo.png" alt="LessonLift Logo">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
