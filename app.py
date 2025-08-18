@@ -66,16 +66,28 @@ st.markdown("""
     margin-bottom: 20px;
 }
 
-.logo-shadow img {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+st.markdown("""
+<style>
+/* existing CSS here... */
+
+.logo-shadow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     border-radius: 12px;
+    padding: 10px;
+    background-color: white;
+}
+.logo-shadow img {
+    display: block;
+    margin: 0 auto;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # --- Logo centered with shadow ---
-with st.container():
-    st.markdown('<div class="logo-shadow"><img src="logo.png" width="200"></div>', unsafe_allow_html=True)
+st.markdown('<div class="logo-shadow"><img src="logo.png" width="200"></div>', unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
