@@ -1,111 +1,87 @@
+# app.py
 import streamlit as st
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
 from io import BytesIO
-from datetime import date
+from fpdf import FPDF
+import openai
 
-# Page config
-st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
+# --- CONFIG ---
+st.set_page_config(page_title="LessonLift - AI Lesson Planner", page_icon="📚", layout="centered")
+st.markdown(
+    """
+    <style>
+    .stApp { background-color: #f0f8ff; }
+    .logo { width: 200px; display: block; margin-left: auto; margin-right: auto; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-# Logo display
-st.image("logo.png", width=200)  # Make sure logo.png is in the same folder
+# --- LOGO ---
+st.image("logo.png", use_column_width=False, width=200)  # Replace 'logo.png' with your file path
 
+# --- HEADER ---
 st.title("📚 LessonLift - AI Lesson Planner")
-st.write("Generate tailored UK primary school lesson plans in seconds!")
+st.write("Generate full UK primary school lesson plans in seconds!")
 
-# Lesson input form
+# --- USER INPUT ---
 with st.form("lesson_form"):
-    year_group = st.selectbox("Year Group", [f"Year {i}" for i in range(1, 7)])
+    year = st.selectbox("Year Group", [f"Year {i}" for i in range(1, 7)])
     subject = st.text_input("Subject")
     topic = st.text_input("Topic")
-    learning_objective = st.text_area("Learning Objective (optional)")
-    ability_level = st.selectbox("Ability Level", ["Mixed ability", "Lower ability", "Higher ability"])
-    lesson_duration = st.text_input("Lesson Duration", value="30 minutes")
-    sen_eal = st.text_area("SEN/EAL Notes (optional)")
-
+    duration = st.number_input("Lesson Duration (minutes)", min_value=10, max_value=120, value=30)
+    ability = st.selectbox("Ability Level", ["Mixed ability", "Lower ability", "Higher ability"])
+    sen_notes = st.text_area("SEN/EAL Notes (optional)")
     submitted = st.form_submit_button("Generate Lesson Plan")
 
+# --- AI GENERATION ---
 if submitted:
-    # Create PDF in memory
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+    if not subject or not topic:
+        st.warning("Please fill in both Subject and Topic fields.")
+    else:
+        with st.spinner("Generating lesson plan..."):
+            prompt = f"""
+Generate a detailed UK primary school lesson plan for {year} {subject} on the topic "{topic}".
+Include: 
+1. Learning Objective
+2. Starter Activity
+3. Teaching & Modelling (with time breakdown)
+4. Guided Practice
+5. Independent Practice
+6. Plenary
+7. Differentiation (lower and higher ability)
+8. Assessment
+9. Notes
+Use clear, structured markdown. Include {duration} minutes lesson duration. Ability level: {ability}. SEN/EAL Notes: {sen_notes or 'None'}.
+"""
+            try:
+                # Use your OpenAI API key
+                openai.api_key = "YOUR_OPENAI_API_KEY"
 
-    # Add Logo
-    try:
-        c.drawImage("logo.png", x=50, y=height-120, width=100, preserveAspectRatio=True, mask='auto')
-    except:
-        pass  # Logo missing is okay, will still generate PDF
+                response = openai.ChatCompletion.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                )
+                lesson_plan = response.choices[0].message.content
 
-    # Title
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(width/2, height-150, f"{year_group} {subject} Lesson Plan")
+                # --- DISPLAY LESSON PLAN ---
+                st.subheader("✅ Lesson Plan")
+                st.markdown(lesson_plan)
 
-    # Date
-    c.setFont("Helvetica", 10)
-    c.drawRightString(width-50, height-150, f"Date: {date.today().strftime('%d/%m/%Y')}")
+                # --- DOWNLOAD TXT ---
+                txt_bytes = lesson_plan.encode("utf-8")
+                st.download_button("📄 Download TXT", data=txt_bytes, file_name="lesson_plan.txt", mime="text/plain")
 
-    # Start Y position
-    y = height - 180
-    line_height = 16
+                # --- DOWNLOAD PDF ---
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", size=12)
+                for line in lesson_plan.split("\n"):
+                    pdf.multi_cell(0, 6, line)
+                pdf_bytes = BytesIO()
+                pdf.output(pdf_bytes)
+                pdf_bytes.seek(0)
+                st.download_button("📄 Download PDF", data=pdf_bytes, file_name="lesson_plan.pdf", mime="application/pdf")
 
-    # Lesson details dictionary
-    details = {
-        "Year Group": year_group,
-        "Subject": subject,
-        "Topic": topic,
-        "Learning Objective": learning_objective or "Not provided",
-        "Ability Level": ability_level,
-        "Lesson Duration": lesson_duration,
-        "SEN/EAL Notes": sen_eal or "None",
-    }
-
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "Lesson Details:")
-    y -= line_height
-
-    c.setFont("Helvetica", 11)
-    for k, v in details.items():
-        for line in v.split("\n"):
-            c.drawString(60, y, f"{k}: {line}")
-            y -= line_height
-        y -= 5  # extra spacing between fields
-
-    # Sections of the lesson plan
-    sections = [
-        ("Starter Activity", "Introduce the topic with engaging activity to activate prior knowledge."),
-        ("Teaching & Modelling", "Explain the key concepts and model activities with examples."),
-        ("Guided Practice", "Work with students to practice the new concepts together."),
-        ("Independent Practice", "Students complete tasks independently to consolidate learning."),
-        ("Plenary", "Review learning objectives and assess understanding."),
-        ("Differentiation", "Adjust activities to support all ability levels."),
-        ("Assessment", "Observe and record student understanding and participation."),
-    ]
-
-    c.setFont("Helvetica-Bold", 12)
-    for title, text in sections:
-        if y < 100:  # Create new page if low
-            c.showPage()
-            y = height - 50
-        c.drawString(50, y, f"{title}:")
-        y -= line_height
-        c.setFont("Helvetica", 11)
-        for line in text.split("\n"):
-            c.drawString(60, y, line)
-            y -= line_height
-        y -= 10
-        c.setFont("Helvetica-Bold", 12)
-
-    c.showPage()
-    c.save()
-
-    # Move buffer to start
-    buffer.seek(0)
-
-    st.success("✅ Lesson Plan PDF is ready!")
-    st.download_button(
-        label="📥 Download Lesson Plan",
-        data=buffer,
-        file_name=f"{year_group}_{subject}_LessonPlan.pdf",
-        mime="application/pdf"
-    )
+            except Exception as e:
+                st.error(f"Error generating lesson plan: {e}")
