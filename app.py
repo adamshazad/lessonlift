@@ -8,45 +8,44 @@ st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered
 # --- Custom CSS ---
 st.markdown("""
 <style>
-body {background-color: #ffffff; color: #000000; font-family: Arial, sans-serif;}
+body {background-color: white; color: black;}
 .stTextInput>div>div>input, textarea, select {
-    background-color: #ffffff !important;
-    color: #000 !important;
+    background-color: white !important;
+    color: black !important;
     border: 1px solid #ccc !important;
     padding: 8px !important;
     border-radius: 5px !important;
 }
 .stCard {
     background-color: #f9f9f9 !important;
-    color: #000 !important;
+    color: black !important;
     border-radius: 12px !important;
     padding: 16px !important;
     margin-bottom: 12px !important;
-    box-shadow: 0px 6px 20px rgba(0,0,0,0.25) !important;
-    line-height: 1.6em;
-}
-.section-title {
-    font-weight: bold;
-    font-size: 16px;
-    margin-bottom: 6px;
-}
-.section-body {
-    font-size: 14px;
+    box-shadow: 0px 4px 12px rgba(0,0,0,0.25) !important;
     line-height: 1.5em;
 }
+.copy-btn, .print-btn {
+    background-color:#4CAF50;
+    color:white;
+    border:none;
+    padding:8px 16px;
+    border-radius:5px;
+    cursor:pointer;
+    margin-top:5px;
+    font-size: 1em;
+}
 .logo-container {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 20px;
+    display:flex; 
+    justify-content:center; 
+    align-items:center; 
+    margin-bottom:20px;
 }
 .logo-container img {
-    width: 150px;
-    height: auto;
-    border-radius: 12px;
-    box-shadow: 0px 6px 20px rgba(0,0,0,0.25);
-}
-.button-container {
-    margin-top: 10px;
+    width: 250px; 
+    max-width: 80%;
+    border-radius:12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -63,15 +62,15 @@ model = genai.GenerativeModel("gemini-1.5-flash-latest")
 # --- Logo ---
 st.markdown("""
 <div class="logo-container">
-    <img src="logo.png" alt="Logo">
+    <img src="logo.png" alt="LessonLift Logo">
 </div>
 """, unsafe_allow_html=True)
 
-# --- App title ---
+# --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
-st.write("Generate professional UK primary school lesson plans in seconds!")
+st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# --- Lesson Form ---
+# --- Form ---
 with st.form("lesson_form"):
     st.subheader("Lesson Details")
     year_group = st.selectbox("Year Group", ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6"])
@@ -90,7 +89,7 @@ with st.form("lesson_form"):
 if submitted or try_again:
     with st.spinner("✨ Creating lesson plan..."):
         prompt = f"""
-Create a detailed UK primary school lesson plan:
+Create a detailed UK primary school lesson plan in a professional format.
 
 Year Group: {year_group}
 Subject: {subject}
@@ -99,73 +98,45 @@ Learning Objective: {learning_objective or 'Not specified'}
 Ability Level: {ability_level}
 Lesson Duration: {lesson_duration}
 SEN/EAL Notes: {sen_notes or 'None'}
+
+Format:
+- Use clear section titles: Lesson Title, Learning Outcomes, Starter Activity, Main Activity, Plenary Activity, Resources, Differentiation, Assessment, Homework.
+- Each sentence should be on a new line.
+- Avoid markdown symbols like ** or ##.
+- Make it neat, professional, and readable.
 """
         try:
             response = model.generate_content(prompt)
-            output = response.text.strip()
-
-            # --- Clean formatting ---
-            clean_output = output.replace("**", "").replace("##", "").replace("_", "")
-
+            lesson_text = response.text.strip()
             st.success("✅ Lesson Plan Ready!")
 
-            # --- Textarea for copy ---
-            st.text_area("Lesson Plan Text", value=clean_output, height=300, key="lesson_text")
-
-            # --- Sections ---
-            sections = ["Lesson title", "Learning outcomes", "Starter activity", 
-                        "Main activity", "Plenary activity", "Resources needed", 
-                        "Differentiation ideas", "Assessment methods"]
-            output_lower = clean_output.lower()
-
+            # Display sections in cards
+            sections = ["Lesson Title", "Learning Outcomes", "Starter Activity", "Main Activity", 
+                        "Plenary Activity", "Resources", "Differentiation", "Assessment", "Homework"]
             for sec in sections:
-                start_idx = output_lower.find(sec.lower())
+                start_idx = lesson_text.find(sec)
                 if start_idx == -1:
                     continue
-                end_idx = len(clean_output)
+                end_idx = len(lesson_text)
                 for next_sec in sections:
-                    if next_sec.lower() == sec.lower():
+                    if next_sec == sec: 
                         continue
-                    next_idx = output_lower.find(next_sec.lower(), start_idx + 1)
+                    next_idx = lesson_text.find(next_sec, start_idx + 1)
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
-                section_text = clean_output[start_idx:end_idx].strip()
+                section_text = lesson_text[start_idx:end_idx].strip()
+                st.markdown(f"<div class='stCard'>{section_text.replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
 
-                lines = section_text.split("\n", 1)
-                title = lines[0].strip()
-                body = lines[1].strip() if len(lines) > 1 else ""
-
-                sentences = [s.strip() + "." for s in body.split(". ") if s.strip()]
-                body_html = "<br>".join(sentences)
-
-                st.markdown(f"""
-                <div class='stCard'>
-                    <div class='section-title'>{title}</div>
-                    <div class='section-body'>{body_html}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            # --- Working Copy & Print buttons using Streamlit native features ---
-            st.markdown("""
-            <div class='button-container'>
-            """, unsafe_allow_html=True)
-
-            # Copy to clipboard via temporary text area
-            st.download_button("📋 Copy Lesson Plan", data=clean_output, file_name="lesson_plan.txt")
+            # Copy button (download)
+            st.download_button("📋 Copy Lesson Plan", data=lesson_text, file_name="lesson_plan.txt")
 
             # Print button using new tab
+            escaped_text = html.escape(lesson_text).replace("\n", "<br>")
             st.markdown(f"""
-            <button class="copy-btn" onclick="
-                var w = window.open();
-                w.document.write('<pre>{html.escape(clean_output)}</pre>');
-                w.document.close();
-                w.print();
-            ">
-            🖨 Print Lesson Plan
-            </button>
+            <a href="data:text/html;charset=utf-8,{escaped_text}" target="_blank">
+                <button class="print-btn">🖨 Print Lesson Plan</button>
+            </a>
             """, unsafe_allow_html=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
