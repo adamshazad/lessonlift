@@ -5,10 +5,10 @@ import html
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# --- Custom CSS ---
+# --- Custom CSS for professional look ---
 st.markdown("""
 <style>
-body {background-color: white; color: black;}
+body {background-color: #fefefe; color: #222; font-family: 'Arial', sans-serif;}
 .stTextInput>div>div>input, textarea, select {
     background-color: white !important;
     color: black !important;
@@ -17,33 +17,37 @@ body {background-color: white; color: black;}
     border-radius: 5px !important;
 }
 .stCard {
-    background-color: #f9f9f9 !important;
-    color: black !important;
+    background-color: #ffffff !important;
+    color: #222 !important;
     border-radius: 12px !important;
     padding: 16px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0px 4px 12px rgba(0,0,0,0.25) !important;
-    line-height: 1.5em;
+    margin-bottom: 14px !important;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.2) !important;
+    line-height: 1.6em;
 }
-.copy-btn, .print-btn {
-    background-color:#4CAF50;
+.copy-btn, .print-btn, .download-btn {
+    background-color:#28a745;
     color:white;
     border:none;
-    padding:8px 16px;
-    border-radius:5px;
+    padding:8px 18px;
+    border-radius:6px;
     cursor:pointer;
     margin-top:5px;
     font-size: 1em;
+    transition: 0.2s;
+}
+.copy-btn:hover, .print-btn:hover, .download-btn:hover {
+    background-color:#218838;
 }
 .logo-container {
     display:flex; 
     justify-content:center; 
     align-items:center; 
-    margin-bottom:20px;
+    margin-bottom:25px;
 }
 .logo-container img {
-    width: 250px; 
-    max-width: 80%;
+    width: 200px;
+    max-width: 60%;
     border-radius:12px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.25);
 }
@@ -100,18 +104,18 @@ Lesson Duration: {lesson_duration}
 SEN/EAL Notes: {sen_notes or 'None'}
 
 Format:
-- Use clear section titles: Lesson Title, Learning Outcomes, Starter Activity, Main Activity, Plenary Activity, Resources, Differentiation, Assessment, Homework.
-- Each sentence should be on a new line.
-- Avoid markdown symbols like ** or ##.
-- Make it neat, professional, and readable.
+- Clear section titles: Lesson Title, Learning Outcomes, Starter Activity, Main Activity, Plenary Activity, Resources, Differentiation, Assessment, Homework.
+- Each sentence on a new line.
+- No markdown symbols like ** or ##.
+- Professional, readable, neat.
 """
         try:
             response = model.generate_content(prompt)
             lesson_text = response.text.strip()
             st.success("✅ Lesson Plan Ready!")
 
-            # Display sections in cards
-            sections = ["Lesson Title", "Learning Outcomes", "Starter Activity", "Main Activity", 
+            # Display each section in professional cards
+            sections = ["Lesson Title", "Learning Outcomes", "Starter Activity", "Main Activity",
                         "Plenary Activity", "Resources", "Differentiation", "Assessment", "Homework"]
             for sec in sections:
                 start_idx = lesson_text.find(sec)
@@ -119,7 +123,7 @@ Format:
                     continue
                 end_idx = len(lesson_text)
                 for next_sec in sections:
-                    if next_sec == sec: 
+                    if next_sec == sec:
                         continue
                     next_idx = lesson_text.find(next_sec, start_idx + 1)
                     if next_idx != -1 and next_idx > start_idx:
@@ -127,10 +131,10 @@ Format:
                 section_text = lesson_text[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text.replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
 
-            # Copy button (download)
-            st.download_button("📋 Copy Lesson Plan", data=lesson_text, file_name="lesson_plan.txt")
+            # Download/Copy button
+            st.download_button("📋 Copy / Download Lesson Plan", data=lesson_text, file_name="lesson_plan.txt")
 
-            # Print button using new tab
+            # Print button
             escaped_text = html.escape(lesson_text).replace("\n", "<br>")
             st.markdown(f"""
             <a href="data:text/html;charset=utf-8,{escaped_text}" target="_blank">
