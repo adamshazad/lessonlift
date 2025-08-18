@@ -1,92 +1,127 @@
 import streamlit as st
-from fpdf import FPDF
-from io import BytesIO
+import google.generativeai as genai
 
-# App title
-st.set_page_config(page_title="LessonLift Ultimate", layout="centered")
-st.title("LessonLift Ultimate")
+# --- Page config ---
+st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# Sidebar inputs
-st.sidebar.header("Lesson Plan Details")
-lesson_title = st.sidebar.text_input("Lesson Title", "Sample Lesson")
-subject = st.sidebar.text_input("Subject", "Sample Subject")
-objectives = st.sidebar.text_area("Objectives", "List objectives here...")
-activities = st.sidebar.text_area("Activities", "Describe activities...")
-homework = st.sidebar.text_area("Homework", "Describe homework...")
+# --- Custom CSS ---
+st.markdown("""
+<style>
+body {background-color: white; color: black;}
+.stTextInput>div>div>input, textarea, select {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+    padding: 8px !important;
+    border-radius: 5px !important;
+}
+.stCard {
+    background-color: #f9f9f9 !important;
+    color: black !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
+    line-height: 1.5em;
+}
+.copy-btn {
+    background-color:#4CAF50;
+    color:white;
+    border:none;
+    padding:5px 10px;
+    border-radius:5px;
+    cursor:pointer;
+    margin-top:5px;
+}
 
-# Logo upload or default
-st.sidebar.header("Logo")
-logo_file = st.sidebar.file_uploader("Upload Logo (optional)", type=["png", "jpg", "jpeg"])
-use_default_logo = False
-if logo_file is None:
-    use_default_logo = True
-    # Default logo placeholder (simple base64 or fallback text)
-    default_logo_path = "logo.png"
+/* Center & shadow the Streamlit image element (works on desktop + mobile) */
+div[data-testid="stImage"] img {
+    display: block;
+    margin: 0 auto; /* centers the image */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    border-radius: 12px;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# Generate PDF
-def generate_pdf():
-    pdf = FPDF()
-    pdf.add_page()
+# --- Sidebar: API Key ---
+st.sidebar.title("🔑 API Key Setup")
+api_key = st.sidebar.text_input("Gemini API Key", type="password")
+if not api_key:
+    st.warning("Please enter your Gemini API key in the sidebar.")
+    st.stop()
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-    # Add logo
-    if use_default_logo:
+# --- Logo (centered with shadow) ---
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    st.image("logo.png", width=200)
+
+# --- App Title ---
+st.title("📚 LessonLift - AI Lesson Planner")
+st.write("Generate tailored UK primary school lesson plans in seconds!")
+
+# --- Form ---
+with st.form("lesson_form"):
+    st.subheader("Lesson Details")
+    year_group = st.selectbox("Year Group", ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6"])
+    subject = st.text_input("Subject")
+    topic = st.text_input("Topic")
+    learning_objective = st.text_area("Learning Objective (optional)")
+    ability_level = st.selectbox("Ability Level", ["Mixed ability", "Lower ability", "Higher ability"])
+    lesson_duration = st.selectbox("Lesson Duration", ["30 min", "45 min", "60 min"])
+    sen_notes = st.text_area("SEN/EAL Notes (optional)")
+
+    colA, colB = st.columns([1,1])
+    submitted = colA.form_submit_button("🚀 Generate Lesson Plan")
+    try_again = colB.form_submit_button("🔄 Try Again")
+
+# --- Generate Lesson Plan ---
+if submitted or try_again:
+    with st.spinner("✨ Creating lesson plan..."):
+        prompt = f"""
+Create a detailed UK primary school lesson plan:
+
+Year Group: {year_group}
+Subject: {subject}
+Topic: {topic}
+Learning Objective: {learning_objective or 'Not specified'}
+Ability Level: {ability_level}
+Lesson Duration: {lesson_duration}
+SEN/EAL Notes: {sen_notes or 'None'}
+"""
         try:
-            pdf.image(default_logo_path, x=10, y=8, w=40)
-        except Exception:
-            st.warning("Default logo not found, skipping logo.")
-    else:
-        logo_bytes = BytesIO(logo_file.read())
-        pdf.image(logo_bytes, x=10, y=8, w=40)
+            response = model.generate_content(prompt)
+            output = response.text.strip()
+            st.success("✅ Lesson Plan Ready!")
 
-    pdf.set_font("Arial", 'B', 16)
-    pdf.ln(25)
-    pdf.cell(0, 10, lesson_title, ln=True, align="C")
-    pdf.set_font("Arial", 'I', 12)
-    pdf.cell(0, 10, f"Subject: {subject}", ln=True, align="C")
-    pdf.ln(5)
+            # Display in cards
+            sections = ["Lesson title", "Learning outcomes", "Starter activity", "Main activity", 
+                        "Plenary activity", "Resources needed", "Differentiation ideas", "Assessment methods"]
+            for sec in sections:
+                start_idx = output.find(sec)
+                if start_idx == -1:
+                    continue
+                end_idx = len(output)
+                for next_sec in sections:
+                    if next_sec == sec: 
+                        continue
+                    next_idx = output.find(next_sec, start_idx + 1)
+                    if next_idx != -1 and next_idx > start_idx:
+                        end_idx = min(end_idx, next_idx)
+                section_text = output[start_idx:end_idx].strip()
+                st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 8, "Objectives:", ln=True)
-    pdf.set_font("Arial", '', 12)
-    for line in objectives.split("\n"):
-        pdf.multi_cell(0, 7, line)
+            # Copy-to-clipboard button
+            st.markdown(f"""
+                <button class="copy-btn" onclick="navigator.clipboard.writeText(`{output.replace('`','\\`')}`)">
+                📋 Copy to Clipboard
+                </button>
+            """, unsafe_allow_html=True)
 
-    pdf.ln(2)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 8, "Activities:", ln=True)
-    pdf.set_font("Arial", '', 12)
-    for line in activities.split("\n"):
-        pdf.multi_cell(0, 7, line)
+            # Download button
+            st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
 
-    pdf.ln(2)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 8, "Homework:", ln=True)
-    pdf.set_font("Arial", '', 12)
-    for line in homework.split("\n"):
-        pdf.multi_cell(0, 7, line)
-
-    # Watermark
-    pdf.set_font("Arial", 'B', 50)
-    pdf.set_text_color(200, 200, 200)
-    pdf.rotate(45, x=105, y=150)
-    pdf.text(20, 150, "LessonLift")
-    pdf.rotate(0)
-
-    pdf_output = BytesIO()
-    pdf.output(pdf_output)
-    pdf_output.seek(0)
-    return pdf_output
-
-# Generate TXT
-def generate_txt():
-    txt_content = f"Lesson Title: {lesson_title}\nSubject: {subject}\n\nObjectives:\n{objectives}\n\nActivities:\n{activities}\n\nHomework:\n{homework}"
-    return txt_content
-
-# Buttons
-if st.button("Generate Lesson Plan"):
-    pdf_file = generate_pdf()
-    txt_file = generate_txt()
-
-    st.success("Lesson Plan Ready!")
-    st.download_button("Download PDF", pdf_file, file_name=f"{lesson_title}.pdf", mime="application/pdf")
-    st.download_button("Download TXT", txt_file, file_name=f"{lesson_title}.txt", mime="text/plain")
+        except Exception as e:
+            st.error(f"Error generating lesson plan: {e}")
