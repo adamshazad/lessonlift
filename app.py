@@ -1,6 +1,5 @@
 import streamlit as st
 import google.generativeai as genai
-import html  # for escaping text safely
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -25,15 +24,6 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
 }
-.copy-btn {
-    background-color:#4CAF50;
-    color:white;
-    border:none;
-    padding:5px 10px;
-    border-radius:5px;
-    cursor:pointer;
-    margin-top:5px;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -47,7 +37,12 @@ genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- Logo ---
-st.image("logo.png", width=200)  # Works reliably on all devices
+st.markdown("""
+<div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
+    <img src="logo.png" width="200" 
+         style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px;">
+</div>
+""", unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -89,6 +84,7 @@ SEN/EAL Notes: {sen_notes or 'None'}
             sections = ["Lesson title", "Learning outcomes", "Starter activity", 
                         "Main activity", "Plenary activity", "Resources needed", 
                         "Differentiation ideas", "Assessment methods"]
+
             output_lower = output.lower()
             for sec in sections:
                 start_idx = output_lower.find(sec.lower())
@@ -102,7 +98,7 @@ SEN/EAL Notes: {sen_notes or 'None'}
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
                 section_text = output[start_idx:end_idx].strip()
-                # Display each section in a card
+                # Render markdown inside card for headings and bold
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
             # --- Full lesson plan text area ---
@@ -110,8 +106,12 @@ SEN/EAL Notes: {sen_notes or 'None'}
             st.text_area("Lesson Plan", value=output, height=400, key="lesson_text")
 
             # --- Download button ---
-            st.download_button("⬇ Copy / Download Lesson Plan", data=output, 
-                               file_name="lesson_plan.txt", mime="text/plain", encoding="utf-8")
+            st.download_button(
+                label="⬇ Copy / Download Lesson Plan",
+                data=output,
+                file_name="lesson_plan.txt",
+                mime="text/plain"
+            )
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
