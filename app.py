@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-import html
+import html  # for escaping text safely
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -47,12 +47,7 @@ genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- Logo ---
-st.markdown("""
-<div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
-    <img src="logo.png" width="200" 
-         style="display:block; box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px;">
-</div>
-""", unsafe_allow_html=True)
+st.image("logo.png", width=200)  # Works reliably on all devices
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -69,12 +64,10 @@ with st.form("lesson_form"):
     lesson_duration = st.selectbox("Lesson Duration", ["30 min", "45 min", "60 min"])
     sen_notes = st.text_area("SEN/EAL Notes (optional)")
 
-    colA, colB = st.columns([1,1])
-    submitted = colA.form_submit_button("🚀 Generate Lesson Plan")
-    try_again = colB.form_submit_button("🔄 Try Again")
+    submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
 # --- Generate Lesson Plan ---
-if submitted or try_again:
+if submitted:
     with st.spinner("✨ Creating lesson plan..."):
         prompt = f"""
 Create a detailed UK primary school lesson plan:
@@ -92,33 +85,33 @@ SEN/EAL Notes: {sen_notes or 'None'}
             output = response.text.strip()
             st.success("✅ Lesson Plan Ready!")
 
-            # Display in cards
-            sections = ["Lesson title", "Learning outcomes", "Starter activity", "Main activity", 
-                        "Plenary activity", "Resources needed", "Differentiation ideas", "Assessment methods"]
+            # --- Split into sections ---
+            sections = ["Lesson title", "Learning outcomes", "Starter activity", 
+                        "Main activity", "Plenary activity", "Resources needed", 
+                        "Differentiation ideas", "Assessment methods"]
+            output_lower = output.lower()
             for sec in sections:
-                start_idx = output.find(sec)
+                start_idx = output_lower.find(sec.lower())
                 if start_idx == -1:
                     continue
                 end_idx = len(output)
                 for next_sec in sections:
-                    if next_sec == sec: 
+                    if next_sec.lower() == sec.lower():
                         continue
-                    next_idx = output.find(next_sec, start_idx + 1)
+                    next_idx = output_lower.find(next_sec.lower(), start_idx + 1)
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
                 section_text = output[start_idx:end_idx].strip()
+                # Display each section in a card
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # ✅ Safe Copy Button using hidden textarea
-            st.markdown(f"""
-                <textarea id="lesson_text" style="display:none;">{html.escape(output)}</textarea>
-                <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('lesson_text').value)">
-                📋 Copy to Clipboard
-                </button>
-            """, unsafe_allow_html=True)
+            # --- Full lesson plan text area ---
+            st.subheader("📋 Full Lesson Plan")
+            st.text_area("Lesson Plan", value=output, height=400, key="lesson_text")
 
-            # Download button
-            st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
+            # --- Download button ---
+            st.download_button("⬇ Copy / Download Lesson Plan", data=output, 
+                               file_name="lesson_plan.txt", mime="text/plain", encoding="utf-8")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
