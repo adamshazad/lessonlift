@@ -4,24 +4,7 @@ import google.generativeai as genai
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# --- Display Logo with shadow and centered ---
-st.markdown("""
-    <style>
-        .logo-container {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .logo-container img {
-            width: 200px;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.2);
-            border-radius: 12px;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown('<div class="logo-container"><img src="logo.png" alt="Logo"></div>', unsafe_allow_html=True)
-
-# --- Force Light Mode ---
+# --- Force Light Mode & Custom Styles ---
 st.markdown("""
     <style>
         body {background-color: white; color: black;}
@@ -32,13 +15,32 @@ st.markdown("""
             padding: 8px !important;
             border-radius: 5px !important;
         }
+        .logo-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 10px;
+        }
         .stCard {
             background-color: #f9f9f9 !important;
             color: black !important;
             border-radius: 12px !important;
             padding: 16px !important;
             margin-bottom: 12px !important;
-            box-shadow: 0px 2px 5px rgba(0,0,0,0.1) !important;
+            box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
+            line-height: 1.5em;
+        }
+        .copy-btn {
+            background-color:#4CAF50;
+            color:white;
+            border:none;
+            padding:5px 10px;
+            border-radius:5px;
+            cursor:pointer;
+            margin-top:5px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -47,6 +49,7 @@ st.markdown("""
 st.sidebar.title("🔑 API Key Setup")
 st.sidebar.write("Enter your **Gemini API key** below to start generating lesson plans.")
 api_key = st.sidebar.text_input("Gemini API Key", type="password")
+
 if not api_key:
     st.warning("Please enter your Gemini API key in the sidebar.")
     st.stop()
@@ -54,6 +57,9 @@ if not api_key:
 # --- Configure Gemini ---
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
+
+# --- Display Logo ---
+st.markdown('<div class="logo-container"><img src="logo.png" width="200"></div>', unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -69,15 +75,13 @@ with st.form("lesson_form"):
     ability_level = st.selectbox("Ability Level", ["Mixed ability", "Lower ability", "Higher ability"])
     lesson_duration = st.selectbox("Lesson Duration", ["30 min", "45 min", "60 min"])
     sen_notes = st.text_area("SEN or EAL Notes (optional)", placeholder="Any special considerations...")
-
+    
     col1, col2 = st.columns([1,1])
-    with col1:
-        submitted = st.form_submit_button("🚀 Generate Lesson Plan")
-    with col2:
-        retry = st.form_submit_button("🔄 Try Again")
+    submitted = col1.form_submit_button("🚀 Generate Lesson Plan")
+    try_again = col2.form_submit_button("🔄 Try Again")
 
-# --- Generate / Retry Plan ---
-if submitted or retry:
+# --- Generate or Retry Plan ---
+if submitted or try_again:
     with st.spinner("✨ Creating your lesson plan..."):
         prompt = f"""
 Create a detailed UK primary school lesson plan based on this info:
@@ -103,24 +107,37 @@ Provide:
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
+
             st.success("✅ Lesson Plan Ready!")
 
-            # Display lesson plan in a card
-            st.markdown(f"<div class='stCard'>{output}</div>", unsafe_allow_html=True)
+            # Split output by section headers
+            sections = ["Lesson title", "Learning outcomes", "Starter activity", "Main activity", "Plenary activity",
+                        "Resources needed", "Differentiation ideas", "Assessment methods"]
 
-            # Text area for easy copy
-            st.subheader("Copy / Download")
-            st.text_area("Lesson Plan:", value=output, height=400, key="lesson_plan_area")
+            # Display each section in its own card
+            for sec in sections:
+                start_idx = output.find(sec)
+                if start_idx == -1:
+                    continue
+                end_idx = len(output)
+                for next_sec in sections:
+                    if next_sec == sec:
+                        continue
+                    next_idx = output.find(next_sec, start_idx + 1)
+                    if next_idx != -1 and next_idx > start_idx:
+                        end_idx = min(end_idx, next_idx)
+                section_text = output[start_idx:end_idx].strip()
+                st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            if st.button("📋 Copy to Clipboard"):
-                st.success("✅ The lesson plan is shown above. Select all the text and copy it (Ctrl+C / Cmd+C).")
+            # Copy to clipboard button
+            st.markdown(f"""
+                <button class="copy-btn" onclick="navigator.clipboard.writeText(`{output.replace('`','\\`')}`)">
+                📋 Copy to Clipboard
+                </button>
+            """, unsafe_allow_html=True)
 
-            st.download_button(
-                label="⬇ Download as TXT",
-                data=output,
-                file_name="lesson_plan.txt",
-                mime="text/plain"
-            )
+            # Download button
+            st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
