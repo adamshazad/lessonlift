@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+import re
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -48,6 +49,13 @@ st.markdown("""
 st.title("📚 LessonLift - AI Lesson Planner")
 st.write("Generate tailored UK primary school lesson plans in seconds!")
 
+# --- Helper to strip Markdown ---
+def strip_markdown(md_text):
+    text = re.sub(r'#+\s*', '', md_text)           # Remove headings
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Remove bold
+    text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italics
+    return text
+
 # --- Form for lesson details ---
 submitted = False
 lesson_data = {}
@@ -81,28 +89,30 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
+            clean_output = strip_markdown(output)  # Remove ** and ##
+
             st.success("✅ Lesson Plan Ready!")
 
             # Display sections in cards
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
                         "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
             for sec in sections:
-                start_idx = output.find(sec)
+                start_idx = clean_output.find(sec)
                 if start_idx == -1: continue
-                end_idx = len(output)
+                end_idx = len(clean_output)
                 for next_sec in sections:
                     if next_sec==sec: continue
-                    next_idx = output.find(next_sec, start_idx+1)
+                    next_idx = clean_output.find(next_sec, start_idx+1)
                     if next_idx != -1 and next_idx>start_idx:
                         end_idx = min(end_idx, next_idx)
-                section_text = output[start_idx:end_idx].strip()
+                section_text = clean_output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
             # Full lesson plan in copyable text area
-            st.text_area("Full Lesson Plan (copyable)", value=output, height=400)
+            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
             # Download button
-            st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
+            st.download_button("⬇ Download as TXT", data=clean_output, file_name="lesson_plan.txt")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
