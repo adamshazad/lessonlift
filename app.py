@@ -34,16 +34,11 @@ body {background-color: white; color: black;}
     margin-top:5px;
 }
 
-/* Logo shadow and centering */
-.logo-box {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 20px;
-}
-.logo-box img {
-    width: 200px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+/* Center & shadow the Streamlit image element (works on desktop + mobile) */
+div[data-testid="stImage"] img {
+    display: block;
+    margin: 0 auto; /* centers the image */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     border-radius: 12px;
 }
 </style>
@@ -58,37 +53,10 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo ---
-from PIL import Image
-logo = Image.open("logo.png")
-
-st.markdown(
-    """
-    <div style="
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 20px;
-    ">
-        <div style="
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            border-radius: 12px;
-            padding: 10px;
-            background-color: white;
-        ">
-    """,
-    unsafe_allow_html=True
-)
-
-st.image(logo, width=200)
-
-st.markdown(
-    """
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# --- Logo (centered with shadow) ---
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    st.image("logo.png", width=200)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -105,9 +73,9 @@ with st.form("lesson_form"):
     lesson_duration = st.selectbox("Lesson Duration", ["30 min", "45 min", "60 min"])
     sen_notes = st.text_area("SEN/EAL Notes (optional)")
 
-    col1, col2 = st.columns([1,1])
-    submitted = col1.form_submit_button("🚀 Generate Lesson Plan")
-    try_again = col2.form_submit_button("🔄 Try Again")
+    colA, colB = st.columns([1,1])
+    submitted = colA.form_submit_button("🚀 Generate Lesson Plan")
+    try_again = colB.form_submit_button("🔄 Try Again")
 
 # --- Generate Lesson Plan ---
 if submitted or try_again:
@@ -137,7 +105,8 @@ SEN/EAL Notes: {sen_notes or 'None'}
                     continue
                 end_idx = len(output)
                 for next_sec in sections:
-                    if next_sec == sec: continue
+                    if next_sec == sec: 
+                        continue
                     next_idx = output.find(next_sec, start_idx + 1)
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
