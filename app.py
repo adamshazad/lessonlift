@@ -54,24 +54,28 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo with shadow and centered ---
+import streamlit as st
+
+# --- Custom CSS for shadow ---
 st.markdown("""
 <style>
-.logo-container {
+.logo-shadow {
     display: flex;
     justify-content: center;
     align-items: center;
     margin-bottom: 20px;
-    padding: 10px;
-    border-radius: 12px;
+}
+
+.logo-shadow img {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-    background-color: white;
+    border-radius: 12px;
 }
 </style>
-<div class="logo-container">
-    <img src="logo.png" width="200">
-</div>
 """, unsafe_allow_html=True)
+
+# --- Logo centered with shadow ---
+with st.container():
+    st.markdown('<div class="logo-shadow"><img src="logo.png" width="200"></div>', unsafe_allow_html=True)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
