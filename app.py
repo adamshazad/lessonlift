@@ -15,15 +15,6 @@ body {background-color: white; color: black;}
     padding: 8px !important;
     border-radius: 5px !important;
 }
-.logo-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    border-radius: 12px;
-    padding: 10px;
-}
 .stCard {
     background-color: #f9f9f9 !important;
     color: black !important;
@@ -42,6 +33,22 @@ body {background-color: white; color: black;}
     cursor:pointer;
     margin-top:5px;
 }
+
+/* Logo shadow and centering */
+.logo-shadow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border-radius: 12px;
+    padding: 10px;
+    background-color: white;
+    margin-bottom: 20px;
+}
+.logo-shadow img {
+    display: block;
+    margin: 0 auto;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,39 +61,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-import streamlit as st
-
-# --- Custom CSS for shadow ---
-st.markdown("""
-<style>
-.logo-shadow {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-st.markdown("""
-<style>
-/* existing CSS here... */
-
-.logo-shadow {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    border-radius: 12px;
-    padding: 10px;
-    background-color: white;
-}
-.logo-shadow img {
-    display: block;
-    margin: 0 auto;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# --- Logo centered with shadow ---
+# --- Logo ---
 st.markdown('<div class="logo-shadow"><img src="logo.png" width="200"></div>', unsafe_allow_html=True)
 
 # --- App Title ---
@@ -150,6 +125,7 @@ SEN/EAL Notes: {sen_notes or 'None'}
                 </button>
             """, unsafe_allow_html=True)
 
+            # Download button
             st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
 
         except Exception as e:
