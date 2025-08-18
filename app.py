@@ -23,20 +23,8 @@ body {background-color: #ffffff; color: #000000; font-family: Arial, sans-serif;
     border-radius: 12px !important;
     padding: 16px !important;
     margin-bottom: 12px !important;
-    box-shadow: 0px 4px 20px rgba(0,0,0,0.25) !important;
+    box-shadow: 0px 6px 20px rgba(0,0,0,0.25) !important;
     line-height: 1.6em;
-    transition: transform 0.2s;
-}
-.stCard:hover { transform: translateY(-3px); }
-.copy-btn, .print-btn {
-    background-color:#4CAF50;
-    color:white;
-    border:none;
-    padding:6px 12px;
-    border-radius:5px;
-    cursor:pointer;
-    margin-top:5px;
-    margin-right:5px;
 }
 .section-title {
     font-weight: bold;
@@ -47,15 +35,24 @@ body {background-color: #ffffff; color: #000000; font-family: Arial, sans-serif;
     font-size: 14px;
     line-height: 1.5em;
 }
+.copy-btn, .print-btn {
+    background-color:#4CAF50;
+    color:white;
+    border:none;
+    padding:6px 12px;
+    border-radius:5px;
+    cursor:pointer;
+    margin-top:5px;
+    margin-right:5px;
+}
 img.logo {
-    box-shadow: 0px 6px 20px rgba(0,0,0,0.25);
-    border-radius: 12px;
     display:block;
     margin-left:auto;
     margin-right:auto;
-}
-details summary {
-    cursor: pointer;
+    width:200px;
+    height:auto;
+    box-shadow: 0px 6px 20px rgba(0,0,0,0.25);
+    border-radius: 12px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -71,7 +68,7 @@ model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- Logo ---
 try:
-    st.image("logo.png", width=200, use_column_width=False, output_format="PNG")
+    st.image("logo.png", use_column_width=False, width=200, output_format="PNG")
 except FileNotFoundError:
     st.warning("Logo not found. Place 'logo.png' in the app folder.")
 
@@ -111,52 +108,49 @@ SEN/EAL Notes: {sen_notes or 'None'}
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
+
+            # --- Clean formatting ---
+            clean_output = output.replace("**", "").replace("##", "").replace("_", "")
+
             st.success("✅ Lesson Plan Ready!")
 
             # --- Textarea for copy ---
-            st.text_area("Lesson Plan Text", value=output, height=300, key="lesson_text")
+            st.text_area("Lesson Plan Text", value=clean_output, height=300, key="lesson_text")
 
             # --- Sections ---
             sections = ["Lesson title", "Learning outcomes", "Starter activity", 
                         "Main activity", "Plenary activity", "Resources needed", 
                         "Differentiation ideas", "Assessment methods"]
-            output_lower = output.lower()
+            output_lower = clean_output.lower()
 
             for sec in sections:
                 start_idx = output_lower.find(sec.lower())
                 if start_idx == -1:
                     continue
-                end_idx = len(output)
+                end_idx = len(clean_output)
                 for next_sec in sections:
                     if next_sec.lower() == sec.lower():
                         continue
                     next_idx = output_lower.find(next_sec.lower(), start_idx + 1)
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
-                section_text = output[start_idx:end_idx].strip()
+                section_text = clean_output[start_idx:end_idx].strip()
 
-                clean_text = section_text.replace("**", "").replace("##", "").replace("_", "")
-                lines = clean_text.split("\n", 1)
+                lines = section_text.split("\n", 1)
                 title = lines[0].strip()
                 body = lines[1].strip() if len(lines) > 1 else ""
 
-                # Format activities with numbers for clarity
-                if title.lower() in ["starter activity", "main activity", "plenary activity"]:
-                    steps = [f"{i+1}. {s.strip().rstrip('.')}" for i, s in enumerate(body.split(". ")) if s.strip()]
-                    body_html = "<br>".join(steps)
-                else:
-                    sentences = [s.strip() + "." for s in body.split(". ") if s.strip()]
-                    body_html = "<br>".join(sentences)
+                sentences = [s.strip() + "." for s in body.split(". ") if s.strip()]
+                body_html = "<br>".join(sentences)
 
-                # --- Collapsible section ---
                 st.markdown(f"""
-                <details class='stCard'>
-                    <summary class='section-title'>{title}</summary>
+                <div class='stCard'>
+                    <div class='section-title'>{title}</div>
                     <div class='section-body'>{body_html}</div>
-                </details>
+                </div>
                 """, unsafe_allow_html=True)
 
-            # --- Copy & Print buttons ---
+            # --- Working Copy & Print buttons ---
             st.markdown("""
             <div>
                 <button class="copy-btn" onclick="
@@ -166,14 +160,20 @@ SEN/EAL Notes: {sen_notes or 'None'}
                 ">
                 📋 Copy to Clipboard
                 </button>
-                <button class="print-btn" onclick="window.print()">
+                <button class="print-btn" onclick="
+                var printContents = document.querySelector('#lesson_text textarea').value;
+                var w = window.open();
+                w.document.write('<pre>' + printContents + '</pre>');
+                w.print();
+                w.close();
+                ">
                 🖨 Print Lesson Plan
                 </button>
             </div>
             """, unsafe_allow_html=True)
 
             # --- Download button ---
-            st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
+            st.download_button("⬇ Download as TXT", data=clean_output, file_name="lesson_plan.txt")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
