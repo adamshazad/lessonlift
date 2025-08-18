@@ -5,7 +5,7 @@ import html
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# --- Custom CSS ---
+# --- CSS ---
 st.markdown("""
 <style>
 body {background-color: white; color: black;}
@@ -37,7 +37,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo (centered with shadow) ---
+# --- Logo ---
 st.markdown("""
 <div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
     <img src="logo.png" width="200" 
@@ -49,65 +49,61 @@ st.markdown("""
 st.title("📚 LessonLift - AI Lesson Planner")
 st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# --- Form ---
+# --- Form for lesson details ---
 submitted = False
-try_again = False
+lesson_data = {}
 
 with st.form("lesson_form"):
     st.subheader("Lesson Details")
-    year_group = st.selectbox("Year Group", ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6"])
-    subject = st.text_input("Subject")
-    topic = st.text_input("Topic")
-    learning_objective = st.text_area("Learning Objective (optional)")
-    ability_level = st.selectbox("Ability Level", ["Mixed ability", "Lower ability", "Higher ability"])
-    lesson_duration = st.selectbox("Lesson Duration", ["30 min", "45 min", "60 min"])
-    sen_notes = st.text_area("SEN/EAL Notes (optional)")
+    lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
+    lesson_data['subject'] = st.text_input("Subject")
+    lesson_data['topic'] = st.text_input("Topic")
+    lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)")
+    lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
+    lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
+    lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)")
 
-    colA, colB = st.columns([1,1])
-    submitted = colA.form_submit_button("🚀 Generate Lesson Plan")
-    try_again = colB.form_submit_button("🔄 Try Again")
+    submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-    # --- Generate Lesson Plan ---
-    if submitted or try_again:
-        prompt = f"""
+# --- Generate and display lesson plan outside form ---
+if submitted:
+    prompt = f"""
 Create a detailed UK primary school lesson plan:
 
-Year Group: {year_group}
-Subject: {subject}
-Topic: {topic}
-Learning Objective: {learning_objective or 'Not specified'}
-Ability Level: {ability_level}
-Lesson Duration: {lesson_duration}
-SEN/EAL Notes: {sen_notes or 'None'}
+Year Group: {lesson_data['year_group']}
+Subject: {lesson_data['subject']}
+Topic: {lesson_data['topic']}
+Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
+Ability Level: {lesson_data['ability_level']}
+Lesson Duration: {lesson_data['lesson_duration']}
+SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
-        with st.spinner("✨ Creating lesson plan..."):
-            try:
-                response = model.generate_content(prompt)
-                output = response.text.strip()
-                st.success("✅ Lesson Plan Ready!")
+    with st.spinner("✨ Creating lesson plan..."):
+        try:
+            response = model.generate_content(prompt)
+            output = response.text.strip()
+            st.success("✅ Lesson Plan Ready!")
 
-                # Display sections in cards
-                sections = ["Lesson title", "Learning outcomes", "Starter activity", "Main activity", 
-                            "Plenary activity", "Resources needed", "Differentiation ideas", "Assessment methods"]
-                for sec in sections:
-                    start_idx = output.find(sec)
-                    if start_idx == -1:
-                        continue
-                    end_idx = len(output)
-                    for next_sec in sections:
-                        if next_sec == sec: 
-                            continue
-                        next_idx = output.find(next_sec, start_idx + 1)
-                        if next_idx != -1 and next_idx > start_idx:
-                            end_idx = min(end_idx, next_idx)
-                    section_text = output[start_idx:end_idx].strip()
-                    st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
+            # Display sections in cards
+            sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
+                        "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
+            for sec in sections:
+                start_idx = output.find(sec)
+                if start_idx == -1: continue
+                end_idx = len(output)
+                for next_sec in sections:
+                    if next_sec==sec: continue
+                    next_idx = output.find(next_sec, start_idx+1)
+                    if next_idx != -1 and next_idx>start_idx:
+                        end_idx = min(end_idx, next_idx)
+                section_text = output[start_idx:end_idx].strip()
+                st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-                # Display entire lesson plan in editable/copyable text area
-                st.text_area("Full Lesson Plan (copyable)", value=output, height=400)
+            # Full lesson plan in copyable text area
+            st.text_area("Full Lesson Plan (copyable)", value=output, height=400)
 
-                # Download button
-                st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
+            # Download button (works outside form)
+            st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
 
-            except Exception as e:
-                st.error(f"Error generating lesson plan: {e}")
+        except Exception as e:
+            st.error(f"Error generating lesson plan: {e}")
