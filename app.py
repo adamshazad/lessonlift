@@ -1,7 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
 import html
-from PIL import Image
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -35,29 +34,24 @@ body {background-color: #ffffff; color: #000000; font-family: Arial, sans-serif;
     font-size: 14px;
     line-height: 1.5em;
 }
-.copy-btn, .print-btn {
-    background-color:#4CAF50;
-    color:white;
-    border:none;
-    padding:6px 12px;
-    border-radius:5px;
-    cursor:pointer;
-    margin-top:5px;
-    margin-right:5px;
+.logo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
 }
-img.logo {
-    display:block;
-    margin-left:auto;
-    margin-right:auto;
-    width:200px;
-    height:auto;
-    box-shadow: 0px 6px 20px rgba(0,0,0,0.25);
+.logo-container img {
+    width: 150px;
+    height: auto;
     border-radius: 12px;
+    box-shadow: 0px 6px 20px rgba(0,0,0,0.25);
+}
+.button-container {
+    margin-top: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Sidebar API Key ---
+# --- Sidebar: API Key ---
 st.sidebar.title("🔑 API Key Setup")
 api_key = st.sidebar.text_input("Gemini API Key", type="password")
 if not api_key:
@@ -67,10 +61,11 @@ genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- Logo ---
-try:
-    st.image("logo.png", use_column_width=False, width=200, output_format="PNG")
-except FileNotFoundError:
-    st.warning("Logo not found. Place 'logo.png' in the app folder.")
+st.markdown("""
+<div class="logo-container">
+    <img src="logo.png" alt="Logo">
+</div>
+""", unsafe_allow_html=True)
 
 # --- App title ---
 st.title("📚 LessonLift - AI Lesson Planner")
@@ -150,30 +145,27 @@ SEN/EAL Notes: {sen_notes or 'None'}
                 </div>
                 """, unsafe_allow_html=True)
 
-            # --- Working Copy & Print buttons ---
+            # --- Working Copy & Print buttons using Streamlit native features ---
             st.markdown("""
-            <div>
-                <button class="copy-btn" onclick="
-                var text = document.querySelector('#lesson_text textarea').value;
-                navigator.clipboard.writeText(text);
-                alert('Lesson plan copied!');
-                ">
-                📋 Copy to Clipboard
-                </button>
-                <button class="print-btn" onclick="
-                var printContents = document.querySelector('#lesson_text textarea').value;
-                var w = window.open();
-                w.document.write('<pre>' + printContents + '</pre>');
-                w.print();
-                w.close();
-                ">
-                🖨 Print Lesson Plan
-                </button>
-            </div>
+            <div class='button-container'>
             """, unsafe_allow_html=True)
 
-            # --- Download button ---
-            st.download_button("⬇ Download as TXT", data=clean_output, file_name="lesson_plan.txt")
+            # Copy to clipboard via temporary text area
+            st.download_button("📋 Copy Lesson Plan", data=clean_output, file_name="lesson_plan.txt")
+
+            # Print button using new tab
+            st.markdown(f"""
+            <button class="copy-btn" onclick="
+                var w = window.open();
+                w.document.write('<pre>{html.escape(clean_output)}</pre>');
+                w.document.close();
+                w.print();
+            ">
+            🖨 Print Lesson Plan
+            </button>
+            """, unsafe_allow_html=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
