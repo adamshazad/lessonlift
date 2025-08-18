@@ -23,7 +23,7 @@ body {background-color: #ffffff; color: #000000; font-family: Arial, sans-serif;
     border-radius: 12px !important;
     padding: 16px !important;
     margin-bottom: 12px !important;
-    box-shadow: 0px 4px 14px rgba(0,0,0,0.18) !important;
+    box-shadow: 0px 4px 20px rgba(0,0,0,0.25) !important;
     line-height: 1.6em;
     transition: transform 0.2s;
 }
@@ -40,24 +40,22 @@ body {background-color: #ffffff; color: #000000; font-family: Arial, sans-serif;
 }
 .section-title {
     font-weight: bold;
-    font-size: 18px;
-    margin-bottom: 8px;
+    font-size: 16px;
+    margin-bottom: 6px;
 }
 .section-body {
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1.5em;
 }
-.logo-container {
-    display:flex; 
-    justify-content:center; 
-    align-items:center; 
-    margin-bottom:20px;
-}
-.logo-container img {
-    border-radius:12px; 
+img.logo {
     box-shadow: 0px 6px 20px rgba(0,0,0,0.25);
-    max-width: 220px;
-    height: auto;
+    border-radius: 12px;
+    display:block;
+    margin-left:auto;
+    margin-right:auto;
+}
+details summary {
+    cursor: pointer;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -73,12 +71,7 @@ model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # --- Logo ---
 try:
-    logo = Image.open("logo.png")
-    st.markdown("""
-    <div class='logo-container'>
-        <img src="logo.png">
-    </div>
-    """, unsafe_allow_html=True)
+    st.image("logo.png", width=200, use_column_width=False, output_format="PNG")
 except FileNotFoundError:
     st.warning("Logo not found. Place 'logo.png' in the app folder.")
 
@@ -120,6 +113,9 @@ SEN/EAL Notes: {sen_notes or 'None'}
             output = response.text.strip()
             st.success("✅ Lesson Plan Ready!")
 
+            # --- Textarea for copy ---
+            st.text_area("Lesson Plan Text", value=output, height=300, key="lesson_text")
+
             # --- Sections ---
             sections = ["Lesson title", "Learning outcomes", "Starter activity", 
                         "Main activity", "Plenary activity", "Resources needed", 
@@ -144,7 +140,7 @@ SEN/EAL Notes: {sen_notes or 'None'}
                 title = lines[0].strip()
                 body = lines[1].strip() if len(lines) > 1 else ""
 
-                # Format activities with numbers
+                # Format activities with numbers for clarity
                 if title.lower() in ["starter activity", "main activity", "plenary activity"]:
                     steps = [f"{i+1}. {s.strip().rstrip('.')}" for i, s in enumerate(body.split(". ")) if s.strip()]
                     body_html = "<br>".join(steps)
@@ -160,19 +156,23 @@ SEN/EAL Notes: {sen_notes or 'None'}
                 </details>
                 """, unsafe_allow_html=True)
 
-            # --- Copy, Download, Print Buttons ---
-            escaped_output = html.escape(output)
-            st.markdown(f"""
-                <div>
-                    <button class="copy-btn" onclick="navigator.clipboard.writeText('{escaped_output}')">
-                    📋 Copy to Clipboard
-                    </button>
-                    <button class="print-btn" onclick="window.print()">
-                    🖨 Print Lesson Plan
-                    </button>
-                </div>
+            # --- Copy & Print buttons ---
+            st.markdown("""
+            <div>
+                <button class="copy-btn" onclick="
+                var text = document.querySelector('#lesson_text textarea').value;
+                navigator.clipboard.writeText(text);
+                alert('Lesson plan copied!');
+                ">
+                📋 Copy to Clipboard
+                </button>
+                <button class="print-btn" onclick="window.print()">
+                🖨 Print Lesson Plan
+                </button>
+            </div>
             """, unsafe_allow_html=True)
 
+            # --- Download button ---
             st.download_button("⬇ Download as TXT", data=output, file_name="lesson_plan.txt")
 
         except Exception as e:
