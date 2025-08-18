@@ -7,7 +7,7 @@ st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered
 # --- Custom CSS ---
 st.markdown("""
 <style>
-body {background-color: white; color: black;}
+body {background-color: white; color: black; font-family: Arial, sans-serif;}
 .stTextInput>div>div>input, textarea, select {
     background-color: white !important;
     color: black !important;
@@ -16,34 +16,36 @@ body {background-color: white; color: black;}
     border-radius: 5px !important;
 }
 .stCard {
-    background-color: #f9f9f9 !important;
-    color: black !important;
     border-radius: 12px !important;
-    padding: 12px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.25) !important;
-    line-height: 1.5em;
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important;
+    line-height: 1.6em;
 }
+.stCard:nth-child(odd) { background-color: #f0f8ff !important; } /* AliceBlue */
+.stCard:nth-child(even) { background-color: #fffaf0 !important; } /* FloralWhite */
 .section-title {
     font-weight: bold;
-    font-size: 18px;
+    font-size: 20px;
     margin-top: 12px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 .section-body {
     font-size: 15px;
-    margin-left: 15px;
+    margin-left: 20px;
 }
 .logo-container {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
 }
 .logo-container img {
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-    width: 200px;
+    max-width: 220px;
+    max-height: 120px;
+    object-fit: contain;
 }
 ul {
     margin: 0;
@@ -64,7 +66,7 @@ model = genai.GenerativeModel("gemini-1.5-flash-latest")
 # --- Logo ---
 st.markdown("""
 <div class="logo-container">
-    <img src="logo.png">
+    <img src="logo.png" alt="LessonLift Logo">
 </div>
 """, unsafe_allow_html=True)
 
@@ -89,7 +91,7 @@ with st.form("lesson_form"):
 if submitted:
     with st.spinner("✨ Creating lesson plan..."):
         prompt = f"""
-Create a detailed UK primary school lesson plan with clearly separated sections:
+Create a professional UK primary school lesson plan with clearly separated sections:
 
 Year Group: {year_group}
 Subject: {subject}
@@ -100,10 +102,11 @@ Lesson Duration: {lesson_duration}
 SEN/EAL Notes: {sen_notes or 'None'}
 
 Format:
-- Use clear section titles: Lesson title, Learning outcomes, Starter activity, Main activity, Plenary activity, Resources needed, Differentiation ideas, Assessment methods
-- Under each section, write short sentences.
-- Format the body as bullet points (each sentence is a separate bullet).
-- Do not use markdown symbols like ** or ##.
+- Section titles: Lesson title, Learning outcomes, Starter activity, Main activity, Plenary activity, Resources needed, Differentiation ideas, Assessment methods
+- Each section body should be concise sentences, formatted as bullet points
+- Each bullet should be one complete sentence ending with a period
+- No markdown symbols like ** or ##
+- Make the lesson plan clean, professional, and teacher-ready
 """
         try:
             response = model.generate_content(prompt)
@@ -116,7 +119,7 @@ Format:
                         "Differentiation ideas", "Assessment methods"]
             output_lower = output.lower()
 
-            for sec in sections:
+            for idx, sec in enumerate(sections):
                 start_idx = output_lower.find(sec.lower())
                 if start_idx == -1:
                     continue
@@ -129,7 +132,7 @@ Format:
                         end_idx = min(end_idx, next_idx)
                 section_text = output[start_idx:end_idx].strip()
                 
-                # Remove unwanted markdown symbols
+                # Clean symbols
                 clean_text = section_text.replace("**", "").replace("##", "").replace("_", "")
                 
                 # Split title and body
@@ -138,7 +141,7 @@ Format:
                 body = lines[1].strip() if len(lines) > 1 else ""
                 
                 # Split body into sentences for bullets
-                bullets = [f"<li>{b.strip()}</li>" for b in body.split(". ") if b.strip()]
+                bullets = [f"<li>{b.strip().rstrip('.')}.</li>" for b in body.split(". ") if b.strip()]
                 bullets_html = "<ul>" + "".join(bullets) + "</ul>" if bullets else ""
                 
                 st.markdown(f"""
