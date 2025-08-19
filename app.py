@@ -2,9 +2,9 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import base64
+from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from io import BytesIO
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -79,20 +79,20 @@ def create_pdf(text):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    y = height - 40
     lines = text.split("\n")
+    y = height - 50
     for line in lines:
-        if y < 40:
+        c.drawString(50, y, line)
+        y -= 15
+        if y < 50:
             c.showPage()
-            y = height - 40
-        c.drawString(40, y, line)
-        y -= 14
+            y = height - 50
     c.save()
     buffer.seek(0)
     return buffer
 
 # --- Function to call Gemini and display plan ---
-def generate_and_display_plan(prompt, title="Latest", update_note=None):
+def generate_and_display_plan(prompt, title="Latest"):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
@@ -100,12 +100,7 @@ def generate_and_display_plan(prompt, title="Latest", update_note=None):
             clean_output = strip_markdown(output)
 
             # Add to history
-            history_title = title
-            if update_note:
-                history_title += " (Updated)"
-                clean_output = f"🔄 {update_note}\n\n{clean_output}"
-
-            st.session_state["lesson_history"].append({"title": history_title, "content": clean_output})
+            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
             # Display sections in cards
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
@@ -127,15 +122,23 @@ def generate_and_display_plan(prompt, title="Latest", update_note=None):
             # Full lesson plan in copyable text area
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # Prepare PDF
+            # Create PDF
             pdf_buffer = create_pdf(clean_output)
 
-            # Download buttons side by side
-            col1, col2 = st.columns([1,1])
-            with col1:
-                st.download_button("⬇ Download as TXT", data=clean_output, file_name="lesson_plan.txt")
-            with col2:
-                st.download_button("⬇ Download as PDF", data=pdf_buffer, file_name="lesson_plan.pdf", mime="application/pdf")
+            # Neatly inline download buttons using HTML
+            st.markdown(
+                f"""
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                        <button style="padding:8px 12px;">⬇ Download TXT</button>
+                    </a>
+                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+                        <button style="padding:8px 12px;">⬇ Download PDF</button>
+                    </a>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
@@ -208,11 +211,11 @@ if "last_prompt" in st.session_state:
             extra_instruction = custom_instruction
 
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
-        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", update_note=extra_instruction)
+        st.info(f"✅ Updated lesson plan: {extra_instruction}")
+        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}")
 
 # --- Sidebar: lesson history ---
 st.sidebar.header("📚 Lesson History")
 for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
     if st.sidebar.button(lesson["title"], key=i):
         st.text_area(f"Lesson History: {lesson['title']}", value=lesson["content"], height=400)
-
