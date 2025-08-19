@@ -167,6 +167,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 # --- Regeneration options ---
 if "last_prompt" in st.session_state:
     st.markdown("### 🔄 Not happy with the plan?")
+
     regen_style = st.selectbox(
         "Choose a regeneration style:",
         [
@@ -178,16 +179,27 @@ if "last_prompt" in st.session_state:
         ]
     )
 
+    custom_instruction = st.text_input(
+        "Or type your own custom instruction (optional)",
+        placeholder="e.g. Make it more interactive with outdoor activities"
+    )
+
     if st.button("🔁 Regenerate Lesson Plan"):
         extra_instruction = ""
-        if regen_style == "🎨 More creative & engaging activities":
-            extra_instruction = "Make activities more creative, interactive, and fun."
-        elif regen_style == "📋 More structured with timings":
-            extra_instruction = "Add clear structure with timings for each section."
-        elif regen_style == "🧩 Simplify for lower ability":
-            extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-        elif regen_style == "🚀 Challenge for higher ability":
-            extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
+
+        # Apply preset styles if no custom text entered
+        if not custom_instruction:
+            if regen_style == "🎨 More creative & engaging activities":
+                extra_instruction = "Make activities more creative, interactive, and fun."
+            elif regen_style == "📋 More structured with timings":
+                extra_instruction = "Add clear structure with timings for each section."
+            elif regen_style == "🧩 Simplify for lower ability":
+                extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
+            elif regen_style == "🚀 Challenge for higher ability":
+                extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
+        else:
+            # Use the teacher’s own custom instruction
+            extra_instruction = custom_instruction
 
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
         generate_and_display_plan(new_prompt)
