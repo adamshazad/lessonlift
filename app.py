@@ -29,6 +29,19 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
 }
+.download-btn {
+    display: inline-block;
+    background-color: #28a745;  /* Green */
+    color: white !important;
+    padding: 10px 20px;
+    margin-right: 10px;  /* Gap between buttons */
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+}
+.download-btn:hover {
+    background-color: #218838;  /* Darker green on hover */
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -41,7 +54,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Function to show logo properly ---
+# --- Show logo ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -65,34 +78,34 @@ st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 # --- Helper to strip Markdown ---
 def strip_markdown(md_text):
-    text = re.sub(r'#+\s*', '', md_text)           # Remove headings
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Remove bold
-    text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italics
+    text = re.sub(r'#+\s*', '', md_text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
-# --- Initialize session state for lesson history ---
+# --- Session state for lesson history ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to generate PDF ---
-def create_pdf(text):
+# --- Generate PDF ---
+def generate_pdf(text):
     buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
+    p = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    lines = text.splitlines()
-    y = height - 50
-    for line in lines:
-        c.drawString(50, y, line)
+    margin = 50
+    y = height - margin
+    for line in text.splitlines():
+        if y < margin:
+            p.showPage()
+            y = height - margin
+        p.drawString(margin, y, line)
         y -= 14
-        if y < 50:
-            c.showPage()
-            y = height - 50
-    c.save()
+    p.save()
     buffer.seek(0)
     return buffer
 
-# --- Function to call Gemini and display plan ---
-def generate_and_display_plan(prompt, title="Latest", regen_message=""):
+# --- Generate and display lesson plan ---
+def generate_and_display_plan(prompt, title="Latest"):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
@@ -102,20 +115,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             # Add to history
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
-            # Display regeneration message if any
-            if regen_message:
-                st.info(f"🔄 {regen_message}")
-
             # Display sections in cards
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
                         "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
             for sec in sections:
                 start_idx = clean_output.find(sec)
-                if start_idx == -1: 
+                if start_idx == -1:
                     continue
                 end_idx = len(clean_output)
                 for next_sec in sections:
-                    if next_sec == sec: 
+                    if next_sec == sec:
                         continue
                     next_idx = clean_output.find(next_sec, start_idx+1)
                     if next_idx != -1 and next_idx > start_idx:
@@ -123,42 +132,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 section_text = clean_output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # Full lesson plan in copyable text area
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # PDF creation
-            pdf_buffer = create_pdf(clean_output)
-
-            # Inline download buttons with same style
-            st.markdown(
-                f"""
-                <div style="display:flex; gap:10px; margin-top:10px;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="
-                            padding:10px 16px;
-                            font-size:14px;
-                            border-radius:8px;
-                            border:none;
-                            background-color:#4CAF50;
-                            color:white;
-                            cursor:pointer;
-                        ">⬇ Download TXT</button>
-                    </a>
-                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="
-                            padding:10px 16px;
-                            font-size:14px;
-                            border-radius:8px;
-                            border:none;
-                            background-color:#4CAF50;
-                            color:white;
-                            cursor:pointer;
-                        ">⬇ Download PDF</button>
-                    </a>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            # Download buttons inline and same shape
+            pdf_buffer = generate_pdf(clean_output)
+            txt_btn_html = f'<a class="download-btn" href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">⬇ Download as TXT</a>'
+            pdf_btn_html = f'<a class="download-btn" href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.getvalue()).decode()}" download="lesson_plan.pdf">⬇ Download as PDF</a>'
+            st.markdown(f"{txt_btn_html} {pdf_btn_html}", unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
@@ -217,29 +197,20 @@ if "last_prompt" in st.session_state:
 
     if st.button("🔁 Regenerate Lesson Plan"):
         extra_instruction = ""
-        regen_message = ""
-
         if not custom_instruction:
             if regen_style == "🎨 More creative & engaging activities":
                 extra_instruction = "Make activities more creative, interactive, and fun."
-                regen_message = "Lesson updated with more creative and engaging activities."
             elif regen_style == "📋 More structured with timings":
                 extra_instruction = "Add clear structure with timings for each section."
-                regen_message = "Lesson updated with clearer structure and timings."
             elif regen_style == "🧩 Simplify for lower ability":
                 extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                regen_message = "Lesson simplified for lower ability."
             elif regen_style == "🚀 Challenge for higher ability":
                 extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                regen_message = "Lesson updated with higher ability challenge tasks."
-            else:
-                regen_message = "Here’s a new updated version of your lesson plan."
         else:
             extra_instruction = custom_instruction
-            regen_message = f"Lesson updated: {custom_instruction}"
 
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
-        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
+        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}")
 
 # --- Sidebar: lesson history ---
 st.sidebar.header("📚 Lesson History")
