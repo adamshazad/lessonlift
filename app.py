@@ -2,9 +2,12 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import base64
+
+# For PDF generation
 from io import BytesIO
-from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -41,7 +44,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Function to show logo properly ---
+# --- Function to show logo ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -70,21 +73,17 @@ def strip_markdown(md_text):
     text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italics
     return text
 
-# --- Initialize session state for lesson history ---
+# --- Initialize session state ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to call Gemini and display plan ---
-def generate_and_display_plan(prompt, title="Latest", is_update=False):
+# --- Function to generate and display lesson plan ---
+def generate_and_display_plan(prompt, title="Latest"):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
             clean_output = strip_markdown(output)
-
-            # Add update notice if regenerated
-            if is_update:
-                clean_output = f"✅ This is an updated version of the lesson plan.\n\n{clean_output}"
 
             # Add to history
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
@@ -109,29 +108,51 @@ def generate_and_display_plan(prompt, title="Latest", is_update=False):
             # Full lesson plan in copyable text area
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # TXT Download
+            # Download as TXT
             st.download_button("⬇ Download as TXT", data=clean_output, file_name="lesson_plan.txt")
 
-            # PDF Download
-            pdf_buffer = BytesIO()
-            c = canvas.Canvas(pdf_buffer, pagesize=A4)
-            width, height = A4
-            lines = clean_output.split("\n")
-            y = height - 50
-            for line in lines:
-                if y < 50:
-                    c.showPage()
-                    y = height - 50
-                c.drawString(50, y, line)
-                y -= 15
-            c.save()
-            pdf_buffer.seek(0)
+            # Download as PDF
+            def create_pdf(text):
+                buffer = BytesIO()
+                pdf = canvas.Canvas(buffer, pagesize=A4)
+                width, height = A4
+                margin = 20 * mm
+                max_width = width - 2*margin
+                max_height = height - 2*margin
+                y = height - margin
+
+                pdf.setFont("Helvetica", 12)
+
+                lines = text.split("\n")
+                for line in lines:
+                    wrapped_lines = []
+                    while pdf.stringWidth(line) > max_width:
+                        # Split line to fit
+                        for i in range(len(line), 0, -1):
+                            if pdf.stringWidth(line[:i]) <= max_width:
+                                wrapped_lines.append(line[:i])
+                                line = line[i:]
+                                break
+                    wrapped_lines.append(line)
+
+                    for wline in wrapped_lines:
+                        if y < margin:
+                            pdf.showPage()
+                            pdf.setFont("Helvetica", 12)
+                            y = height - margin
+                        pdf.drawString(margin, y, wline)
+                        y -= 14
+                pdf.save()
+                buffer.seek(0)
+                return buffer
+
+            pdf_buffer = create_pdf(clean_output)
             st.download_button("⬇ Download as PDF", data=pdf_buffer, file_name="lesson_plan.pdf", mime="application/pdf")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
 
-# --- Form for lesson details ---
+# --- Lesson form ---
 submitted = False
 lesson_data = {}
 
@@ -148,7 +169,7 @@ with st.form("lesson_form"):
 
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-# --- Run on first submit ---
+# --- On first submit ---
 if submitted:
     prompt = f"""
 Create a detailed UK primary school lesson plan:
@@ -185,6 +206,7 @@ if "last_prompt" in st.session_state:
 
     if st.button("🔁 Regenerate Lesson Plan"):
         extra_instruction = ""
+
         if not custom_instruction:
             if regen_style == "🎨 More creative & engaging activities":
                 extra_instruction = "Make activities more creative, interactive, and fun."
@@ -198,7 +220,8 @@ if "last_prompt" in st.session_state:
             extra_instruction = custom_instruction
 
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
-        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", is_update=True)
+        st.info(f"✅ Lesson updated: {extra_instruction}")  # shows update to teacher
+        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}")
 
 # --- Sidebar: lesson history ---
 st.sidebar.header("📚 Lesson History")
