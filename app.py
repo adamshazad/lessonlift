@@ -26,12 +26,6 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
 }
-hr {
-    border: 0;
-    height: 1px;
-    background: #ddd;
-    margin: 20px 0;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -63,19 +57,9 @@ def show_logo(path, width=200):
 # Show logo
 show_logo("logo.png", width=200)
 
-# --- Polished Header ---
-st.markdown("<br>", unsafe_allow_html=True)  # Small spacing
-
-st.markdown("""
-<h1 style='text-align:center; color:#1a1a1a; font-size:2.2em;'>
-📚 LessonLift - AI Lesson Planner
-</h1>
-<p style='text-align:center; color:#555; font-size:1.1em; margin-top:5px;'>
-Generate tailored UK primary school lesson plans in seconds!<br>
-Covers Years 1–6 | All primary subjects
-</p>
-<hr>
-""", unsafe_allow_html=True)
+# --- App Title ---
+st.title("📚 LessonLift - AI Lesson Planner")
+st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 # --- Helper to strip Markdown ---
 def strip_markdown(md_text):
