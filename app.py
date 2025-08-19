@@ -139,6 +139,7 @@ Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
     st.session_state["last_prompt"] = prompt
+    st.session_state["original_prompt"] = prompt  # Store original for clean regenerations
     generate_and_display_plan(prompt, title="Original")
 
 # --- Regeneration options ---
@@ -175,7 +176,11 @@ if "last_prompt" in st.session_state:
         else:
             extra_instruction = custom_instruction
 
-        new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
+        new_prompt = st.session_state["original_prompt"] + "\n\n" + extra_instruction
+
+        # Show a notice that this is an updated version
+        st.info(f"📝 This is an updated version of your lesson plan: {extra_instruction}")
+
         generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}")
 
 # --- Sidebar: lesson history ---
