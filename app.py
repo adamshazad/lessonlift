@@ -1,9 +1,75 @@
 import streamlit as st
-import time
+import google.generativeai as genai
+import re
+import base64
+
+# --- Page config ---
+st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
+
+# --- CSS ---
+st.markdown("""
+<style>
+body {background-color: white; color: black;}
+.stTextInput>div>div>input, textarea, select {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+    padding: 8px !important;
+    border-radius: 5px !important;
+}
+.stCard {
+    background-color: #f9f9f9 !important;
+    color: black !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
+    line-height: 1.5em;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# --- Sidebar: API Key ---
+st.sidebar.title("🔑 API Key Setup")
+api_key = st.sidebar.text_input("Gemini API Key", type="password")
+if not api_key:
+    st.warning("Please enter your Gemini API key in the sidebar.")
+    st.stop()
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-1.5-flash-latest")
+
+# --- Function to show logo properly ---
+def show_logo(path, width=200):
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        b64 = base64.b64encode(data).decode()
+        st.markdown(f"""
+        <div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
+            <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
+                <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
+
+# Show logo
+show_logo("logo.png", width=200)
+
+# --- App Title ---
+st.title("📚 LessonLift - AI Lesson Planner")
+st.write("Generate tailored UK primary school lesson plans in seconds!")
+
+# --- Helper to strip Markdown ---
+def strip_markdown(md_text):
+    text = re.sub(r'#+\s*', '', md_text)           # Remove headings
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Remove bold
+    text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italics
+    return text
 
 # --- Form for lesson details ---
 submitted = False
-try_again = False
 lesson_data = {}
 
 with st.form("lesson_form"):
@@ -16,20 +82,10 @@ with st.form("lesson_form"):
     lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
     lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)")
 
-    # Two buttons side by side
-    colA, colB = st.columns([1,1])
-    with colA:
-        submitted = st.form_submit_button("🚀 Generate Lesson Plan")
-    with colB:
-        try_again = st.form_submit_button("🔄 Try Again")
+    submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-# --- Trigger lesson generation ---
-if submitted or try_again:
-    # Add a visual cue for Try Again
-    if try_again:
-        st.info("🔄 Regenerating lesson plan, please wait...")
-        time.sleep(0.5)  # tiny pause for UX effect
-
+# --- Generate and display lesson plan outside form ---
+if submitted:
     prompt = f"""
 Create a detailed UK primary school lesson plan:
 
@@ -45,7 +101,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
-            clean_output = strip_markdown(output)
+            clean_output = strip_markdown(output)  # Remove ** and ##
 
             st.success("✅ Lesson Plan Ready!")
 
@@ -64,7 +120,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                 section_text = clean_output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # Copyable text area
+            # Full lesson plan in copyable text area
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
             # Download button
