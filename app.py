@@ -2,6 +2,9 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import base64
+from io import BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -69,15 +72,19 @@ def strip_markdown(md_text):
 
 # --- Initialize session state for lesson history ---
 if "lesson_history" not in st.session_state:
-    st.session_state["lesson_history"] = []  # List of dicts: {"title": str, "content": str}
+    st.session_state["lesson_history"] = []
 
 # --- Function to call Gemini and display plan ---
-def generate_and_display_plan(prompt, title="Latest"):
+def generate_and_display_plan(prompt, title="Latest", is_update=False):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
             clean_output = strip_markdown(output)
+
+            # Add update notice if regenerated
+            if is_update:
+                clean_output = f"✅ This is an updated version of the lesson plan.\n\n{clean_output}"
 
             # Add to history
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
@@ -102,8 +109,24 @@ def generate_and_display_plan(prompt, title="Latest"):
             # Full lesson plan in copyable text area
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # Download button
+            # TXT Download
             st.download_button("⬇ Download as TXT", data=clean_output, file_name="lesson_plan.txt")
+
+            # PDF Download
+            pdf_buffer = BytesIO()
+            c = canvas.Canvas(pdf_buffer, pagesize=A4)
+            width, height = A4
+            lines = clean_output.split("\n")
+            y = height - 50
+            for line in lines:
+                if y < 50:
+                    c.showPage()
+                    y = height - 50
+                c.drawString(50, y, line)
+                y -= 15
+            c.save()
+            pdf_buffer.seek(0)
+            st.download_button("⬇ Download as PDF", data=pdf_buffer, file_name="lesson_plan.pdf", mime="application/pdf")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
@@ -139,7 +162,6 @@ Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
     st.session_state["last_prompt"] = prompt
-    st.session_state["original_prompt"] = prompt  # Store original for clean regenerations
     generate_and_display_plan(prompt, title="Original")
 
 # --- Regeneration options ---
@@ -163,7 +185,6 @@ if "last_prompt" in st.session_state:
 
     if st.button("🔁 Regenerate Lesson Plan"):
         extra_instruction = ""
-
         if not custom_instruction:
             if regen_style == "🎨 More creative & engaging activities":
                 extra_instruction = "Make activities more creative, interactive, and fun."
@@ -176,12 +197,8 @@ if "last_prompt" in st.session_state:
         else:
             extra_instruction = custom_instruction
 
-        new_prompt = st.session_state["original_prompt"] + "\n\n" + extra_instruction
-
-        # Show a notice that this is an updated version
-        st.info(f"📝 This is an updated version of your lesson plan: {extra_instruction}")
-
-        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}")
+        new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
+        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", is_update=True)
 
 # --- Sidebar: lesson history ---
 st.sidebar.header("📚 Lesson History")
