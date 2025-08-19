@@ -112,24 +112,13 @@ with st.form("lesson_form"):
 
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-# --- Generate and display lesson plan outside form ---
-if submitted:
-    prompt = f"""
-Create a detailed UK primary school lesson plan:
-
-Year Group: {lesson_data['year_group']}
-Subject: {lesson_data['subject']}
-Topic: {lesson_data['topic']}
-Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
-Ability Level: {lesson_data['ability_level']}
-Lesson Duration: {lesson_data['lesson_duration']}
-SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
-"""
+# --- Function to call Gemini and display plan ---
+def generate_and_display_plan(prompt):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
-            clean_output = strip_markdown(output)  # Remove ** and ##
+            clean_output = strip_markdown(output)
 
             st.success("✅ Lesson Plan Ready!")
 
@@ -158,3 +147,47 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
+
+# --- Run on first submit ---
+if submitted:
+    prompt = f"""
+Create a detailed UK primary school lesson plan:
+
+Year Group: {lesson_data['year_group']}
+Subject: {lesson_data['subject']}
+Topic: {lesson_data['topic']}
+Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
+Ability Level: {lesson_data['ability_level']}
+Lesson Duration: {lesson_data['lesson_duration']}
+SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
+"""
+    st.session_state["last_prompt"] = prompt
+    generate_and_display_plan(prompt)
+
+# --- Regeneration options ---
+if "last_prompt" in st.session_state:
+    st.markdown("### 🔄 Not happy with the plan?")
+    regen_style = st.selectbox(
+        "Choose a regeneration style:",
+        [
+            "♻️ Just regenerate (different variation)",
+            "🎨 More creative & engaging activities",
+            "📋 More structured with timings",
+            "🧩 Simplify for lower ability",
+            "🚀 Challenge for higher ability"
+        ]
+    )
+
+    if st.button("🔁 Regenerate Lesson Plan"):
+        extra_instruction = ""
+        if regen_style == "🎨 More creative & engaging activities":
+            extra_instruction = "Make activities more creative, interactive, and fun."
+        elif regen_style == "📋 More structured with timings":
+            extra_instruction = "Add clear structure with timings for each section."
+        elif regen_style == "🧩 Simplify for lower ability":
+            extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
+        elif regen_style == "🚀 Challenge for higher ability":
+            extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
+
+        new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
+        generate_and_display_plan(new_prompt)
