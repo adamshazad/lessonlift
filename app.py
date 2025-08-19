@@ -2,12 +2,9 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import base64
-
-# For PDF generation
-from io import BytesIO
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
+from io import BytesIO
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -44,7 +41,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Function to show logo ---
+# --- Function to show logo properly ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -73,12 +70,29 @@ def strip_markdown(md_text):
     text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italics
     return text
 
-# --- Initialize session state ---
+# --- Initialize session state for lesson history ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to generate and display lesson plan ---
-def generate_and_display_plan(prompt, title="Latest"):
+# --- Function to create PDF ---
+def create_pdf(text):
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    y = height - 40
+    lines = text.split("\n")
+    for line in lines:
+        if y < 40:
+            c.showPage()
+            y = height - 40
+        c.drawString(40, y, line)
+        y -= 14
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+# --- Function to call Gemini and display plan ---
+def generate_and_display_plan(prompt, title="Latest", update_note=None):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
@@ -86,7 +100,12 @@ def generate_and_display_plan(prompt, title="Latest"):
             clean_output = strip_markdown(output)
 
             # Add to history
-            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
+            history_title = title
+            if update_note:
+                history_title += " (Updated)"
+                clean_output = f"🔄 {update_note}\n\n{clean_output}"
+
+            st.session_state["lesson_history"].append({"title": history_title, "content": clean_output})
 
             # Display sections in cards
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
@@ -108,51 +127,20 @@ def generate_and_display_plan(prompt, title="Latest"):
             # Full lesson plan in copyable text area
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # Download as TXT
-            st.download_button("⬇ Download as TXT", data=clean_output, file_name="lesson_plan.txt")
-
-            # Download as PDF
-            def create_pdf(text):
-                buffer = BytesIO()
-                pdf = canvas.Canvas(buffer, pagesize=A4)
-                width, height = A4
-                margin = 20 * mm
-                max_width = width - 2*margin
-                max_height = height - 2*margin
-                y = height - margin
-
-                pdf.setFont("Helvetica", 12)
-
-                lines = text.split("\n")
-                for line in lines:
-                    wrapped_lines = []
-                    while pdf.stringWidth(line) > max_width:
-                        # Split line to fit
-                        for i in range(len(line), 0, -1):
-                            if pdf.stringWidth(line[:i]) <= max_width:
-                                wrapped_lines.append(line[:i])
-                                line = line[i:]
-                                break
-                    wrapped_lines.append(line)
-
-                    for wline in wrapped_lines:
-                        if y < margin:
-                            pdf.showPage()
-                            pdf.setFont("Helvetica", 12)
-                            y = height - margin
-                        pdf.drawString(margin, y, wline)
-                        y -= 14
-                pdf.save()
-                buffer.seek(0)
-                return buffer
-
+            # Prepare PDF
             pdf_buffer = create_pdf(clean_output)
-            st.download_button("⬇ Download as PDF", data=pdf_buffer, file_name="lesson_plan.pdf", mime="application/pdf")
+
+            # Download buttons side by side
+            col1, col2 = st.columns([1,1])
+            with col1:
+                st.download_button("⬇ Download as TXT", data=clean_output, file_name="lesson_plan.txt")
+            with col2:
+                st.download_button("⬇ Download as PDF", data=pdf_buffer, file_name="lesson_plan.pdf", mime="application/pdf")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
 
-# --- Lesson form ---
+# --- Form for lesson details ---
 submitted = False
 lesson_data = {}
 
@@ -169,7 +157,7 @@ with st.form("lesson_form"):
 
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-# --- On first submit ---
+# --- Run on first submit ---
 if submitted:
     prompt = f"""
 Create a detailed UK primary school lesson plan:
@@ -220,11 +208,11 @@ if "last_prompt" in st.session_state:
             extra_instruction = custom_instruction
 
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
-        st.info(f"✅ Lesson updated: {extra_instruction}")  # shows update to teacher
-        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}")
+        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", update_note=extra_instruction)
 
 # --- Sidebar: lesson history ---
 st.sidebar.header("📚 Lesson History")
 for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
     if st.sidebar.button(lesson["title"], key=i):
         st.text_area(f"Lesson History: {lesson['title']}", value=lesson["content"], height=400)
+
