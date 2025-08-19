@@ -105,89 +105,20 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 
             st.success("✅ Lesson Plan Ready!")
 
-            # --- Sections ---
-            sections = {
-                "📘 Lesson Title": "Lesson title",
-                "🎯 Learning Outcomes": "Learning outcomes",
-                "⚡ Starter Activity": "Starter activity",
-                "🧩 Main Activity": "Main activity",
-                "🔄 Plenary Activity": "Plenary activity",
-                "📎 Resources Needed": "Resources needed",
-                "🎚️ Differentiation Ideas": "Differentiation ideas",
-                "📝 Assessment Methods": "Assessment methods"
-            }
-
-            st.subheader("📑 Interactive Lesson Plan")
-
-            if "refinements" not in st.session_state:
-                st.session_state.refinements = {}
-            if "original_sections" not in st.session_state:
-                st.session_state.original_sections = {}
-
-            for emoji_title, sec in sections.items():
-                # Case-insensitive search
-                match = re.search(re.escape(sec), clean_output, re.IGNORECASE)
-                if not match:
-                    continue
-                start_idx = match.start()
-
-                # Find next section
+            # Display sections in cards
+            sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
+                        "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
+            for sec in sections:
+                start_idx = clean_output.find(sec)
+                if start_idx == -1: continue
                 end_idx = len(clean_output)
-                for next_sec in sections.values():
-                    if next_sec == sec:
-                        continue
-                    next_match = re.search(re.escape(next_sec), clean_output[start_idx+1:], re.IGNORECASE)
-                    if next_match:
-                        next_idx = next_match.start() + start_idx + 1
+                for next_sec in sections:
+                    if next_sec==sec: continue
+                    next_idx = clean_output.find(next_sec, start_idx+1)
+                    if next_idx != -1 and next_idx>start_idx:
                         end_idx = min(end_idx, next_idx)
-
                 section_text = clean_output[start_idx:end_idx].strip()
-
-                # Store original text
-                if sec not in st.session_state.original_sections:
-                    st.session_state.original_sections[sec] = section_text
-
-                # Use refined version if exists
-                if sec in st.session_state.refinements:
-                    section_text = st.session_state.refinements[sec]
-
-                with st.expander(emoji_title, expanded=True if sec in ["Lesson title","Learning outcomes"] else False):
-                    st.write(section_text)
-
-                    col1, col2, col3 = st.columns(3)
-
-                    if col1.button("✨ Enhance", key=sec+"enhance"):
-                        with st.spinner(f"Enhancing {emoji_title}..."):
-                            refine_prompt = f"""
-                            Section: {sec}
-                            Original Content:
-                            {section_text}
-
-                            Please enhance this section with more detail, engagement, and UK curriculum-appropriate language.
-                            """
-                            refine_response = model.generate_content(refine_prompt)
-                            new_text = refine_response.text.strip()
-                            st.session_state.refinements[sec] = new_text
-                            st.experimental_rerun()
-
-                    if col2.button("✂️ Simplify", key=sec+"simplify"):
-                        with st.spinner(f"Simplifying {emoji_title}..."):
-                            refine_prompt = f"""
-                            Section: {sec}
-                            Original Content:
-                            {section_text}
-
-                            Please simplify this section for easier readability and accessibility (e.g., for younger pupils or lower ability groups).
-                            """
-                            refine_response = model.generate_content(refine_prompt)
-                            new_text = refine_response.text.strip()
-                            st.session_state.refinements[sec] = new_text
-                            st.experimental_rerun()
-
-                    if col3.button("🔄 Reset", key=sec+"reset"):
-                        if sec in st.session_state.refinements:
-                            del st.session_state.refinements[sec]
-                        st.experimental_rerun()
+                st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
             # Full lesson plan in copyable text area
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
