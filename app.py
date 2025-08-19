@@ -74,16 +74,16 @@ def strip_markdown(md_text):
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to create PDF ---
+# --- Function to generate PDF ---
 def create_pdf(text):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    lines = text.split("\n")
+    lines = text.splitlines()
     y = height - 50
     for line in lines:
         c.drawString(50, y, line)
-        y -= 15
+        y -= 14
         if y < 50:
             c.showPage()
             y = height - 50
@@ -92,7 +92,7 @@ def create_pdf(text):
     return buffer
 
 # --- Function to call Gemini and display plan ---
-def generate_and_display_plan(prompt, title="Latest"):
+def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
@@ -101,6 +101,10 @@ def generate_and_display_plan(prompt, title="Latest"):
 
             # Add to history
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
+
+            # Display regeneration message if any
+            if regen_message:
+                st.info(f"🔄 {regen_message}")
 
             # Display sections in cards
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
@@ -122,18 +126,34 @@ def generate_and_display_plan(prompt, title="Latest"):
             # Full lesson plan in copyable text area
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # Create PDF
+            # PDF creation
             pdf_buffer = create_pdf(clean_output)
 
-            # Neatly inline download buttons using HTML
+            # Inline download buttons with same style
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:8px 12px;">⬇ Download TXT</button>
+                        <button style="
+                            padding:10px 16px;
+                            font-size:14px;
+                            border-radius:8px;
+                            border:none;
+                            background-color:#4CAF50;
+                            color:white;
+                            cursor:pointer;
+                        ">⬇ Download TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:8px 12px;">⬇ Download PDF</button>
+                        <button style="
+                            padding:10px 16px;
+                            font-size:14px;
+                            border-radius:8px;
+                            border:none;
+                            background-color:#4CAF50;
+                            color:white;
+                            cursor:pointer;
+                        ">⬇ Download PDF</button>
                     </a>
                 </div>
                 """,
@@ -197,22 +217,29 @@ if "last_prompt" in st.session_state:
 
     if st.button("🔁 Regenerate Lesson Plan"):
         extra_instruction = ""
+        regen_message = ""
 
         if not custom_instruction:
             if regen_style == "🎨 More creative & engaging activities":
                 extra_instruction = "Make activities more creative, interactive, and fun."
+                regen_message = "Lesson updated with more creative and engaging activities."
             elif regen_style == "📋 More structured with timings":
                 extra_instruction = "Add clear structure with timings for each section."
+                regen_message = "Lesson updated with clearer structure and timings."
             elif regen_style == "🧩 Simplify for lower ability":
                 extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
+                regen_message = "Lesson simplified for lower ability."
             elif regen_style == "🚀 Challenge for higher ability":
                 extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
+                regen_message = "Lesson updated with higher ability challenge tasks."
+            else:
+                regen_message = "Here’s a new updated version of your lesson plan."
         else:
             extra_instruction = custom_instruction
+            regen_message = f"Lesson updated: {custom_instruction}"
 
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
-        st.info(f"✅ Updated lesson plan: {extra_instruction}")
-        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}")
+        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
 
 # --- Sidebar: lesson history ---
 st.sidebar.header("📚 Lesson History")
