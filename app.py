@@ -84,28 +84,28 @@ with st.form("lesson_form"):
 
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-# --- Generate and display lesson plan ---
+# --- Generate and display lesson plan outside form ---
 if submitted:
     prompt = f"""
-    Create a detailed UK primary school lesson plan:
+Create a detailed UK primary school lesson plan:
 
-    Year Group: {lesson_data['year_group']}
-    Subject: {lesson_data['subject']}
-    Topic: {lesson_data['topic']}
-    Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
-    Ability Level: {lesson_data['ability_level']}
-    Lesson Duration: {lesson_data['lesson_duration']}
-    SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
-    """
+Year Group: {lesson_data['year_group']}
+Subject: {lesson_data['subject']}
+Topic: {lesson_data['topic']}
+Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
+Ability Level: {lesson_data['ability_level']}
+Lesson Duration: {lesson_data['lesson_duration']}
+SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
+"""
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
-            clean_output = strip_markdown(output)
+            clean_output = strip_markdown(output)  # Remove ** and ##
 
             st.success("✅ Lesson Plan Ready!")
 
-            # --- Interactive Section ---
+            # --- Sections ---
             sections = {
                 "📘 Lesson Title": "Lesson title",
                 "🎯 Learning Outcomes": "Learning outcomes",
@@ -125,21 +125,29 @@ if submitted:
                 st.session_state.original_sections = {}
 
             for emoji_title, sec in sections.items():
-                start_idx = clean_output.find(sec)
-                if start_idx == -1:
+                # Case-insensitive search
+                match = re.search(re.escape(sec), clean_output, re.IGNORECASE)
+                if not match:
                     continue
+                start_idx = match.start()
+
+                # Find next section
                 end_idx = len(clean_output)
                 for next_sec in sections.values():
-                    if next_sec == sec: continue
-                    next_idx = clean_output.find(next_sec, start_idx+1)
-                    if next_idx != -1 and next_idx > start_idx:
+                    if next_sec == sec:
+                        continue
+                    next_match = re.search(re.escape(next_sec), clean_output[start_idx+1:], re.IGNORECASE)
+                    if next_match:
+                        next_idx = next_match.start() + start_idx + 1
                         end_idx = min(end_idx, next_idx)
 
                 section_text = clean_output[start_idx:end_idx].strip()
 
+                # Store original text
                 if sec not in st.session_state.original_sections:
                     st.session_state.original_sections[sec] = section_text
 
+                # Use refined version if exists
                 if sec in st.session_state.refinements:
                     section_text = st.session_state.refinements[sec]
 
@@ -181,13 +189,11 @@ if submitted:
                             del st.session_state.refinements[sec]
                         st.experimental_rerun()
 
-            # --- Final Lesson Plan (with refinements applied) ---
-            final_text = clean_output
-            for sec, refined_text in st.session_state.get("refinements", {}).items():
-                final_text = final_text.replace(st.session_state.original_sections[sec], refined_text)
+            # Full lesson plan in copyable text area
+            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            st.text_area("Full Lesson Plan (copyable)", value=final_text, height=400)
-            st.download_button("⬇ Download as TXT", data=final_text, file_name="lesson_plan.txt")
+            # Download button
+            st.download_button("⬇ Download as TXT", data=clean_output, file_name="lesson_plan.txt")
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
