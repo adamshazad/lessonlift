@@ -74,13 +74,41 @@ lesson_data = {}
 
 with st.form("lesson_form"):
     st.subheader("Lesson Details")
-    lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
-    lesson_data['subject'] = st.text_input("Subject")
-    lesson_data['topic'] = st.text_input("Topic")
-    lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)")
-    lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
-    lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
-    lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)")
+    
+    lesson_data['year_group'] = st.selectbox(
+        "Year Group", 
+        ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"]
+    )
+    
+    lesson_data['subject'] = st.text_input(
+        "Subject", 
+        placeholder="e.g. English, Maths, Science"
+    )
+    
+    lesson_data['topic'] = st.text_input(
+        "Topic", 
+        placeholder="e.g. Fractions, The Romans, Plant Growth"
+    )
+    
+    lesson_data['learning_objective'] = st.text_area(
+        "Learning Objective (optional)", 
+        placeholder="e.g. To understand how fractions represent equal parts of a whole"
+    )
+    
+    lesson_data['ability_level'] = st.selectbox(
+        "Ability Level", 
+        ["Mixed ability","Lower ability","Higher ability"]
+    )
+    
+    lesson_data['lesson_duration'] = st.selectbox(
+        "Lesson Duration", 
+        ["30 min","45 min","60 min"]
+    )
+    
+    lesson_data['sen_notes'] = st.text_area(
+        "SEN/EAL Notes (optional)", 
+        placeholder="e.g. Use visual aids, sentence starters, word banks"
+    )
 
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
@@ -110,12 +138,14 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                         "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
             for sec in sections:
                 start_idx = clean_output.find(sec)
-                if start_idx == -1: continue
+                if start_idx == -1: 
+                    continue
                 end_idx = len(clean_output)
                 for next_sec in sections:
-                    if next_sec==sec: continue
+                    if next_sec == sec: 
+                        continue
                     next_idx = clean_output.find(next_sec, start_idx+1)
-                    if next_idx != -1 and next_idx>start_idx:
+                    if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
                 section_text = clean_output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
