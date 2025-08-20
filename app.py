@@ -117,14 +117,14 @@ def create_pdf(text):
 # -------------------------------
 st.set_page_config(page_title="LessonLift AI", page_icon="📘", layout="centered")
 
-# Centered logo + tagline
+# Centered logo
 st.markdown(
     """
     <div style="text-align: center;">
         <img src="https://via.placeholder.com/200x80.png?text=LessonLift+AI" 
              style="box-shadow: 0px 4px 12px rgba(0,0,0,0.25); border-radius: 8px;"/>
-        <h1>LessonLift AI</h1>
-        <p><em>Create lessons in seconds, powered by AI.</em></p>
+        <h1>📘 LessonLift AI</h1>
+        <p><em>Create lessons in seconds, powered by AI ✨</em></p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -136,22 +136,18 @@ if "logged_in" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = ""
 
-# -------------------------------
 # Login/Register flow
-# -------------------------------
 if not st.session_state.logged_in:
-    choice = st.radio("Choose an option", ["Login", "Register"])
+    choice = st.radio("🔑 Choose an option", ["Login", "Register"])
 
     if choice == "Login":
         login_input = st.text_input("Username or Email")
         login_pass = st.text_input("Password", type="password")
-        if st.button("Login"):
+        if st.button("Login ✅"):
             success, msg = login_user(login_input, login_pass)
             if success:
                 st.session_state.logged_in = True
                 st.session_state.username = msg
-                st.success(f"Welcome back, {msg}!")
-                st.rerun()  # ✅ Fixed rerun
             else:
                 st.error(msg)
 
@@ -159,53 +155,36 @@ if not st.session_state.logged_in:
         reg_user = st.text_input("Choose a username")
         reg_email = st.text_input("Your email")
         reg_pass = st.text_input("Choose a password", type="password")
-        if st.button("Register"):
+        if st.button("Register 📝"):
             success, msg = register_user(reg_user, reg_email, reg_pass)
             if success:
                 st.success(msg + " Please login now.")
             else:
                 st.error(msg)
 
-# -------------------------------
-# Main app (after login)
-# -------------------------------
 else:
-    st.success(f"Logged in as {st.session_state.username}")
+    st.success(f"Welcome back, {st.session_state.username}! 🎉")
 
-    st.header("Generate a Lesson Plan")
+    st.header("📝 Generate a Lesson Plan")
     subject = st.text_input("Subject")
     topic = st.text_input("Topic")
     year_group = st.text_input("Year Group")
     notes = st.text_area("Additional Notes")
 
-    if st.button("Generate Lesson Plan"):
-        # Placeholder AI response (replace with real AI later)
+    if st.button("Generate Lesson Plan 🚀"):
+        # Placeholder AI response
         lesson_plan = f"""
 Lesson Title: {topic}  
-
-Learning Outcomes:  
-- Understand the basics of {topic}.  
-
-Starter Activity:  
-- Quick recap quiz.  
-
-Main Activity:  
-- Group work exploring {topic}.  
-
-Plenary Activity:  
-- Q&A session.  
-
-Resources Needed:  
-- Worksheets, projector.  
-
-Differentiation Ideas:  
-- Scaffolded tasks for mixed abilities.  
-
-Assessment Methods:  
-- Exit ticket reflection.  
+Learning Outcomes: - Understand the basics of {topic}.  
+Starter Activity: Quick recap quiz.  
+Main Activity: Group work exploring {topic}.  
+Plenary Activity: Q&A session.  
+Resources Needed: Worksheets, projector.  
+Differentiation Ideas: Scaffolded tasks for mixed abilities.  
+Assessment Methods: Exit ticket reflection.  
 """
-        st.subheader("Preview")
+        st.subheader("Preview 📄")
         st.text(lesson_plan)
 
         pdf_buffer = create_pdf(lesson_plan)
-        st.download_button("Download as PDF", pdf_buffer, file_name="lesson_plan.pdf", mime="application/pdf")
+        st.download_button("Download as PDF 📥", pdf_buffer, file_name="lesson_plan.pdf", mime="application/pdf")
