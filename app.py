@@ -4,7 +4,7 @@ import re
 import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
 # --- Page config ---
@@ -85,9 +85,12 @@ def create_pdf_wrapped(text):
                             rightMargin=40, leftMargin=40,
                             topMargin=50, bottomMargin=50)
     styles = getSampleStyleSheet()
-    styleN = styles["Normal"]
-    styleN.fontSize = 12
-    styleN.leading = 16  # line spacing
+    styleN = ParagraphStyle(
+        'Normal',
+        parent=styles['Normal'],
+        fontSize=12,
+        leading=18
+    )
 
     paragraphs = [Paragraph(p.replace('\n', '<br/>'), styleN) for p in text.split('\n\n')]
 
@@ -115,30 +118,32 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Display sections in cards
+            # Sections for cards display
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
                         "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
+            lower_output = clean_output.lower()
             for sec in sections:
-                start_idx = clean_output.find(sec)
+                start_idx = lower_output.find(sec.lower())
                 if start_idx == -1: 
                     continue
                 end_idx = len(clean_output)
                 for next_sec in sections:
-                    if next_sec == sec: 
+                    if next_sec.lower() == sec.lower(): 
                         continue
-                    next_idx = clean_output.find(next_sec, start_idx+1)
+                    next_idx = lower_output.find(next_sec.lower(), start_idx+1)
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
                 section_text = clean_output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
             # Full lesson plan in copyable text area
-            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
+            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400, key=title)
 
             # PDF creation
             pdf_buffer = create_pdf_wrapped(clean_output)
+            pdf_buffer.seek(0)
 
-            # Inline download buttons with same style
+            # Inline download buttons
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px;">
@@ -252,4 +257,4 @@ if "last_prompt" in st.session_state:
 st.sidebar.header("📚 Lesson History")
 for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
     if st.sidebar.button(lesson["title"], key=i):
-        st.text_area(f"Lesson History: {lesson['title']}", value=lesson["content"], height=400)
+        st.text_area(f"Lesson History: {lesson['title']}", value=lesson["content"], height=400, key=f"history_{i}")
