@@ -54,9 +54,9 @@ def create_pdf(text):
     normal = ParagraphStyle(
         "Normal",
         parent=styles["Normal"],
-        fontSize=11,
-        leading=14,
-        spaceAfter=6,
+        fontSize=12,
+        leading=16,
+        spaceAfter=8,
         alignment=TA_LEFT
     )
     heading = ParagraphStyle(
@@ -65,7 +65,7 @@ def create_pdf(text):
         fontSize=14,
         textColor=colors.darkblue,
         spaceBefore=12,
-        spaceAfter=6
+        spaceAfter=8
     )
 
     story = []
@@ -123,8 +123,8 @@ st.markdown(
     <div style="text-align: center;">
         <img src="https://via.placeholder.com/200x80.png?text=LessonLift+AI" 
              style="box-shadow: 0px 4px 12px rgba(0,0,0,0.25); border-radius: 8px;"/>
-        <h1>📘 LessonLift AI</h1>
-        <p><em>Create lessons in seconds, powered by AI ✨</em></p>
+        <h1>LessonLift AI</h1>
+        <p><em>Create lessons in seconds, powered by AI.</em></p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -138,16 +138,17 @@ if "username" not in st.session_state:
 
 # Login/Register flow
 if not st.session_state.logged_in:
-    choice = st.radio("🔑 Choose an option", ["Login", "Register"])
+    choice = st.radio("Choose an option", ["Login", "Register"])
 
     if choice == "Login":
         login_input = st.text_input("Username or Email")
         login_pass = st.text_input("Password", type="password")
-        if st.button("Login ✅"):
+        if st.button("Login 🔑"):
             success, msg = login_user(login_input, login_pass)
             if success:
                 st.session_state.logged_in = True
                 st.session_state.username = msg
+                st.success(f"Welcome back, {msg}!")
             else:
                 st.error(msg)
 
@@ -163,16 +164,15 @@ if not st.session_state.logged_in:
                 st.error(msg)
 
 else:
-    st.success(f"Welcome back, {st.session_state.username}! 🎉")
+    st.success(f"Logged in as {st.session_state.username}")
 
-    st.header("📝 Generate a Lesson Plan")
+    st.header("Generate a Lesson Plan")
     subject = st.text_input("Subject")
     topic = st.text_input("Topic")
     year_group = st.text_input("Year Group")
     notes = st.text_area("Additional Notes")
 
-    if st.button("Generate Lesson Plan 🚀"):
-        # Placeholder AI response
+    if st.button("Generate Lesson Plan 📄"):
         lesson_plan = f"""
 Lesson Title: {topic}  
 Learning Outcomes: - Understand the basics of {topic}.  
@@ -183,7 +183,7 @@ Resources Needed: Worksheets, projector.
 Differentiation Ideas: Scaffolded tasks for mixed abilities.  
 Assessment Methods: Exit ticket reflection.  
 """
-        st.subheader("Preview 📄")
+        st.subheader("Preview")
         st.text(lesson_plan)
 
         pdf_buffer = create_pdf(lesson_plan)
