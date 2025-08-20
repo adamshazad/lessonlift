@@ -1,100 +1,66 @@
 import streamlit as st
-import datetime
-import json
-import os
+from datetime import datetime
 
-# --------------------------
-# Paths & Constants
-# --------------------------
-USER_DB_PATH = "users.json"
-LOGO_PATH = "logo.png"
-DAILY_LIMIT = 50
+# Page config
+st.set_page_config(page_title="LessonLift AI Lesson Planner", page_icon="logo.png")
 
-# --------------------------
-# Load or Initialize Users
-# --------------------------
-if os.path.exists(USER_DB_PATH):
-    with open(USER_DB_PATH, "r") as f:
-        users = json.load(f)
-else:
-    users = {}
+# Logo
+st.image("logo.png", width=150)
 
-# --------------------------
-# Helper Functions
-# --------------------------
-def save_users():
-    with open(USER_DB_PATH, "w") as f:
-        json.dump(users, f)
-
-def is_valid_login(username, password):
-    return username in users and users[username]["password"] == password
-
-def register_user(username, password):
-    if username in users:
-        return False
-    users[username] = {
-        "password": password,
-        "last_request_date": "",
-        "daily_requests": 0
-    }
-    save_users()
-    return True
-
-def can_request_lesson(username):
-    today = datetime.date.today().isoformat()
-    if users[username]["last_request_date"] != today:
-        users[username]["last_request_date"] = today
-        users[username]["daily_requests"] = 0
-    return users[username]["daily_requests"] < DAILY_LIMIT
-
-def increment_requests(username):
-    users[username]["daily_requests"] += 1
-    save_users()
-
-# --------------------------
-# App UI
-# --------------------------
-st.set_page_config(page_title="LessonLift AI Lesson Planner", page_icon=LOGO_PATH)
-
-# Display Logo and Header
-st.image(LOGO_PATH, width=150)
+# Title and subtitle
 st.title("LessonLift AI Lesson Planner")
 st.subheader("Create lessons in seconds!")
 
-# Authentication
-auth_choice = st.radio("Login or Register?", ["Login", "Register"])
+# Demo mode notice
+st.info("Demo mode is ON. Some features may be limited.")
 
-if auth_choice == "Register":
-    new_user = st.text_input("Choose a username/email")
-    new_password = st.text_input("Choose a password", type="password")
-    if st.button("Register"):
-        if register_user(new_user, new_password):
-            st.success("Registration successful! Please login now.")
-        else:
-            st.error("Username already exists. Try a different one.")
+# User login simulation (for demo/testing)
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
 
-if auth_choice == "Login":
-    username = st.text_input("Username/email")
-    password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        if is_valid_login(username, password):
-            st.success(f"Welcome, {username}!")
-            
-            # --------------------------
-            # Lesson Generator Section
-            # --------------------------
-            st.markdown("---")
-            st.header("Generate a Lesson Plan")
-            
-            if can_request_lesson(username):
-                subject = st.text_input("Subject (e.g., Biology, Math)")
-                topic = st.text_input("Topic or Title of Lesson")
-                level = st.selectbox("Level", ["Beginner", "Intermediate", "Advanced"])
-                if st.button("Generate Lesson"):
-                    # Demo placeholder for lesson generator
-                    st.info(f"Lesson plan generated for {topic} ({subject}) - Level: {level}")
-                    increment_requests(username)
+if not st.session_state['logged_in']:
+    with st.form("login_form"):
+        st.subheader("Sign in")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        login_btn = st.form_submit_button("Log In")
+
+        if login_btn:
+            # Demo authentication
+            if username == "teacher" and password == "password":
+                st.session_state['logged_in'] = True
+                st.success("Logged in successfully!")
             else:
-                st.warning("Maximum lessons reached for today. Come back tomorrow!")
-        else:
-            st.error("Invalid username or password.")
+                st.error("Invalid username or password")
+else:
+    st.success("You are logged in!")
+
+    # Lesson generator form
+    with st.form("lesson_form"):
+        st.subheader("Generate a lesson plan")
+        subject = st.text_input("Subject", placeholder="e.g., Biology")
+        topic = st.text_input("Topic", placeholder="e.g., Photosynthesis")
+        duration = st.selectbox("Duration", ["30 mins", "45 mins", "60 mins"])
+        level = st.selectbox("Level", ["Beginner", "Intermediate", "Advanced"])
+        generate_btn = st.form_submit_button("Generate Lesson Plan")
+
+        if generate_btn:
+            # Check API quota (demo mode max 50/day)
+            if 'lesson_count' not in st.session_state:
+                st.session_state['lesson_count'] = 0
+
+            if st.session_state['lesson_count'] >= 50:
+                st.warning("Maximum lessons hit for today! Come back tomorrow.")
+            else:
+                st.session_state['lesson_count'] += 1
+                # Demo generated lesson
+                st.write(f"### Lesson Plan for {subject} - {topic}")
+                st.write(f"Duration: {duration} | Level: {level}")
+                st.write("**Learning Objectives:**")
+                st.write("- Objective 1")
+                st.write("- Objective 2")
+                st.write("**Activities:**")
+                st.write("- Activity 1")
+                st.write("- Activity 2")
+                st.write("**Assessment:**")
+                st.write("- Assessment method")
