@@ -1,91 +1,100 @@
 import streamlit as st
-from streamlit_authenticator import Authenticate
 import datetime
+import json
+import os
 
-# ----------------------------
-# User authentication setup
-# ----------------------------
-users = {
-    "usernames": {
-        "teacher1": {"name": "Teacher One", "password": "hashed_password1"},
-        "teacher2": {"name": "Teacher Two", "password": "hashed_password2"},
+# --------------------------
+# Paths & Constants
+# --------------------------
+USER_DB_PATH = "users.json"
+LOGO_PATH = "logo.png"
+DAILY_LIMIT = 50
+
+# --------------------------
+# Load or Initialize Users
+# --------------------------
+if os.path.exists(USER_DB_PATH):
+    with open(USER_DB_PATH, "r") as f:
+        users = json.load(f)
+else:
+    users = {}
+
+# --------------------------
+# Helper Functions
+# --------------------------
+def save_users():
+    with open(USER_DB_PATH, "w") as f:
+        json.dump(users, f)
+
+def is_valid_login(username, password):
+    return username in users and users[username]["password"] == password
+
+def register_user(username, password):
+    if username in users:
+        return False
+    users[username] = {
+        "password": password,
+        "last_request_date": "",
+        "daily_requests": 0
     }
-}
+    save_users()
+    return True
 
-authenticator = Authenticate(
-    users,
-    "lesson_lift_cookie",
-    "lesson_lift_signature",
-    cookie_expiry_days=30
-)
+def can_request_lesson(username):
+    today = datetime.date.today().isoformat()
+    if users[username]["last_request_date"] != today:
+        users[username]["last_request_date"] = today
+        users[username]["daily_requests"] = 0
+    return users[username]["daily_requests"] < DAILY_LIMIT
 
-# ----------------------------
-# App config
-# ----------------------------
-st.set_page_config(page_title="LessonLift AI Planner", page_icon="📝", layout="centered")
+def increment_requests(username):
+    users[username]["daily_requests"] += 1
+    save_users()
 
-# ----------------------------
-# Session State for API usage
-# ----------------------------
-if "api_calls_today" not in st.session_state:
-    st.session_state.api_calls_today = 0
-if "last_reset" not in st.session_state:
-    st.session_state.last_reset = datetime.date.today()
+# --------------------------
+# App UI
+# --------------------------
+st.set_page_config(page_title="LessonLift AI Lesson Planner", page_icon=LOGO_PATH)
 
-MAX_API_CALLS = 50
-
-# Reset daily counter
-if st.session_state.last_reset != datetime.date.today():
-    st.session_state.api_calls_today = 0
-    st.session_state.last_reset = datetime.date.today()
-
-# ----------------------------
-# App layout
-# ----------------------------
-st.image("logo.png", width=200)  # replace with your logo path
+# Display Logo and Header
+st.image(LOGO_PATH, width=150)
 st.title("LessonLift AI Lesson Planner")
-st.subheader("Create lessons in seconds with AI-powered plans!")
+st.subheader("Create lessons in seconds!")
 
-name, authentication_status, username = authenticator.login("Login", "main")
+# Authentication
+auth_choice = st.radio("Login or Register?", ["Login", "Register"])
 
-if authentication_status:
-    st.success(f"Welcome {name}!")
-
-    # API limit check
-    if st.session_state.api_calls_today >= MAX_API_CALLS:
-        st.warning("Maximum lesson generation limit reached for today. Please try again tomorrow.")
-    else:
-        st.markdown("---")
-        st.header("Generate a Lesson Plan")
-        subject = st.text_input("Subject", placeholder="e.g., Biology")
-        topic = st.text_input("Topic", placeholder="e.g., Photosynthesis")
-        grade = st.selectbox("Grade Level", ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"])
-        style = st.selectbox("Lesson Style", ["Interactive", "Lecture", "Project-Based", "Flipped Classroom"])
-        generate = st.button("Generate Lesson Plan")
-
-        if generate:
-            # Increment API calls
-            st.session_state.api_calls_today += 1
-
-            # Example of generating lesson plan (replace with your actual API call)
-            lesson_plan = f"**Subject:** {subject}\n\n**Topic:** {topic}\n\n**Grade:** {grade}\n\n**Style:** {style}\n\n**Lesson Plan:** This is a generated lesson plan."
-            st.markdown(lesson_plan)
-
-elif authentication_status is False:
-    st.error("Invalid username or password")
-elif authentication_status is None:
-    st.info("Please enter your username and password to continue")
-
-# ----------------------------
-# Registration option
-# ----------------------------
-with st.expander("Create a new account"):
-    new_user = st.text_input("Choose a username")
-    new_name = st.text_input("Your full name")
+if auth_choice == "Register":
+    new_user = st.text_input("Choose a username/email")
     new_password = st.text_input("Choose a password", type="password")
     if st.button("Register"):
-        if new_user and new_password and new_name:
-            # This is a placeholder: integrate your user storage/database
-            st.success(f"Account for {new_name} created! You can now log in above.")
+        if register_user(new_user, new_password):
+            st.success("Registration successful! Please login now.")
         else:
-            st.error("Please fill in all fields.")
+            st.error("Username already exists. Try a different one.")
+
+if auth_choice == "Login":
+    username = st.text_input("Username/email")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if is_valid_login(username, password):
+            st.success(f"Welcome, {username}!")
+            
+            # --------------------------
+            # Lesson Generator Section
+            # --------------------------
+            st.markdown("---")
+            st.header("Generate a Lesson Plan")
+            
+            if can_request_lesson(username):
+                subject = st.text_input("Subject (e.g., Biology, Math)")
+                topic = st.text_input("Topic or Title of Lesson")
+                level = st.selectbox("Level", ["Beginner", "Intermediate", "Advanced"])
+                if st.button("Generate Lesson"):
+                    # Demo placeholder for lesson generator
+                    st.info(f"Lesson plan generated for {topic} ({subject}) - Level: {level}")
+                    increment_requests(username)
+            else:
+                st.warning("Maximum lessons reached for today. Come back tomorrow!")
+        else:
+            st.error("Invalid username or password.")
