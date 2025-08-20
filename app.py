@@ -29,15 +29,26 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
 }
-button.download-btn {
+.download-btn {
+    display: inline-block;
     padding: 10px 16px;
+    margin: 0;
     font-size: 14px;
     border-radius: 8px;
     border: none;
     background-color: #4CAF50;
-    color: white;
+    color: white !important;
+    text-decoration: none !important;
     cursor: pointer;
-    text-decoration: none;
+    text-align: center;
+}
+.download-btn:hover {
+    background-color: #45a049;
+}
+.download-btn-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -89,22 +100,14 @@ def create_pdf(text):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    left_margin = 20
-    top_margin = height - 40
-    line_height = 14
-    y = top_margin
-
-    paragraphs = text.split('\n\n')
-    for para in paragraphs:
-        lines = para.split('\n')
-        for line in lines:
-            if y < 40:
-                c.showPage()
-                y = top_margin
-            c.drawString(left_margin, y, line.strip())
-            y -= line_height
-        y -= line_height  # extra space between paragraphs
-
+    lines = text.splitlines()
+    y = height - 50
+    for line in lines:
+        c.drawString(50, y, line)
+        y -= 18  # slightly bigger spacing
+        if y < 50:
+            c.showPage()
+            y = height - 50
     c.save()
     buffer.seek(0)
     return buffer
@@ -147,16 +150,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             # PDF creation
             pdf_buffer = create_pdf(clean_output)
 
-            # Inline download buttons with same style, close together
+            # Inline download buttons with same style
             st.markdown(
                 f"""
-                <div style="display:flex; gap:10px; margin-top:10px;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt" class="download-btn">
-                        ⬇ Download TXT
-                    </a>
-                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf" class="download-btn">
-                        ⬇ Download PDF
-                    </a>
+                <div class="download-btn-container">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt" class="download-btn">⬇ Download TXT</a>
+                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf" class="download-btn">⬇ Download PDF</a>
                 </div>
                 """,
                 unsafe_allow_html=True
