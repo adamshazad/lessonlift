@@ -5,6 +5,7 @@ import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -27,15 +28,10 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
+    line-height: 1.7em;
+    white-space: pre-wrap !important;
 }
-button.download-btn {
-    padding:10px 16px;
-    font-size:14px;
-    border-radius:8px;
-    border:none;
-    background-color:#4CAF50;
-    color:white;
+button {
     cursor:pointer;
 }
 </style>
@@ -50,7 +46,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Function to show logo properly ---
+# --- Logo display function ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -68,79 +64,52 @@ def show_logo(path, width=200):
 
 show_logo("logo.png", width=200)
 
-# --- App Title ---
+# --- App title ---
 st.title("📚 LessonLift - AI Lesson Planner")
 st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# --- Helper to strip Markdown ---
+# --- Markdown stripping ---
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)           # Remove headings
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Remove bold
     text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italics
     return text
 
-# --- Initialize session state for lesson history ---
+# --- Session state ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to generate PDF ---
+# --- PDF generation with proper spacing ---
 def create_pdf(text):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    margin = 50
-    max_width = width - 2 * margin
-    y = height - margin
+    left_margin = 20 * mm
+    right_margin = 20 * mm
+    top_margin = 20 * mm
+    bottom_margin = 20 * mm
+    line_height = 12
+    y = height - top_margin
 
-    # Set font
-    c.setFont("Helvetica", 12)
     lines = text.splitlines()
-
     for line in lines:
-        if not line.strip():  # Blank line for spacing
-            y -= 12
+        if not line.strip():  # blank line
+            y -= line_height
             continue
-
-        # Handle bullets
-        bullet = ""
-        if line.strip().startswith(("-", "*")):
-            bullet = "• "
-            line = line.strip()[1:].strip()
-
-        # Wrap text manually
-        words = line.split()
-        current_line = bullet
-        for word in words:
-            if c.stringWidth(current_line + " " + word, "Helvetica", 12) < max_width:
-                if current_line.endswith(" "):
-                    current_line += word
-                else:
-                    current_line += " " + word
-            else:
-                c.drawString(margin, y, current_line)
-                y -= 18
-                current_line = "    " + word if bullet else word
-
-            if y < margin:  # New page
-                c.showPage()
-                c.setFont("Helvetica", 12)
-                y = height - margin
-                current_line = bullet + word
-
-        # Draw the last line
-        c.drawString(margin, y, current_line)
-        y -= 18
-
-        if y < margin:
+        # handle bullet points
+        if line.startswith("- ") or line.startswith("* "):
+            c.drawString(left_margin + 10, y, line)
+        else:
+            c.drawString(left_margin, y, line)
+        y -= line_height
+        if y < bottom_margin:
             c.showPage()
-            c.setFont("Helvetica", 12)
-            y = height - margin
-
+            y = height - top_margin
     c.save()
     buffer.seek(0)
     return buffer
 
-# --- Function to call Gemini and display plan ---
+# --- Generate lesson plan ---
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -151,11 +120,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             # Add to history
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
-            # Display regeneration message if any
+            # Show regen message
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Display sections in cards
+            # Sections
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
                         "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
             for sec in sections:
@@ -172,21 +141,35 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 section_text = clean_output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # Full lesson plan in copyable text area
+            # Full lesson plan text area
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # PDF creation
+            # PDF
             pdf_buffer = create_pdf(clean_output)
 
-            # Inline download buttons with same style
+            # Download buttons side by side
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button class="download-btn">⬇ Download TXT</button>
+                        <button style="
+                            padding:10px 16px;
+                            font-size:14px;
+                            border-radius:8px;
+                            border:none;
+                            background-color:#4CAF50;
+                            color:white;
+                        ">⬇ Download TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button class="download-btn">⬇ Download PDF</button>
+                        <button style="
+                            padding:10px 16px;
+                            font-size:14px;
+                            border-radius:8px;
+                            border:none;
+                            background-color:#4CAF50;
+                            color:white;
+                        ">⬇ Download PDF</button>
                     </a>
                 </div>
                 """,
@@ -196,13 +179,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
 
-# --- Form for lesson details ---
+# --- Form ---
 submitted = False
 lesson_data = {}
 
 with st.form("lesson_form"):
     st.subheader("Lesson Details")
-    
     lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
     lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
     lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
@@ -210,10 +192,8 @@ with st.form("lesson_form"):
     lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
     lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
     lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
-
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-# --- Run on first submit ---
 if submitted:
     prompt = f"""
 Create a detailed UK primary school lesson plan:
@@ -229,7 +209,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
     st.session_state["last_prompt"] = prompt
     generate_and_display_plan(prompt, title="Original")
 
-# --- Regeneration options ---
+# --- Regeneration ---
 if "last_prompt" in st.session_state:
     st.markdown("### 🔄 Not happy with the plan?")
     regen_style = st.selectbox(
@@ -242,16 +222,13 @@ if "last_prompt" in st.session_state:
             "🚀 Challenge for higher ability"
         ]
     )
-
     custom_instruction = st.text_input(
         "Or type your own custom instruction (optional)",
         placeholder="e.g. Make it more interactive with outdoor activities"
     )
-
     if st.button("🔁 Regenerate Lesson Plan"):
         extra_instruction = ""
         regen_message = ""
-
         if not custom_instruction:
             if regen_style == "🎨 More creative & engaging activities":
                 extra_instruction = "Make activities more creative, interactive, and fun."
@@ -274,8 +251,8 @@ if "last_prompt" in st.session_state:
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
         generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
 
-# --- Sidebar: lesson history ---
+# --- Sidebar history ---
 st.sidebar.header("📚 Lesson History")
 for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
     if st.sidebar.button(lesson["title"], key=i):
-        st.text_area(f"Lesson History: {lesson['title']}", lesson["content"], height=300)
+        st.text_area(f"Lesson History: {lesson['title']}", value=lesson["content"], height=400)
