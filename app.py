@@ -5,7 +5,6 @@ import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -42,7 +41,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Function to show logo properly ---
+# --- Function to show logo ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -64,12 +63,26 @@ show_logo("logo.png", width=200)
 st.title("📚 LessonLift - AI Lesson Planner")
 st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# --- Helper to strip Markdown ---
-def strip_markdown(md_text):
+# --- Helper to strip markdown and format bullets ---
+def format_lesson_text(md_text):
+    # Remove headings and bold
     text = re.sub(r'#+\s*', '', md_text)           # Remove headings
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)  # Remove bold
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Remove bold
     text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italics
-    return text
+
+    # Convert lines that look like steps into bullets
+    lines = text.splitlines()
+    formatted_lines = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        # Add bullet if line starts with a verb or numbered item
+        if re.match(r'^\d+\. ', line) or re.match(r'^(Do|Use|Add|Create|Prepare|Write|Explain|Discuss|Ask|Draw|Check)', line, re.I):
+            formatted_lines.append(f"• {line}")
+        else:
+            formatted_lines.append(line)
+    return "\n".join(formatted_lines)
 
 # --- Initialize session state for lesson history ---
 if "lesson_history" not in st.session_state:
@@ -80,29 +93,14 @@ def create_pdf(text):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    max_width = width - 40 * mm  # 20mm margins
-    y = height - 30  # top margin
-    line_height = 14
-
-    for paragraph in text.split("\n"):
-        words = paragraph.split()
-        line = ""
-        for word in words:
-            test_line = f"{line} {word}".strip()
-            if c.stringWidth(test_line, "Helvetica", 12) > max_width:
-                c.drawString(20 * mm, y, line)
-                y -= line_height
-                line = word
-                if y < 30:
-                    c.showPage()
-                    y = height - 30
-            else:
-                line = test_line
-        if line:
-            c.drawString(20 * mm, y, line)
-            y -= line_height
-        y -= 5  # space between paragraphs
-
+    lines = text.splitlines()
+    y = height - 50
+    for line in lines:
+        c.drawString(50, y, line)
+        y -= 14
+        if y < 50:
+            c.showPage()
+            y = height - 50
     c.save()
     buffer.seek(0)
     return buffer
@@ -113,7 +111,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
-            clean_output = strip_markdown(output)
+            clean_output = format_lesson_text(output)
 
             # Add to history
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
