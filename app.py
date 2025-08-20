@@ -30,8 +30,6 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
 }
-a {text-decoration: none;}
-button {cursor: pointer;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -44,15 +42,17 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo ---
+# --- Logo display ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
             data = f.read()
         b64 = base64.b64encode(data).decode()
         st.markdown(f"""
-        <div style="display:flex; justify-content:center; margin-bottom:20px;">
-            <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.25);">
+        <div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
+            <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
+                <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
+            </div>
         </div>
         """, unsafe_allow_html=True)
     except FileNotFoundError:
@@ -64,18 +64,18 @@ show_logo("logo.png", width=200)
 st.title("📚 LessonLift - AI Lesson Planner")
 st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# --- Helper to strip unwanted Markdown formatting ---
-def clean_text(md_text):
+# --- Helper to strip Markdown ---
+def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)           # Remove headings
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Remove bold
     text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italics
-    return text.strip()
+    return text
 
-# --- Session state for lesson history ---
+# --- Session state ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- PDF generation (wraps text correctly) ---
+# --- PDF creation with better spacing ---
 def create_pdf(text):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -83,31 +83,40 @@ def create_pdf(text):
     margin = 50
     max_width = width - 2 * margin
     y = height - margin
-    lines = simpleSplit(text, 'Helvetica', 12, max_width)
-    for line in lines:
-        if y < margin:
-            c.showPage()
-            y = height - margin
-        c.drawString(margin, y, line)
-        y -= 14
+
+    paragraphs = text.split("\n\n")
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            y -= 10
+            continue
+
+        lines = simpleSplit(para, 'Helvetica', 12, max_width)
+        for line in lines:
+            if y < margin:
+                c.showPage()
+                y = height - margin
+            c.drawString(margin, y, line)
+            y -= 16
+        y -= 10  # space between paragraphs
+
     c.save()
     buffer.seek(0)
     return buffer
 
-# --- Generate and display lesson plan ---
+# --- Display plan ---
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
-            clean_output = clean_text(output)
+            clean_output = strip_markdown(output)
 
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Display main sections in cards
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
                         "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
             for sec in sections:
@@ -124,42 +133,44 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 section_text = clean_output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # Full lesson plan in a copyable text area
-            st.text_area("Full Lesson Plan", value=clean_output, height=400)
+            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # PDF and TXT download buttons side by side
             pdf_buffer = create_pdf(clean_output)
-            pdf_data = base64.b64encode(pdf_buffer.read()).decode()
-            txt_data = base64.b64encode(clean_output.encode()).decode()
-            st.markdown(f"""
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <a href="data:text/plain;base64,{txt_data}" download="lesson_plan.txt">
-                    <button style="
-                        padding:10px 16px;
-                        font-size:14px;
-                        border-radius:8px;
-                        border:none;
-                        background-color:#4CAF50;
-                        color:white;
-                    ">⬇ Download TXT</button>
-                </a>
-                <a href="data:application/pdf;base64,{pdf_data}" download="lesson_plan.pdf">
-                    <button style="
-                        padding:10px 16px;
-                        font-size:14px;
-                        border-radius:8px;
-                        border:none;
-                        background-color:#4CAF50;
-                        color:white;
-                    ">⬇ Download PDF</button>
-                </a>
-            </div>
-            """, unsafe_allow_html=True)
+
+            st.markdown(
+                f"""
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                        <button style="
+                            padding:10px 16px;
+                            font-size:14px;
+                            border-radius:8px;
+                            border:none;
+                            background-color:#4CAF50;
+                            color:white;
+                            cursor:pointer;
+                        ">⬇ Download TXT</button>
+                    </a>
+                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+                        <button style="
+                            padding:10px 16px;
+                            font-size:14px;
+                            border-radius:8px;
+                            border:none;
+                            background-color:#4CAF50;
+                            color:white;
+                            cursor:pointer;
+                        ">⬇ Download PDF</button>
+                    </a>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
 
-# --- Lesson form ---
+# --- Form ---
 submitted = False
 lesson_data = {}
 
