@@ -117,7 +117,7 @@ def create_pdf(text):
 # -------------------------------
 st.set_page_config(page_title="LessonLift AI", page_icon="📘", layout="centered")
 
-# Centered logo
+# Centered logo + tagline
 st.markdown(
     """
     <div style="text-align: center;">
@@ -136,7 +136,9 @@ if "logged_in" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = ""
 
+# -------------------------------
 # Login/Register flow
+# -------------------------------
 if not st.session_state.logged_in:
     choice = st.radio("Choose an option", ["Login", "Register"])
 
@@ -149,7 +151,7 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.username = msg
                 st.success(f"Welcome back, {msg}!")
-                st.experimental_rerun()
+                st.rerun()  # ✅ Fixed rerun
             else:
                 st.error(msg)
 
@@ -164,6 +166,9 @@ if not st.session_state.logged_in:
             else:
                 st.error(msg)
 
+# -------------------------------
+# Main app (after login)
+# -------------------------------
 else:
     st.success(f"Logged in as {st.session_state.username}")
 
@@ -174,16 +179,30 @@ else:
     notes = st.text_area("Additional Notes")
 
     if st.button("Generate Lesson Plan"):
-        # Placeholder AI response
+        # Placeholder AI response (replace with real AI later)
         lesson_plan = f"""
 Lesson Title: {topic}  
-Learning Outcomes: - Understand the basics of {topic}.  
-Starter Activity: Quick recap quiz.  
-Main Activity: Group work exploring {topic}.  
-Plenary Activity: Q&A session.  
-Resources Needed: Worksheets, projector.  
-Differentiation Ideas: Scaffolded tasks for mixed abilities.  
-Assessment Methods: Exit ticket reflection.  
+
+Learning Outcomes:  
+- Understand the basics of {topic}.  
+
+Starter Activity:  
+- Quick recap quiz.  
+
+Main Activity:  
+- Group work exploring {topic}.  
+
+Plenary Activity:  
+- Q&A session.  
+
+Resources Needed:  
+- Worksheets, projector.  
+
+Differentiation Ideas:  
+- Scaffolded tasks for mixed abilities.  
+
+Assessment Methods:  
+- Exit ticket reflection.  
 """
         st.subheader("Preview")
         st.text(lesson_plan)
