@@ -61,7 +61,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Helper to show logo ---
+# --- Function to show logo ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -79,26 +79,26 @@ def show_logo(path, width=200):
 
 show_logo("logo.png", width=200)
 
-# --- App Title ---
+# --- Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
 st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# --- Strip Markdown function ---
+# --- Strip Markdown helper ---
 def strip_markdown(md_text: str) -> str:
-    text = re.sub(r'```.*?```', '', md_text, flags=re.S)   # code fences
-    text = re.sub(r'!\[.*?\]\(.*?\)', '', text)            # images
-    text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)        # links -> text
-    text = re.sub(r'#', '', text)                          # remove all '#'
-    text = re.sub(r'\*\*', '', text)                       # remove all '**'
-    text = re.sub(r'\*', '', text)                         # remove '*'
-    text = re.sub(r'`(.*?)`', r'\1', text)                 # inline code
+    text = re.sub(r'```.*?```', '', md_text, flags=re.S)
+    text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
+    text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
+    text = re.sub(r'#', '', text)
+    text = re.sub(r'\*\*', '', text)
+    text = re.sub(r'\*', '', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
     return text.strip()
 
-# --- Initialize session state ---
+# --- Session State ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- PDF function ---
+# --- PDF Creator ---
 def create_pdf(text):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -115,7 +115,7 @@ def create_pdf(text):
     buffer.seek(0)
     return buffer
 
-# --- Generate & display plan ---
+# --- Generate & Display Plan ---
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -123,33 +123,40 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # Save to history
+            # Add to history
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Display in cards
+            # Display sections
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
                         "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
+
             for sec in sections:
-                start_idx = clean_output.lower().find(sec.lower())
+                start_idx = clean_output.find(sec)
                 if start_idx == -1: 
                     continue
                 end_idx = len(clean_output)
                 for next_sec in sections:
                     if next_sec == sec: 
                         continue
-                    next_idx = clean_output.lower().find(next_sec.lower(), start_idx+1)
+                    next_idx = clean_output.find(next_sec, start_idx+1)
                     if next_idx != -1 and next_idx > start_idx:
                         end_idx = min(end_idx, next_idx)
                 section_text = clean_output[start_idx:end_idx].strip()
+
+                # Format section text as bullet points
+                lines = [line.strip() for line in section_text.splitlines() if line.strip()]
+                if len(lines) > 1:
+                    section_text = "<ul>" + "".join([f"<li>{l}</li>" for l in lines]) + "</ul>"
+
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # Full lesson plan
+            # Copyable text
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # PDF
+            # PDF creation
             pdf_buffer = create_pdf(clean_output)
 
             # Download buttons
@@ -166,7 +173,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
 
-# --- Form for lesson details ---
+# --- Form ---
 submitted = False
 lesson_data = {}
 
@@ -183,7 +190,6 @@ with st.form("lesson_form"):
 
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-# --- Run first submit ---
 if submitted:
     prompt = f"""
 Create a detailed UK primary school lesson plan:
@@ -199,7 +205,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
     st.session_state["last_prompt"] = prompt
     generate_and_display_plan(prompt, title="Original")
 
-# --- Regeneration ---
+# --- Regen options ---
 if "last_prompt" in st.session_state:
     st.markdown("### 🔄 Not happy with the plan?")
     regen_style = st.selectbox(
@@ -244,7 +250,7 @@ if "last_prompt" in st.session_state:
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
         generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
 
-# --- Sidebar history ---
+# --- Sidebar History ---
 st.sidebar.header("📚 Lesson History")
 for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
     if st.sidebar.button(lesson["title"], key=i):
