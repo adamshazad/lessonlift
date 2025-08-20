@@ -4,7 +4,8 @@ import re
 import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -29,26 +30,8 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
 }
-.download-btn {
-    display: inline-block;
-    padding: 10px 16px;
-    margin: 0;
-    font-size: 14px;
-    border-radius: 8px;
-    border: none;
-    background-color: #4CAF50;
-    color: white !important;
-    text-decoration: none !important;
-    cursor: pointer;
-    text-align: center;
-}
-.download-btn:hover {
-    background-color: #45a049;
-}
-.download-btn-container {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
+button {
+    cursor:pointer;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -62,7 +45,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Function to show logo properly ---
+# --- Show logo ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -95,20 +78,25 @@ def strip_markdown(md_text):
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to generate PDF ---
-def create_pdf(text):
+# --- Function to generate wrapped PDF ---
+def create_pdf_wrapped(text):
     buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    lines = text.splitlines()
-    y = height - 50
-    for line in lines:
-        c.drawString(50, y, line)
-        y -= 18  # slightly bigger spacing
-        if y < 50:
-            c.showPage()
-            y = height - 50
-    c.save()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=40, leftMargin=40,
+                            topMargin=50, bottomMargin=50)
+    styles = getSampleStyleSheet()
+    styleN = styles["Normal"]
+    styleN.fontSize = 12
+    styleN.leading = 16  # line spacing
+
+    paragraphs = [Paragraph(p.replace('\n', '<br/>'), styleN) for p in text.split('\n\n')]
+
+    story = []
+    for p in paragraphs:
+        story.append(p)
+        story.append(Spacer(1, 12))
+
+    doc.build(story)
     buffer.seek(0)
     return buffer
 
@@ -148,14 +136,32 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
             # PDF creation
-            pdf_buffer = create_pdf(clean_output)
+            pdf_buffer = create_pdf_wrapped(clean_output)
 
             # Inline download buttons with same style
             st.markdown(
                 f"""
-                <div class="download-btn-container">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt" class="download-btn">⬇ Download TXT</a>
-                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf" class="download-btn">⬇ Download PDF</a>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                        <button style="
+                            padding:10px 16px;
+                            font-size:14px;
+                            border-radius:8px;
+                            border:none;
+                            background-color:#4CAF50;
+                            color:white;
+                        ">⬇ Download TXT</button>
+                    </a>
+                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+                        <button style="
+                            padding:10px 16px;
+                            font-size:14px;
+                            border-radius:8px;
+                            border:none;
+                            background-color:#4CAF50;
+                            color:white;
+                        ">⬇ Download PDF</button>
+                    </a>
                 </div>
                 """,
                 unsafe_allow_html=True
