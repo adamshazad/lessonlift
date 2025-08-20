@@ -5,8 +5,6 @@ import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm
-from textwrap import wrap
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -31,8 +29,15 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
 }
-button {
+button.download-btn {
+    padding: 10px 16px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: none;
+    background-color: #4CAF50;
+    color: white;
     cursor: pointer;
+    text-decoration: none;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -46,7 +51,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Logo ---
+# --- Function to show logo properly ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -75,43 +80,36 @@ def strip_markdown(md_text):
     text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italics
     return text
 
-# --- Initialize session state ---
+# --- Initialize session state for lesson history ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to create PDF ---
+# --- Function to generate PDF ---
 def create_pdf(text):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    left_margin = 20 * mm
-    right_margin = 20 * mm
-    top_margin = 20 * mm
-    bottom_margin = 20 * mm
+    left_margin = 20
+    top_margin = height - 40
     line_height = 14
+    y = top_margin
 
-    usable_width = width - left_margin - right_margin
-    y = height - top_margin
-
-    for paragraph in text.split('\n\n'):
-        lines = wrap(paragraph, width=90)
+    paragraphs = text.split('\n\n')
+    for para in paragraphs:
+        lines = para.split('\n')
         for line in lines:
-            if y < bottom_margin:
+            if y < 40:
                 c.showPage()
-                y = height - top_margin
-            # indent bullets slightly
-            if line.strip().startswith("- ") or line.strip().startswith("* "):
-                c.drawString(left_margin + 10, y, line)
-            else:
-                c.drawString(left_margin, y, line)
+                y = top_margin
+            c.drawString(left_margin, y, line.strip())
             y -= line_height
-        y -= line_height // 2  # extra spacing between paragraphs
+        y -= line_height  # extra space between paragraphs
 
     c.save()
     buffer.seek(0)
     return buffer
 
-# --- Function to generate & display plan ---
+# --- Function to call Gemini and display plan ---
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -119,8 +117,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
+            # Add to history
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
+            # Display regeneration message if any
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
@@ -147,29 +147,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             # PDF creation
             pdf_buffer = create_pdf(clean_output)
 
-            # Inline download buttons
+            # Inline download buttons with same style, close together
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="
-                            padding:10px 16px;
-                            font-size:14px;
-                            border-radius:8px;
-                            border:none;
-                            background-color:#4CAF50;
-                            color:white;
-                        ">⬇ Download TXT</button>
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt" class="download-btn">
+                        ⬇ Download TXT
                     </a>
-                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="
-                            padding:10px 16px;
-                            font-size:14px;
-                            border-radius:8px;
-                            border:none;
-                            background-color:#4CAF50;
-                            color:white;
-                        ">⬇ Download PDF</button>
+                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf" class="download-btn">
+                        ⬇ Download PDF
                     </a>
                 </div>
                 """,
