@@ -5,7 +5,10 @@ import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 import textwrap
+from docx import Document
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -35,10 +38,20 @@ body {background-color: white; color: black;}
 
 # --- Sidebar: API Key ---
 st.sidebar.title("🔑 API Key Setup")
-api_key = st.sidebar.text_input("Gemini API Key", type="password")
+
+# Secure API key loading
+api_key = None
+if "gemini_api" in st.secrets:
+    api_key = st.secrets["gemini_api"]
+
+# Fallback: user input
 if not api_key:
-    st.warning("Please enter your Gemini API key in the sidebar.")
+    api_key = st.sidebar.text_input("Gemini API Key", type="password")
+
+if not api_key:
+    st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
     st.stop()
+
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
@@ -75,22 +88,27 @@ def strip_markdown(md_text):
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to generate PDF with wrapped text ---
+# --- Function to generate improved PDF with Platypus ---
 def create_pdf(text):
     buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    margin = 50
-    y = height - margin
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
     for paragraph in text.split("\n"):
-        lines = textwrap.wrap(paragraph, width=95)  # adjust width if needed
-        for line in lines:
-            c.drawString(margin, y, line)
-            y -= 14
-            if y < margin:
-                c.showPage()
-                y = height - margin
-    c.save()
+        if paragraph.strip():
+            story.append(Paragraph(paragraph, styles["Normal"]))
+            story.append(Spacer(1, 12))
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+# --- Function to generate .docx file ---
+def create_docx(text):
+    doc = Document()
+    for paragraph in text.split("\n"):
+        doc.add_paragraph(paragraph)
+    buffer = BytesIO()
+    doc.save(buffer)
     buffer.seek(0)
     return buffer
 
@@ -107,33 +125,38 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
-                        "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
-            for sec in sections:
-                start_idx = clean_output.find(sec)
-                if start_idx == -1:
-                    continue
-                end_idx = len(clean_output)
-                for next_sec in sections:
-                    if next_sec == sec:
-                        continue
-                    next_idx = clean_output.find(next_sec, start_idx+1)
-                    if next_idx != -1 and next_idx > start_idx:
-                        end_idx = min(end_idx, next_idx)
+            # --- Section parsing with regex ---
+            sections = [
+                "Lesson title","Learning outcomes","Starter activity","Main activity",
+                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
+            ]
+            pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
+
+            matches = list(pattern.finditer(clean_output))
+            for i, match in enumerate(matches):
+                sec_name = match.group(1).capitalize()
+                start_idx = match.end()
+                end_idx = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
                 section_text = clean_output[start_idx:end_idx].strip()
-                st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
 
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
+
+            # Export buttons
             pdf_buffer = create_pdf(clean_output)
+            docx_buffer = create_docx(clean_output)
 
             st.markdown(
                 f"""
-                <div style="display:flex; gap:10px; margin-top:10px;">
+                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                     <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download TXT</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download PDF</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
+                    </a>
+                    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
                     </a>
                 </div>
                 """,
@@ -141,7 +164,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
 
         except Exception as e:
-            st.error(f"Error generating lesson plan: {e}")
+            error_msg = str(e)
+            if "API key" in error_msg:
+                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
+            elif "quota" in error_msg:
+                st.error("⚠️ API quota exceeded. Please try again later.")
+            else:
+                st.error(f"Error generating lesson plan: {e}")
 
 # --- Form for lesson details ---
 submitted = False
@@ -223,4 +252,4 @@ if "last_prompt" in st.session_state:
 st.sidebar.header("📚 Lesson History")
 for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
     if st.sidebar.button(lesson["title"], key=i):
-        st.text_area(f"Lesson History: {lesson['title']}", value=lesson["content"], height=400)
+        st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
