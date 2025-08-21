@@ -4,17 +4,8 @@ import re
 import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas  # kept from your original (we now use Platypus under the hood)
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfgen import canvas
 import textwrap
-
-# DOCX is optional to avoid crashes if not installed
-try:
-    from docx import Document
-    DOCX_AVAILABLE = True
-except Exception:
-    DOCX_AVAILABLE = False
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -44,17 +35,14 @@ body {background-color: white; color: black;}
 
 # --- Sidebar: API Key ---
 st.sidebar.title("🔑 API Key Setup")
-# Keep your sidebar input, add secrets fallback (non-breaking)
-api_key = st.secrets.get("gemini_api", None)
-if not api_key:
-    api_key = st.sidebar.text_input("Gemini API Key", type="password")
+api_key = st.sidebar.text_input("Gemini API Key", type="password")
 if not api_key:
     st.warning("Please enter your Gemini API key in the sidebar.")
     st.stop()
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Function to show logo (kept) ---
+# --- Function to show logo ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -72,99 +60,85 @@ def show_logo(path, width=200):
 
 show_logo("logo.png", width=200)
 
-# --- App Title (kept) ---
+# --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
 st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# --- Helper to strip Markdown (kept) ---
+# --- Helper to strip Markdown ---
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
-# --- Section splitter + Formatter (added for neat, consistent outputs) ---
-SECTIONS_ORDER = [
-    "Lesson title","Learning outcomes","Starter activity","Main activity",
-    "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
-]
-SECTION_PATTERN = re.compile(r"(" + "|".join(SECTIONS_ORDER) + r")[:\s]*", re.IGNORECASE)
-
-def split_sections(clean_output):
-    matches = list(SECTION_PATTERN.finditer(clean_output))
-    if not matches:
-        return [("Lesson Plan", clean_output.strip())]
-
-    chunks = []
-    for i, m in enumerate(matches):
-        name = m.group(1)
-        name_norm = name.strip().title()
-        start = m.end()
-        end = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
-        content = clean_output[start:end].strip()
-        chunks.append((name_norm, content))
-    return chunks
-
+# --- NEW: Formatter for neat exports (only formatting; rest unchanged) ---
 def format_lesson_text(clean_output):
-    sections = split_sections(clean_output)
-    formatted = []
-    for title, body in sections:
-        formatted.append(f"{title}\n{'-'*len(title)}\n{body}\n")
-    return "\n\n".join(formatted).strip()
+    """
+    Build a professional, consistent text layout:
+    Section Title
+    -------------
+    content...
+    """
+    sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
+                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
 
-# --- Initialize session state (kept) ---
+    formatted_blocks = []
+    for sec in sections:
+        start_idx = clean_output.find(sec)
+        if start_idx == -1:
+            continue
+
+        # find where this section ends (next section or end of string)
+        end_idx = len(clean_output)
+        for next_sec in sections:
+            if next_sec == sec:
+                continue
+            next_idx = clean_output.find(next_sec, start_idx+1)
+            if next_idx != -1 and next_idx > start_idx:
+                end_idx = min(end_idx, next_idx)
+
+        # extract body (remove the header label itself + optional colon)
+        body = clean_output[start_idx + len(sec):end_idx].strip()
+        if body.startswith(":"):
+            body = body[1:].strip()
+
+        header = sec.title()
+        underline = "-" * len(header)
+        block = f"{header}\n{underline}\n{body}".rstrip()
+        formatted_blocks.append(block)
+
+    # fall back to the original text if no sections were detected
+    if not formatted_blocks:
+        return clean_output.strip()
+
+    return "\n\n".join(formatted_blocks).strip()
+
+# --- Initialize session state ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Improved PDF (uses Platypus for wrapping/headers) ---
-def create_pdf(formatted_text):
+# --- Function to generate PDF with wrapped text (original kept) ---
+def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
-    styles = getSampleStyleSheet()
-    story = []
-
-    # Parse headers + paragraphs from formatted text
-    lines = formatted_text.split("\n")
-    i = 0
-    while i < len(lines):
-        line = lines[i].rstrip()
-        if line and i+1 < len(lines) and set(lines[i+1].rstrip()) == {"-"} and len(lines[i+1].rstrip()) >= len(line):
-            # It's a section header
-            story.append(Paragraph(f"<b>{line}</b>", styles["Heading2"]))
-            story.append(Spacer(1, 6))
-            i += 2  # skip underline
-        else:
-            if line.strip():
-                story.append(Paragraph(line, styles["Normal"]))
-                story.append(Spacer(1, 6))
-            i += 1
-
-    doc.build(story)
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    margin = 50
+    y = height - margin
+    for paragraph in text.split("\n"):
+        lines = textwrap.wrap(paragraph, width=95)  # adjust width if needed
+        if not lines:
+            y -= 14
+        for line in lines:
+            c.drawString(margin, y, line)
+            y -= 14
+            if y < margin:
+                c.showPage()
+                y = height - margin
+    c.save()
     buffer.seek(0)
     return buffer
 
-# --- Optional DOCX (only if python-docx installed) ---
-def create_docx(formatted_text):
-    if not DOCX_AVAILABLE:
-        return None
-    doc = Document()
-    lines = formatted_text.split("\n")
-    i = 0
-    while i < len(lines):
-        line = lines[i].rstrip()
-        if line and i+1 < len(lines) and set(lines[i+1].rstrip()) == {"-"} and len(lines[i+1].rstrip()) >= len(line):
-            doc.add_heading(line, level=2)
-            i += 2
-        else:
-            if line.strip():
-                doc.add_paragraph(line)
-            i += 1
-    buffer = BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
-
-# --- Function to call Gemini and display plan (restored & enhanced formatting only) ---
+# --- Function to call Gemini and display plan (kept; only exports/textarea use formatted text) ---
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -172,71 +146,56 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # Build structured view + neat formatted export text
-            sections = split_sections(clean_output)
-            neat_text = format_lesson_text(clean_output)
-
-            # Save to history (formatted for consistency)
-            st.session_state["lesson_history"].append({"title": title, "content": neat_text})
+            # keep original history entry exactly
+            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show as styled cards (restored)
-            for sec_title, sec_body in sections:
-                sec_html = f"<b>{sec_title}</b><br>{sec_body.replace('\n','<br>')}"
-                st.markdown(f"<div class='stCard'>{sec_html}</div>", unsafe_allow_html=True)
+            # ORIGINAL section rendering (unchanged)
+            sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
+                        "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
+            for sec in sections:
+                start_idx = clean_output.find(sec)
+                if start_idx == -1:
+                    continue
+                end_idx = len(clean_output)
+                for next_sec in sections:
+                    if next_sec == sec:
+                        continue
+                    next_idx = clean_output.find(next_sec, start_idx+1)
+                    if next_idx != -1 and next_idx > start_idx:
+                        end_idx = min(end_idx, next_idx)
+                section_text = clean_output[start_idx:end_idx].strip()
+                st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
 
-            # Full plan (copyable) now uses neat formatted version
+            # NEW: neat, professional text for copy + exports ONLY
+            neat_text = format_lesson_text(clean_output)
+
+            # Copyable full plan shows the neat version
             st.text_area("Full Lesson Plan (copyable)", value=neat_text, height=400)
 
-            # --- Downloads (fixed: use .getvalue() so files aren’t blank) ---
-            txt_b64 = base64.b64encode(neat_text.encode()).decode()
+            # Build files from the neat version (TXT + PDF)
+            pdf_buffer = create_pdf(neat_text)
 
-            pdf_buf = create_pdf(neat_text)
-            pdf_b64 = base64.b64encode(pdf_buf.getvalue()).decode()
-
-            docx_b64 = None
-            if DOCX_AVAILABLE:
-                docx_buf = create_docx(neat_text)
-                if docx_buf:
-                    docx_b64 = base64.b64encode(docx_buf.getvalue()).decode()
-
-            # Buttons (restored, now robust)
-            buttons_html = f"""
-                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{txt_b64}" download="lesson_plan.txt">
+            st.markdown(
+                f"""
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <a href="data:text/plain;base64,{base64.b64encode(neat_text.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download TXT</button>
                     </a>
-                    <a href="data:application/pdf;base64,{pdf_b64}" download="lesson_plan.pdf">
+                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
                         <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download PDF</button>
                     </a>
-            """
-            if docx_b64:
-                buttons_html += f"""
-                    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{docx_b64}" download="lesson_plan.docx">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download DOCX</button>
-                    </a>
-                """
-            else:
-                # Subtle hint if DOCX package missing (keeps UX friendly)
-                buttons_html += """
-                    <span style="align-self:center; opacity:0.8;">(Install <code>python-docx</code> to enable DOCX export)</span>
-                """
-
-            buttons_html += "</div>"
-            st.markdown(buttons_html, unsafe_allow_html=True)
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
         except Exception as e:
-            msg = str(e).lower()
-            if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
-            elif "quota" in msg:
-                st.error("⚠️ API quota exceeded. Please try again later.")
-            else:
-                st.error(f"Error generating lesson plan: {e}")
+            st.error(f"Error generating lesson plan: {e}")
 
-# --- Form for lesson details (restored) ---
+# --- Form for lesson details (unchanged) ---
 submitted = False
 lesson_data = {}
 
@@ -267,7 +226,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
     st.session_state["last_prompt"] = prompt
     generate_and_display_plan(prompt, title="Original")
 
-# --- Regeneration options (restored) ---
+# --- Regeneration options (unchanged) ---
 if "last_prompt" in st.session_state:
     st.markdown("### 🔄 Not happy with the plan?")
     regen_style = st.selectbox(
@@ -312,9 +271,8 @@ if "last_prompt" in st.session_state:
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
         generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
 
-# --- Sidebar: lesson history (restored) ---
+# --- Sidebar: lesson history (unchanged) ---
 st.sidebar.header("📚 Lesson History")
 for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
     if st.sidebar.button(lesson["title"], key=i):
-        # Show as plain copyable text (like your original)
         st.text_area(f"Lesson History: {lesson['title']}", value=lesson["content"], height=400)
