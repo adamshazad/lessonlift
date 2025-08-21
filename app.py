@@ -5,14 +5,40 @@ import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import json
 import os
 
+# --- Page config ---
+st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
+
+# --- CSS ---
+st.markdown("""
+<style>
+body {background-color: white; color: black;}
+.stTextInput>div>div>input, textarea, select {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+    padding: 8px !important;
+    border-radius: 5px !important;
+}
+.stCard {
+    background-color: #f9f9f9 !important;
+    color: black !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
+    line-height: 1.5em;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # -------------------------------
-# User authentication helpers
+# Authentication Helper Functions
 # -------------------------------
 USER_FILE = "users.json"
 
@@ -41,55 +67,25 @@ def login_user(username_or_email, password):
             return True, username
     return False, "Invalid username/email or password."
 
-# -------------------------------
-# Streamlit config and styling
-# -------------------------------
-st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
-
-st.markdown("""
-<style>
-body {background-color: white; color: black;}
-.stTextInput>div>div>input, textarea, select {
-    background-color: white !important;
-    color: black !important;
-    border: 1px solid #ccc !important;
-    padding: 8px !important;
-    border-radius: 5px !important;
-}
-.stCard {
-    background-color: #f9f9f9 !important;
-    color: black !important;
-    border-radius: 12px !important;
-    padding: 16px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# -------------------------------
-# Gemini API setup
-# -------------------------------
+# --- Sidebar: API Key ---
 st.sidebar.title("🔑 API Key Setup")
 api_key = st.secrets.get("gemini_api", None) or st.sidebar.text_input("Gemini API Key", type="password")
 if not api_key:
     st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
     st.stop()
+
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# -------------------------------
-# Logo function
-# -------------------------------
-def show_logo(path="logo.png", width=200):
+# --- Function to show logo ---
+def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
             data = f.read()
         b64 = base64.b64encode(data).decode()
         st.markdown(f"""
-        <div style="display:flex; justify-content:center; align-items:center; margin-bottom:10px;">
-            <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
+        <div style="text-align:center; margin-bottom:20px;">
+            <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; display:inline-block; padding:8px;">
                 <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
             </div>
         </div>
@@ -97,33 +93,32 @@ def show_logo(path="logo.png", width=200):
     except FileNotFoundError:
         st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
 
-# -------------------------------
-# Initialize session state
-# -------------------------------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "lesson_history" not in st.session_state:
-    st.session_state.lesson_history = []
+# --- App Title ---
+def show_app_header():
+    st.title("📚 LessonLift - AI Lesson Planner")
+    st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# -------------------------------
-# Helper function
-# -------------------------------
+# --- Helper to strip Markdown ---
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
-# -------------------------------
-# PDF and DOCX generators
-# -------------------------------
+# --- Initialize session state ---
+if "lesson_history" not in st.session_state:
+    st.session_state["lesson_history"] = []
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+# --- PDF generator ---
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=6)
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=14)
     story = []
     for paragraph in text.split("\n"):
         if paragraph.strip():
@@ -133,6 +128,7 @@ def create_pdf(text):
     buffer.seek(0)
     return buffer
 
+# --- DOCX generator ---
 def create_docx(text):
     doc = Document()
     for paragraph in text.split("\n"):
@@ -142,9 +138,7 @@ def create_docx(text):
     buffer.seek(0)
     return buffer
 
-# -------------------------------
-# Lesson plan generator display
-# -------------------------------
+# --- Main Generator Function ---
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -152,12 +146,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            st.session_state.lesson_history.append({"title": title, "content": clean_output})
+            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Sections display
+            # Sections
             sections = [
                 "Lesson title","Learning outcomes","Starter activity","Main activity",
                 "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
@@ -173,9 +167,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # Downloads
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
+
             st.markdown(f"""
             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                 <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
@@ -199,13 +193,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.error(f"Error generating lesson plan: {e}")
 
-# -------------------------------
-# Login / Sign-up page
-# -------------------------------
+# --- Show login/register page first ---
 if not st.session_state.logged_in:
     show_logo("logo.png", width=200)
-    st.markdown("<h1 style='text-align:center;'>📚 LessonLift - AI Lesson Planner</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;'>Generate tailored UK primary school lesson plans in seconds!</p>", unsafe_allow_html=True)
+    show_app_header()
+    st.subheader("Login or Register to continue")
+
     choice = st.radio("Choose an option", ["Login", "Register"])
 
     if choice == "Login":
@@ -217,7 +210,6 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.username = msg
                 st.success(f"Welcome back, {msg}!")
-                st.experimental_rerun()
             else:
                 st.error(msg)
 
@@ -232,18 +224,18 @@ if not st.session_state.logged_in:
             else:
                 st.error(msg)
 
-# -------------------------------
-# Main generator page
-# -------------------------------
-else:
+# --- Main generator page ---
+if st.session_state.logged_in:
     show_logo("logo.png", width=200)
-    st.markdown("<h1 style='text-align:center;'>📚 LessonLift - AI Lesson Planner</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;'>Generate tailored UK primary school lesson plans in seconds!</p>", unsafe_allow_html=True)
+    show_app_header()
     st.success(f"Logged in as {st.session_state.username}")
 
+    # --- Lesson form ---
+    submitted = False
     lesson_data = {}
+
     with st.form("lesson_form"):
-        # Correct order: Year Group → Ability Level → Lesson Duration
+        st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
         lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
@@ -251,6 +243,7 @@ else:
         lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
         lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
+
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
@@ -268,7 +261,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state["last_prompt"] = prompt
         generate_and_display_plan(prompt, title="Original")
 
-    # Regeneration options
+    # --- Regeneration options ---
     if "last_prompt" in st.session_state:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
@@ -281,10 +274,16 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                 "🚀 Challenge for higher ability"
             ]
         )
-        custom_instruction = st.text_input("Or type your own custom instruction (optional)", placeholder="e.g. Make it more interactive with outdoor activities")
+
+        custom_instruction = st.text_input(
+            "Or type your own custom instruction (optional)",
+            placeholder="e.g. Make it more interactive with outdoor activities"
+        )
+
         if st.button("🔁 Regenerate Lesson Plan"):
             extra_instruction = ""
             regen_message = ""
+
             if not custom_instruction:
                 if regen_style == "🎨 More creative & engaging activities":
                     extra_instruction = "Make activities more creative, interactive, and fun."
@@ -303,11 +302,12 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             else:
                 extra_instruction = custom_instruction
                 regen_message = f"Lesson updated: {custom_instruction}"
+
             new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
 
-    # Sidebar lesson history
+    # --- Sidebar lesson history ---
     st.sidebar.header("📚 Lesson History")
-    for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
+    for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
         if st.sidebar.button(lesson["title"], key=i):
             st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
