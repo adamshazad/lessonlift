@@ -98,14 +98,14 @@ def show_app_header():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# --- Helper to strip Markdown ---
+# --- Helper ---
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
-# --- Initialize session state ---
+# --- Session state ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 if "logged_in" not in st.session_state:
@@ -118,12 +118,12 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=14)
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=16)
     story = []
     for paragraph in text.split("\n"):
         if paragraph.strip():
             story.append(Paragraph(paragraph.strip(), normal_style))
-            story.append(Spacer(1, 6))
+            story.append(Spacer(1, 8))
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -138,7 +138,7 @@ def create_docx(text):
     buffer.seek(0)
     return buffer
 
-# --- Main Generator Function ---
+# --- Generate and display lesson plan ---
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -151,7 +151,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Sections
+            # Sections display
             sections = [
                 "Lesson title","Learning outcomes","Starter activity","Main activity",
                 "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
@@ -167,6 +167,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
+            # Downloads
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
 
@@ -193,10 +194,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.error(f"Error generating lesson plan: {e}")
 
-# --- Show login/register page first ---
+# -------------------------------
+# LOGIN / SIGNUP PAGE
+# -------------------------------
 if not st.session_state.logged_in:
+    st.title("📚 LessonLift - AI Lesson Planner")
     show_logo("logo.png", width=200)
-    show_app_header()
+    st.write("Generate tailored UK primary school lesson plans in seconds!")
     st.subheader("Login or Register to continue")
 
     choice = st.radio("Choose an option", ["Login", "Register"])
@@ -224,13 +228,15 @@ if not st.session_state.logged_in:
             else:
                 st.error(msg)
 
-# --- Main generator page ---
+# -------------------------------
+# GENERATOR PAGE
+# -------------------------------
 if st.session_state.logged_in:
-    show_logo("logo.png", width=200)
     show_app_header()
+    show_logo("logo.png", width=200)
     st.success(f"Logged in as {st.session_state.username}")
 
-    # --- Lesson form ---
+    # --- Form for lesson details ---
     submitted = False
     lesson_data = {}
 
@@ -261,52 +267,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state["last_prompt"] = prompt
         generate_and_display_plan(prompt, title="Original")
 
-    # --- Regeneration options ---
-    if "last_prompt" in st.session_state:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ]
-        )
-
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities"
-        )
-
-        if st.button("🔁 Regenerate Lesson Plan"):
-            extra_instruction = ""
-            regen_message = ""
-
-            if not custom_instruction:
-                if regen_style == "🎨 More creative & engaging activities":
-                    extra_instruction = "Make activities more creative, interactive, and fun."
-                    regen_message = "Lesson updated with more creative and engaging activities."
-                elif regen_style == "📋 More structured with timings":
-                    extra_instruction = "Add clear structure with timings for each section."
-                    regen_message = "Lesson updated with clearer structure and timings."
-                elif regen_style == "🧩 Simplify for lower ability":
-                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                    regen_message = "Lesson simplified for lower ability."
-                elif regen_style == "🚀 Challenge for higher ability":
-                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                    regen_message = "Lesson updated with higher ability challenge tasks."
-                else:
-                    regen_message = "Here’s a new updated version of your lesson plan."
-            else:
-                extra_instruction = custom_instruction
-                regen_message = f"Lesson updated: {custom_instruction}"
-
-            new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
-
-    # --- Sidebar lesson history ---
+    # --- Sidebar: lesson history ---
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
         if st.sidebar.button(lesson["title"], key=i):
