@@ -77,7 +77,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Function to show logo ---
+# --- Logo & Header ---
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -93,7 +93,6 @@ def show_logo(path, width=200):
     except FileNotFoundError:
         st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
 
-# --- App Title ---
 def show_app_header():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
@@ -198,8 +197,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 # LOGIN / SIGNUP PAGE
 # -------------------------------
 if not st.session_state.logged_in:
-    st.title("📚 LessonLift - AI Lesson Planner")
     show_logo("logo.png", width=200)
+    show_app_header()
     st.write("Generate tailored UK primary school lesson plans in seconds!")
     st.subheader("Login or Register to continue")
 
@@ -213,7 +212,7 @@ if not st.session_state.logged_in:
             if success:
                 st.session_state.logged_in = True
                 st.session_state.username = msg
-                st.success(f"Welcome back, {msg}!")
+                st.experimental_rerun()
             else:
                 st.error(msg)
 
@@ -232,8 +231,9 @@ if not st.session_state.logged_in:
 # GENERATOR PAGE
 # -------------------------------
 if st.session_state.logged_in:
-    show_app_header()
     show_logo("logo.png", width=200)
+    show_app_header()
+    st.write("Generate tailored UK primary school lesson plans in seconds!")
     st.success(f"Logged in as {st.session_state.username}")
 
     # --- Form for lesson details ---
