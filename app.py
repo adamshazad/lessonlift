@@ -4,6 +4,7 @@ import textwrap
 from io import BytesIO
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
+from docx import Document
 import base64
 
 # --- Session state for lesson history ---
@@ -24,7 +25,7 @@ def create_pdf(text):
     width, height = A4
     margin = 50
     y = height - margin
-    paragraphs = text.split("\n\n")  # keep paragraph spacing
+    paragraphs = text.split("\n\n")
     for paragraph in paragraphs:
         lines = textwrap.wrap(paragraph, width=95)
         for line in lines:
@@ -35,6 +36,16 @@ def create_pdf(text):
                 y = height - margin
         y -= 10
     c.save()
+    buffer.seek(0)
+    return buffer
+
+# --- DOCX creator ---
+def create_docx(text):
+    doc = Document()
+    for paragraph in text.split("\n\n"):
+        doc.add_paragraph(paragraph)
+    buffer = BytesIO()
+    doc.save(buffer)
     buffer.seek(0)
     return buffer
 
@@ -58,10 +69,7 @@ if st.button("Generate Lesson Plan"):
     else:
         with st.spinner("✨ Creating lesson plan..."):
             try:
-                # --- Here is where your AI model generates content ---
-                # Replace this with your actual model call
-                # Example: response = model.generate_content(prompt)
-                # For demo, using placeholder text
+                # --- Placeholder AI response ---
                 response_text = f"Year 1 Maths Lesson Plan: Shape Explorers!\nYear Group: Year 1\nSubject: Mathematics\nTopic: 2D Shapes\nLearning Objective: Pupils will be able to identify and name circles, squares, triangles, and rectangles.\nAbility Level: Mixed ability\nLesson Duration: 30 minutes\nSEN/EAL Notes: None\n\nResources:\n- Large flashcards of shapes\n- Smaller cutouts\n\nStarter Activity:\n- Quick shape identification game\n\nMain Activity:\n- Match shapes to flashcards\n\nPlenary Activity:\n- Quiz and recap\n\nDifferentiation Ideas:\n- Extra support for SEN\n- Challenge questions for advanced learners\n\nAssessment Methods:\n- Observe participation\n- Quick quiz"
 
                 clean_output = strip_markdown(response_text)
@@ -79,26 +87,27 @@ if st.button("Generate Lesson Plan"):
                     "Assessment Methods": r"(Assessment Methods|Assessment)\:?"
                 }
 
-                found_section = False
+                # --- Split by sections to avoid blank warnings ---
+                section_found = False
                 for sec_name, pattern in section_patterns.items():
-                    match = re.search(pattern, clean_output, re.IGNORECASE)
-                    if match:
-                        found_section = True
-                        start_idx = match.start()
-                        next_idxs = [re.search(p, clean_output[start_idx+1:], re.IGNORECASE) for p in section_patterns.values()]
-                        end_idx = min([m.start()+start_idx+1 for m in next_idxs if m is not None] + [len(clean_output)])
+                    matches = list(re.finditer(pattern, clean_output, re.IGNORECASE))
+                    for i, match in enumerate(matches):
+                        start_idx = match.end()
+                        end_idx = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
                         section_text = clean_output[start_idx:end_idx].strip()
-                        st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
+                        if section_text:
+                            section_found = True
+                            st.markdown(f"**{sec_name}**\n\n{section_text}")
 
-                if not found_section:
-                    st.warning("⚠️ No lesson plan sections detected. Full output shown below.")
-                    st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+                if not section_found:
+                    st.markdown(clean_output)
 
                 # --- Full copyable text area ---
                 st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
                 # --- Downloads ---
                 pdf_buffer = create_pdf(clean_output)
+                docx_buffer = create_docx(clean_output)
                 st.markdown(
                     f"""
                     <div style="display:flex; gap:10px; margin-top:10px;">
@@ -108,7 +117,7 @@ if st.button("Generate Lesson Plan"):
                         <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
                             <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download PDF</button>
                         </a>
-                        <a href="#" id="download-docx">
+                        <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
                             <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download DOCX</button>
                         </a>
                     </div>
