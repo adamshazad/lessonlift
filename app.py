@@ -88,7 +88,7 @@ def show_logo(path="logo.png", width=200):
             data = f.read()
         b64 = base64.b64encode(data).decode()
         st.markdown(f"""
-        <div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
+        <div style="display:flex; justify-content:center; align-items:center; margin-bottom:10px;">
             <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
                 <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
             </div>
@@ -123,7 +123,7 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=14)
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=6)
     story = []
     for paragraph in text.split("\n"):
         if paragraph.strip():
@@ -157,7 +157,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Display sections
+            # Sections display
             sections = [
                 "Lesson title","Learning outcomes","Starter activity","Main activity",
                 "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
@@ -200,12 +200,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 st.error(f"Error generating lesson plan: {e}")
 
 # -------------------------------
-# Show login/signup page
+# Login / Sign-up page
 # -------------------------------
 if not st.session_state.logged_in:
     show_logo("logo.png", width=200)
-    st.title("📚 LessonLift - AI Lesson Planner")
-    st.write("Generate tailored UK primary school lesson plans in seconds!")
+    st.markdown("<h1 style='text-align:center;'>📚 LessonLift - AI Lesson Planner</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;'>Generate tailored UK primary school lesson plans in seconds!</p>", unsafe_allow_html=True)
     choice = st.radio("Choose an option", ["Login", "Register"])
 
     if choice == "Login":
@@ -237,16 +237,19 @@ if not st.session_state.logged_in:
 # -------------------------------
 else:
     show_logo("logo.png", width=200)
+    st.markdown("<h1 style='text-align:center;'>📚 LessonLift - AI Lesson Planner</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;'>Generate tailored UK primary school lesson plans in seconds!</p>", unsafe_allow_html=True)
     st.success(f"Logged in as {st.session_state.username}")
-    st.header("Generate a Lesson Plan")
+
     lesson_data = {}
     with st.form("lesson_form"):
+        # Correct order: Year Group → Ability Level → Lesson Duration
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
+        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
+        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
         lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
         lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
         lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
-        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
-        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
@@ -255,11 +258,11 @@ else:
 Create a detailed UK primary school lesson plan:
 
 Year Group: {lesson_data['year_group']}
+Ability Level: {lesson_data['ability_level']}
+Lesson Duration: {lesson_data['lesson_duration']}
 Subject: {lesson_data['subject']}
 Topic: {lesson_data['topic']}
 Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
-Ability Level: {lesson_data['ability_level']}
-Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state["last_prompt"] = prompt
