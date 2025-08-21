@@ -25,7 +25,7 @@ def create_pdf(text):
     width, height = A4
     margin = 50
     y = height - margin
-    paragraphs = text.split("\n\n")
+    paragraphs = text.split("\n\n")  # keep paragraph spacing
     for paragraph in paragraphs:
         lines = textwrap.wrap(paragraph, width=95)
         for line in lines:
@@ -42,8 +42,9 @@ def create_pdf(text):
 # --- DOCX creator ---
 def create_docx(text):
     doc = Document()
-    for paragraph in text.split("\n\n"):
-        doc.add_paragraph(paragraph)
+    paragraphs = text.split("\n\n")
+    for para in paragraphs:
+        doc.add_paragraph(para)
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -69,38 +70,39 @@ if st.button("Generate Lesson Plan"):
     else:
         with st.spinner("✨ Creating lesson plan..."):
             try:
-                # --- Placeholder AI response ---
+                # --- Here is where your AI model generates content ---
+                # Replace this with your actual model call
+                # For demo, using placeholder text
                 response_text = f"Year 1 Maths Lesson Plan: Shape Explorers!\nYear Group: Year 1\nSubject: Mathematics\nTopic: 2D Shapes\nLearning Objective: Pupils will be able to identify and name circles, squares, triangles, and rectangles.\nAbility Level: Mixed ability\nLesson Duration: 30 minutes\nSEN/EAL Notes: None\n\nResources:\n- Large flashcards of shapes\n- Smaller cutouts\n\nStarter Activity:\n- Quick shape identification game\n\nMain Activity:\n- Match shapes to flashcards\n\nPlenary Activity:\n- Quiz and recap\n\nDifferentiation Ideas:\n- Extra support for SEN\n- Challenge questions for advanced learners\n\nAssessment Methods:\n- Observe participation\n- Quick quiz"
 
                 clean_output = strip_markdown(response_text)
                 st.session_state["lesson_history"].append({"title": "Latest Lesson Plan", "content": clean_output})
 
-                # --- Flexible section detection ---
-                section_patterns = {
-                    "Lesson Title": r"(Lesson\s*Plan|Lesson\s*Title|^.+?Lesson Plan)\:?",
-                    "Learning Outcomes": r"(Learning Outcomes|Learning objective|Objective)\:?",
-                    "Starter Activity": r"(Starter Activity|Starter)\:?",
-                    "Main Activity": r"(Main Activity|Main)\:?",
-                    "Plenary Activity": r"(Plenary Activity|Plenary)\:?",
-                    "Resources Needed": r"(Resources Needed|Resources)\:?",
-                    "Differentiation Ideas": r"(Differentiation Ideas|Differentiation)\:?",
-                    "Assessment Methods": r"(Assessment Methods|Assessment)\:?"
-                }
+                # --- Robust section parsing ---
+                section_headers = [
+                    "Lesson Plan", "Learning Objective", "Resources", "Starter Activity",
+                    "Main Activity", "Plenary Activity", "Differentiation Ideas", "Assessment Methods"
+                ]
 
-                # --- Split by sections to avoid blank warnings ---
-                section_found = False
-                for sec_name, pattern in section_patterns.items():
-                    matches = list(re.finditer(pattern, clean_output, re.IGNORECASE))
-                    for i, match in enumerate(matches):
-                        start_idx = match.end()
-                        end_idx = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
-                        section_text = clean_output[start_idx:end_idx].strip()
-                        if section_text:
-                            section_found = True
-                            st.markdown(f"**{sec_name}**\n\n{section_text}")
+                sections = {}
+                current_header = "Full Lesson Plan"
+                sections[current_header] = ""
 
-                if not section_found:
-                    st.markdown(clean_output)
+                for line in clean_output.split("\n"):
+                    found_header = False
+                    for header in section_headers:
+                        if re.match(fr"^{header}", line, re.IGNORECASE):
+                            current_header = header
+                            sections[current_header] = ""
+                            found_header = True
+                            break
+                    if not found_header:
+                        sections[current_header] += line + "\n"
+
+                # --- Display sections neatly ---
+                for header, content in sections.items():
+                    st.markdown(f"### {header}")
+                    st.text_area(header, value=content.strip(), height=150)
 
                 # --- Full copyable text area ---
                 st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
@@ -108,16 +110,20 @@ if st.button("Generate Lesson Plan"):
                 # --- Downloads ---
                 pdf_buffer = create_pdf(clean_output)
                 docx_buffer = create_docx(clean_output)
+                txt_data = base64.b64encode(clean_output.encode()).decode()
+                pdf_data = base64.b64encode(pdf_buffer.read()).decode()
+                docx_data = base64.b64encode(docx_buffer.read()).decode()
+
                 st.markdown(
                     f"""
                     <div style="display:flex; gap:10px; margin-top:10px;">
-                        <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                        <a href="data:text/plain;base64,{txt_data}" download="lesson_plan.txt">
                             <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download TXT</button>
                         </a>
-                        <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+                        <a href="data:application/pdf;base64,{pdf_data}" download="lesson_plan.pdf">
                             <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download PDF</button>
                         </a>
-                        <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+                        <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{docx_data}" download="lesson_plan.docx">
                             <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download DOCX</button>
                         </a>
                     </div>
