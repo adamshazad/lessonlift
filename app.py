@@ -4,9 +4,9 @@ import re
 import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
 from docx import Document
 import json
 import os
@@ -37,9 +37,9 @@ body {background-color: white; color: black;}
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------
-# Authentication Helper Functions
-# -------------------------------
+# ---------------------
+# Authentication
+# ---------------------
 USER_FILE = "users.json"
 
 def load_users():
@@ -67,25 +67,17 @@ def login_user(username_or_email, password):
             return True, username
     return False, "Invalid username/email or password."
 
-# --- Sidebar: API Key ---
-st.sidebar.title("🔑 API Key Setup")
-api_key = st.secrets.get("gemini_api", None) or st.sidebar.text_input("Gemini API Key", type="password")
-if not api_key:
-    st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
-    st.stop()
-
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-1.5-flash-latest")
-
-# --- Logo & Header ---
+# ---------------------
+# Logo display
+# ---------------------
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
             data = f.read()
         b64 = base64.b64encode(data).decode()
         st.markdown(f"""
-        <div style="text-align:center; margin-bottom:20px;">
-            <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; display:inline-block; padding:8px;">
+        <div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
+            <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
                 <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
             </div>
         </div>
@@ -93,41 +85,50 @@ def show_logo(path, width=200):
     except FileNotFoundError:
         st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
 
-def show_app_header():
-    st.title("📚 LessonLift - AI Lesson Planner")
-    st.write("Generate tailored UK primary school lesson plans in seconds!")
+# ---------------------
+# API Key setup
+# ---------------------
+st.sidebar.title("🔑 API Key Setup")
+api_key = st.secrets.get("gemini_api", None) or st.sidebar.text_input("Gemini API Key", type="password")
+if not api_key:
+    st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
+    st.stop()
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Helper ---
+# ---------------------
+# Helpers
+# ---------------------
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
-# --- Session state ---
-if "lesson_history" not in st.session_state:
-    st.session_state["lesson_history"] = []
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
     st.session_state.username = ""
+if "lesson_history" not in st.session_state:
+    st.session_state.lesson_history = []
 
-# --- PDF generator ---
+# ---------------------
+# PDF & DOCX generators
+# ---------------------
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=16)
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=14)
     story = []
     for paragraph in text.split("\n"):
         if paragraph.strip():
             story.append(Paragraph(paragraph.strip(), normal_style))
-            story.append(Spacer(1, 8))
+            story.append(Spacer(1, 6))
     doc.build(story)
     buffer.seek(0)
     return buffer
 
-# --- DOCX generator ---
 def create_docx(text):
     doc = Document()
     for paragraph in text.split("\n"):
@@ -137,7 +138,9 @@ def create_docx(text):
     buffer.seek(0)
     return buffer
 
-# --- Generate and display lesson plan ---
+# ---------------------
+# Lesson generator
+# ---------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -145,7 +148,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
+            st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -166,10 +169,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # Downloads
+            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
-
             st.markdown(f"""
             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                 <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
@@ -193,15 +195,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.error(f"Error generating lesson plan: {e}")
 
-# -------------------------------
-# LOGIN / SIGNUP PAGE
-# -------------------------------
+# ---------------------
+# LOGIN / REGISTER PAGE
+# ---------------------
 if not st.session_state.logged_in:
     show_logo("logo.png", width=200)
-    show_app_header()
-    st.write("Generate tailored UK primary school lesson plans in seconds!")
-    st.subheader("Login or Register to continue")
+    st.title("📚 LessonLift - AI Lesson Planner")
+    st.write("Generate tailored UK primary school lesson plans in seconds!")  # only once
 
+    st.subheader("Login or Register to continue")
     choice = st.radio("Choose an option", ["Login", "Register"])
 
     if choice == "Login":
@@ -227,19 +229,17 @@ if not st.session_state.logged_in:
             else:
                 st.error(msg)
 
-# -------------------------------
+# ---------------------
 # GENERATOR PAGE
-# -------------------------------
-if st.session_state.logged_in:
+# ---------------------
+else:
     show_logo("logo.png", width=200)
-    show_app_header()
-    st.write("Generate tailored UK primary school lesson plans in seconds!")
+    st.title("📚 LessonLift - AI Lesson Planner")
+    st.write("Generate tailored UK primary school lesson plans in seconds!")  # only once
     st.success(f"Logged in as {st.session_state.username}")
 
-    # --- Form for lesson details ---
     submitted = False
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
@@ -254,6 +254,8 @@ if st.session_state.logged_in:
 
     if submitted:
         prompt = f"""
+Create a detailed UK primary school
+        prompt = f"""
 Create a detailed UK primary school lesson plan:
 
 Year Group: {lesson_data['year_group']}
@@ -267,7 +269,52 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state["last_prompt"] = prompt
         generate_and_display_plan(prompt, title="Original")
 
-    # --- Sidebar: lesson history ---
+    # --- Regeneration options ---
+    if "last_prompt" in st.session_state:
+        st.markdown("### 🔄 Not happy with the plan?")
+        regen_style = st.selectbox(
+            "Choose a regeneration style:",
+            [
+                "♻️ Just regenerate (different variation)",
+                "🎨 More creative & engaging activities",
+                "📋 More structured with timings",
+                "🧩 Simplify for lower ability",
+                "🚀 Challenge for higher ability"
+            ]
+        )
+
+        custom_instruction = st.text_input(
+            "Or type your own custom instruction (optional)",
+            placeholder="e.g. Make it more interactive with outdoor activities"
+        )
+
+        if st.button("🔁 Regenerate Lesson Plan"):
+            extra_instruction = ""
+            regen_message = ""
+
+            if not custom_instruction:
+                if regen_style == "🎨 More creative & engaging activities":
+                    extra_instruction = "Make activities more creative, interactive, and fun."
+                    regen_message = "Lesson updated with more creative and engaging activities."
+                elif regen_style == "📋 More structured with timings":
+                    extra_instruction = "Add clear structure with timings for each section."
+                    regen_message = "Lesson updated with clearer structure and timings."
+                elif regen_style == "🧩 Simplify for lower ability":
+                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
+                    regen_message = "Lesson simplified for lower ability."
+                elif regen_style == "🚀 Challenge for higher ability":
+                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
+                    regen_message = "Lesson updated with higher ability challenge tasks."
+                else:
+                    regen_message = "Here’s a new updated version of your lesson plan."
+            else:
+                extra_instruction = custom_instruction
+                regen_message = f"Lesson updated: {custom_instruction}"
+
+            new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
+            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
+
+    # --- Sidebar lesson history ---
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
         if st.sidebar.button(lesson["title"], key=i):
