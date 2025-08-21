@@ -7,6 +7,8 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, ListFlowabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib import colors
+from docx import Document
+from docx.shared import Pt
 
 # -------------------------------
 # Authentication Helper Functions
@@ -49,14 +51,13 @@ def create_pdf(text):
         topMargin=40, bottomMargin=40
     )
 
-    # Styles
     styles = getSampleStyleSheet()
     normal = ParagraphStyle(
         "Normal",
         parent=styles["Normal"],
-        fontSize=12,
-        leading=16,
-        spaceAfter=8,
+        fontSize=11,
+        leading=14,
+        spaceAfter=6,
         alignment=TA_LEFT
     )
     heading = ParagraphStyle(
@@ -65,7 +66,7 @@ def create_pdf(text):
         fontSize=14,
         textColor=colors.darkblue,
         spaceBefore=12,
-        spaceAfter=8
+        spaceAfter=6
     )
 
     story = []
@@ -84,7 +85,6 @@ def create_pdf(text):
             story.append(Spacer(1, 8))
             continue
 
-        # Detect headings
         if any(line.lower().startswith(h) for h in [
             "lesson title", "learning outcomes", "starter activity",
             "main activity", "plenary activity", "resources needed",
@@ -113,9 +113,34 @@ def create_pdf(text):
     return buffer
 
 # -------------------------------
+# DOCX Generator
+# -------------------------------
+def create_docx(text):
+    doc = Document()
+    lines = text.splitlines()
+    for line in lines:
+        if any(line.lower().startswith(h) for h in [
+            "lesson title", "learning outcomes", "starter activity",
+            "main activity", "plenary activity", "resources needed",
+            "differentiation ideas", "assessment methods"
+        ]):
+            para = doc.add_paragraph(line)
+            para.runs[0].font.bold = True
+            para.runs[0].font.size = Pt(14)
+        elif line.startswith("-") or line[0].isdigit():
+            doc.add_paragraph(line, style='List Bullet')
+        else:
+            para = doc.add_paragraph(line)
+            para.runs[0].font.size = Pt(11)
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# -------------------------------
 # Streamlit App Layout
 # -------------------------------
-st.set_page_config(page_title="LessonLift AI", page_icon="📘", layout="centered")
+st.set_page_config(page_title="📘 LessonLift AI", page_icon="📘", layout="centered")
 
 # Centered logo
 st.markdown(
@@ -123,7 +148,7 @@ st.markdown(
     <div style="text-align: center;">
         <img src="https://via.placeholder.com/200x80.png?text=LessonLift+AI" 
              style="box-shadow: 0px 4px 12px rgba(0,0,0,0.25); border-radius: 8px;"/>
-        <h1>LessonLift AI</h1>
+        <h1>📘 LessonLift AI</h1>
         <p><em>Create lessons in seconds, powered by AI.</em></p>
     </div>
     """,
@@ -138,17 +163,18 @@ if "username" not in st.session_state:
 
 # Login/Register flow
 if not st.session_state.logged_in:
-    choice = st.radio("Choose an option", ["Login", "Register"])
+    choice = st.radio("🔑 Choose an option", ["Login", "Register"])
 
     if choice == "Login":
         login_input = st.text_input("Username or Email")
         login_pass = st.text_input("Password", type="password")
-        if st.button("Login 🔑"):
+        if st.button("Login"):
             success, msg = login_user(login_input, login_pass)
             if success:
                 st.session_state.logged_in = True
                 st.session_state.username = msg
-                st.success(f"Welcome back, {msg}!")
+                st.success(f"Welcome back, {msg}! 🎉")
+                st.experimental_rerun()
             else:
                 st.error(msg)
 
@@ -156,23 +182,23 @@ if not st.session_state.logged_in:
         reg_user = st.text_input("Choose a username")
         reg_email = st.text_input("Your email")
         reg_pass = st.text_input("Choose a password", type="password")
-        if st.button("Register 📝"):
+        if st.button("Register"):
             success, msg = register_user(reg_user, reg_email, reg_pass)
             if success:
-                st.success(msg + " Please login now.")
+                st.success(msg + " Please login now. ✅")
             else:
                 st.error(msg)
 
 else:
-    st.success(f"Logged in as {st.session_state.username}")
+    st.success(f"Logged in as {st.session_state.username} 🎉")
 
-    st.header("Generate a Lesson Plan")
+    st.header("📝 Generate a Lesson Plan")
     subject = st.text_input("Subject")
     topic = st.text_input("Topic")
     year_group = st.text_input("Year Group")
     notes = st.text_area("Additional Notes")
 
-    if st.button("Generate Lesson Plan 📄"):
+    if st.button("Generate Lesson Plan"):
         lesson_plan = f"""
 Lesson Title: {topic}  
 Learning Outcomes: - Understand the basics of {topic}.  
@@ -187,4 +213,7 @@ Assessment Methods: Exit ticket reflection.
         st.text(lesson_plan)
 
         pdf_buffer = create_pdf(lesson_plan)
-        st.download_button("Download as PDF 📥", pdf_buffer, file_name="lesson_plan.pdf", mime="application/pdf")
+        st.download_button("📄 Download as PDF", pdf_buffer, file_name="lesson_plan.pdf", mime="application/pdf")
+
+        docx_buffer = create_docx(lesson_plan)
+        st.download_button("📝 Download as DOCX", docx_buffer, file_name="lesson_plan.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
