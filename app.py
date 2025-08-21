@@ -184,7 +184,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 # -------------------------------
 def login_page():
     show_logo("logo.png", width=200)
-    st.title("📚 LessonLift AI")
+    st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
     choice = st.radio("Choose an option", ["Login", "Register"])
     if choice == "Login":
@@ -216,7 +216,7 @@ def login_page():
 
 def lesson_generator_page():
     show_logo("logo.png", width=200)
-    st.title("📚 LessonLift AI")
+    st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
     st.subheader(f"Logged in as {st.session_state.username}")
     if st.button("Logout"):
