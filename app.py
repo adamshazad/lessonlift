@@ -1,51 +1,19 @@
 import streamlit as st
-import json
-import os
+import google.generativeai as genai
 import re
 import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
-import google.generativeai as genai
+import json
+import os
 
-# -------------------------------
-# Page config
-# -------------------------------
-st.set_page_config(page_title="LessonLift AI", page_icon="📘", layout="centered")
-
-# -------------------------------
-# CSS styling
-# -------------------------------
-st.markdown("""
-<style>
-body {background-color: white; color: black;}
-.stTextInput>div>div>input, textarea, select {
-    background-color: white !important;
-    color: black !important;
-    border: 1px solid #ccc !important;
-    padding: 8px !important;
-    border-radius: 5px !important;
-}
-.stCard {
-    background-color: #f9f9f9 !important;
-    color: black !important;
-    border-radius: 12px !important;
-    padding: 16px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# -------------------------------
+# -------------------
 # User authentication
-# -------------------------------
+# -------------------
 USER_FILE = "users.json"
 
 def load_users():
@@ -73,21 +41,51 @@ def login_user(username_or_email, password):
             return True, username
     return False, "Invalid username/email or password."
 
-# -------------------------------
-# Session state for login and page
-# -------------------------------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "page" not in st.session_state:
-    st.session_state.page = "login"
-if "lesson_history" not in st.session_state:
-    st.session_state.lesson_history = []
+# -------------------
+# Streamlit page config
+# -------------------
+st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# -------------------------------
-# Logo display
-# -------------------------------
+# -------------------
+# CSS styling
+# -------------------
+st.markdown("""
+<style>
+body {background-color: white; color: black;}
+.stTextInput>div>div>input, textarea, select {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+    padding: 8px !important;
+    border-radius: 5px !important;
+}
+.stCard {
+    background-color: #f9f9f9 !important;
+    color: black !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
+    line-height: 1.5em;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------
+# Gemini API setup
+# -------------------
+st.sidebar.title("🔑 API Key Setup")
+api_key = st.secrets.get("gemini_api", None) or st.sidebar.text_input("Gemini API Key", type="password")
+if not api_key:
+    st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
+    st.stop()
+
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-1.5-flash-latest")
+
+# -------------------
+# Helper functions
+# -------------------
 def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
@@ -95,58 +93,32 @@ def show_logo(path, width=200):
         b64 = base64.b64encode(data).decode()
         st.markdown(f"""
         <div style="display:flex; justify-content:center; align-items:center; margin-bottom:10px;">
-            <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
-                <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
-            </div>
+            <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.25);">
         </div>
         """, unsafe_allow_html=True)
     except FileNotFoundError:
         st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
 
-# -------------------------------
-# PDF generator
-# -------------------------------
+def strip_markdown(md_text):
+    text = re.sub(r'#+\s*', '', md_text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    return text
+
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=14, alignment=TA_LEFT)
-    heading_style = ParagraphStyle('Heading', parent=styles['Heading2'], fontSize=14, textColor=colors.darkblue, spaceBefore=12, spaceAfter=6)
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, leading=14)
     story = []
-    lines = text.splitlines()
-    current_list = []
-    sections_keywords = [
-        "lesson title","learning outcomes","starter activity","main activity",
-        "plenary activity","resources needed","differentiation ideas","assessment methods"
-    ]
-
-    for line in lines:
-        line = line.strip()
-        if not line:
-            if current_list:
-                story.append(ListFlowable([ListItem(Paragraph(item, normal_style)) for item in current_list], bulletType='bullet'))
-                current_list = []
+    for paragraph in text.split("\n"):
+        if paragraph.strip():
+            story.append(Paragraph(paragraph.strip(), normal_style))
             story.append(Spacer(1, 6))
-            continue
-        if any(line.lower().startswith(h) for h in sections_keywords):
-            if current_list:
-                story.append(ListFlowable([ListItem(Paragraph(item, normal_style)) for item in current_list], bulletType='bullet'))
-                current_list = []
-            story.append(Paragraph(line, heading_style))
-        elif line.startswith("-") or line[0].isdigit():
-            current_list.append(line)
-        else:
-            story.append(Paragraph(line, normal_style))
-    if current_list:
-        story.append(ListFlowable([ListItem(Paragraph(item, normal_style)) for item in current_list], bulletType='bullet'))
-
     doc.build(story)
     buffer.seek(0)
     return buffer
 
-# -------------------------------
-# DOCX generator
-# -------------------------------
 def create_docx(text):
     doc = Document()
     for paragraph in text.split("\n"):
@@ -156,53 +128,99 @@ def create_docx(text):
     buffer.seek(0)
     return buffer
 
-# -------------------------------
-# Helper function to clean markdown
-# -------------------------------
-def strip_markdown(md_text):
-    text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    return text
+# -------------------
+# Generate lesson
+# -------------------
+def generate_and_display_plan(prompt, title="Latest", regen_message=""):
+    with st.spinner("✨ Creating lesson plan..."):
+        try:
+            response = model.generate_content(prompt)
+            output = response.text.strip()
+            clean_output = strip_markdown(output)
 
-# -------------------------------
-# Gemini AI setup
-# -------------------------------
-api_key = st.secrets.get("gemini_api", None)
-if api_key:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash-latest")
-else:
-    st.warning("Please add your Gemini API key to st.secrets['gemini_api'].")
+            if "lesson_history" not in st.session_state:
+                st.session_state["lesson_history"] = []
+            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
-# -------------------------------
-# Login Page
-# -------------------------------
+            if regen_message:
+                st.info(f"🔄 {regen_message}")
+
+            sections = [
+                "Lesson title","Learning outcomes","Starter activity","Main activity",
+                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
+            ]
+            pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
+            matches = list(pattern.finditer(clean_output))
+            for i, match in enumerate(matches):
+                sec_name = match.group(1).capitalize()
+                start_idx = match.end()
+                end_idx = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
+                section_text = clean_output[start_idx:end_idx].strip()
+                st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
+
+            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
+
+            pdf_buffer = create_pdf(clean_output)
+            docx_buffer = create_docx(clean_output)
+
+            st.markdown(f"""
+            <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
+                </a>
+                <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
+                </a>
+                <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
+
+        except Exception as e:
+            error_msg = str(e)
+            if "API key" in error_msg:
+                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
+            elif "quota" in error_msg:
+                st.error("⚠️ API quota exceeded. Please try again later.")
+            else:
+                st.error(f"Error generating lesson plan: {e}")
+
+# -------------------
+# Login/Register pages
+# -------------------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
 def login_page():
+    st.header("Login / Register")
     show_logo("logo.png", width=200)
-    st.title("📚 LessonLift AI")
+    st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-    choice = st.radio("Choose an option", ["Login", "Register"], key="login_register_choice")
+    choice = st.radio("Choose an option", ["Login", "Register"])
 
     if choice == "Login":
-        username_or_email = st.text_input("Username or Email", key="login_user")
-        password = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login", key="login_button"):
-            success, msg = login_user(username_or_email, password)
+        login_input = st.text_input("Username or Email")
+        login_pass = st.text_input("Password", type="password")
+        if st.button("Login"):
+            success, msg = login_user(login_input, login_pass)
             if success:
                 st.session_state.logged_in = True
                 st.session_state.username = msg
-                st.session_state.page = "generator"
+                st.success(f"Welcome back, {msg}!")
+                st.experimental_rerun()
             else:
                 st.error(msg)
 
     elif choice == "Register":
-        reg_user = st.text_input("Choose a username", key="reg_user")
-        reg_email = st.text_input("Email", key="reg_email")
-        reg_pass = st.text_input("Password", type="password", key="reg_pass")
-        reg_confirm = st.text_input("Confirm Password", type="password", key="reg_confirm")
-        if st.button("Register", key="register_button"):
+        reg_user = st.text_input("Choose a username")
+        reg_email = st.text_input("Your email")
+        reg_pass = st.text_input("Choose a password", type="password")
+        reg_confirm = st.text_input("Confirm password", type="password")
+        if st.button("Register"):
             if reg_pass != reg_confirm:
                 st.error("Passwords do not match.")
             else:
@@ -212,21 +230,16 @@ def login_page():
                 else:
                     st.error(msg)
 
-# -------------------------------
-# Lesson Generator Page
-# -------------------------------
 def lesson_generator_page():
     show_logo("logo.png", width=200)
-    st.title("📚 LessonLift AI")
+    st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-    st.write(f"Logged in as {st.session_state.username}")
     if st.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.username = ""
-        st.session_state.page = "login"
+        st.experimental_rerun()
 
-    # Lesson form
     submitted = False
     lesson_data = {}
 
@@ -254,70 +267,16 @@ Topic: {lesson_data['topic']}
 Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
+        st.session_state["last_prompt"] = prompt
         generate_and_display_plan(prompt, title="Original")
 
-# -------------------------------
-# Generate and display plan
-# -------------------------------
-def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    with st.spinner("✨ Creating lesson plan..."):
-        try:
-            response = model.generate_content(prompt)
-            output = response.text.strip()
-            clean_output = strip_markdown(output)
-
-            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
-
-            if regen_message:
-                st.info(f"🔄 {regen_message}")
-
-            # Sections display
-            sections = [
-                "Lesson title","Learning outcomes","Starter activity","Main activity",
-                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
-            ]
-            pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
-            matches = list(pattern.finditer(clean_output))
-            for i, match in enumerate(matches):
-                sec_name = match.group(1).capitalize()
-                start_idx = match.end()
-                end_idx = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
-                section_text = clean_output[start_idx:end_idx].strip()
-                st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
-
-            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
-
-            # Download buttons
-            pdf_buffer = create_pdf(clean_output)
-            docx_buffer = create_docx(clean_output)
-            st.markdown(f"""
-            <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
-                </a>
-                <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
-                </a>
-                <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
-                </a>
-            </div>
-            """, unsafe_allow_html=True)
-
-        except Exception as e:
-            st.error(f"Error generating lesson plan: {e}")
-
-# -------------------------------
-# Main
-# -------------------------------
+# -------------------
+# Main page routing
+# -------------------
 def main():
-    if st.session_state.logged_in:
-        st.session_state.page = "generator"
-
-    if st.session_state.page == "login":
+    if not st.session_state.logged_in:
         login_page()
-    elif st.session_state.page == "generator":
+    else:
         lesson_generator_page()
 
-if __name__ == "__main__":
-    main()
+main()
