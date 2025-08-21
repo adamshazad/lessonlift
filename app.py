@@ -6,6 +6,7 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 import textwrap
+from docx import Document
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -71,53 +72,11 @@ def strip_markdown(md_text):
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
-# --- NEW: Formatter for neat exports (only formatting; rest unchanged) ---
-def format_lesson_text(clean_output):
-    """
-    Build a professional, consistent text layout:
-    Section Title
-    -------------
-    content...
-    """
-    sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
-                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
-
-    formatted_blocks = []
-    for sec in sections:
-        start_idx = clean_output.find(sec)
-        if start_idx == -1:
-            continue
-
-        # find where this section ends (next section or end of string)
-        end_idx = len(clean_output)
-        for next_sec in sections:
-            if next_sec == sec:
-                continue
-            next_idx = clean_output.find(next_sec, start_idx+1)
-            if next_idx != -1 and next_idx > start_idx:
-                end_idx = min(end_idx, next_idx)
-
-        # extract body (remove the header label itself + optional colon)
-        body = clean_output[start_idx + len(sec):end_idx].strip()
-        if body.startswith(":"):
-            body = body[1:].strip()
-
-        header = sec.title()
-        underline = "-" * len(header)
-        block = f"{header}\n{underline}\n{body}".rstrip()
-        formatted_blocks.append(block)
-
-    # fall back to the original text if no sections were detected
-    if not formatted_blocks:
-        return clean_output.strip()
-
-    return "\n\n".join(formatted_blocks).strip()
-
 # --- Initialize session state ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to generate PDF with wrapped text (original kept) ---
+# --- Function to generate PDF with wrapped text ---
 def create_pdf(text):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -126,8 +85,6 @@ def create_pdf(text):
     y = height - margin
     for paragraph in text.split("\n"):
         lines = textwrap.wrap(paragraph, width=95)  # adjust width if needed
-        if not lines:
-            y -= 14
         for line in lines:
             c.drawString(margin, y, line)
             y -= 14
@@ -138,7 +95,17 @@ def create_pdf(text):
     buffer.seek(0)
     return buffer
 
-# --- Function to call Gemini and display plan (kept; only exports/textarea use formatted text) ---
+# --- Function to generate DOCX ---
+def create_docx(text):
+    buffer = BytesIO()
+    doc = Document()
+    for paragraph in text.split("\n"):
+        doc.add_paragraph(paragraph)
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# --- Function to call Gemini and display plan ---
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -146,15 +113,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # keep original history entry exactly
             st.session_state["lesson_history"].append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # ORIGINAL section rendering (unchanged)
             sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
                         "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
+            displayed = False
             for sec in sections:
                 start_idx = clean_output.find(sec)
                 if start_idx == -1:
@@ -168,24 +134,28 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                         end_idx = min(end_idx, next_idx)
                 section_text = clean_output[start_idx:end_idx].strip()
                 st.markdown(f"<div class='stCard'>{section_text}</div>", unsafe_allow_html=True)
+                displayed = True
 
-            # NEW: neat, professional text for copy + exports ONLY
-            neat_text = format_lesson_text(clean_output)
+            if not displayed:
+                st.warning("⚠️ No lesson plan sections detected. Full output shown below.")
 
-            # Copyable full plan shows the neat version
-            st.text_area("Full Lesson Plan (copyable)", value=neat_text, height=400)
+            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
-            # Build files from the neat version (TXT + PDF)
-            pdf_buffer = create_pdf(neat_text)
+            # PDF and DOCX
+            pdf_buffer = create_pdf(clean_output)
+            docx_buffer = create_docx(clean_output)
 
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px;">
-                    <a href="data:text/plain;base64,{base64.b64encode(neat_text.encode()).decode()}" download="lesson_plan.txt">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
                         <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download PDF</button>
+                    </a>
+                    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ Download DOCX</button>
                     </a>
                 </div>
                 """,
@@ -195,7 +165,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         except Exception as e:
             st.error(f"Error generating lesson plan: {e}")
 
-# --- Form for lesson details (unchanged) ---
+# --- Form for lesson details ---
 submitted = False
 lesson_data = {}
 
@@ -226,7 +196,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
     st.session_state["last_prompt"] = prompt
     generate_and_display_plan(prompt, title="Original")
 
-# --- Regeneration options (unchanged) ---
+# --- Regeneration options ---
 if "last_prompt" in st.session_state:
     st.markdown("### 🔄 Not happy with the plan?")
     regen_style = st.selectbox(
@@ -240,39 +210,4 @@ if "last_prompt" in st.session_state:
         ]
     )
 
-    custom_instruction = st.text_input(
-        "Or type your own custom instruction (optional)",
-        placeholder="e.g. Make it more interactive with outdoor activities"
-    )
-
-    if st.button("🔁 Regenerate Lesson Plan"):
-        extra_instruction = ""
-        regen_message = ""
-
-        if not custom_instruction:
-            if regen_style == "🎨 More creative & engaging activities":
-                extra_instruction = "Make activities more creative, interactive, and fun."
-                regen_message = "Lesson updated with more creative and engaging activities."
-            elif regen_style == "📋 More structured with timings":
-                extra_instruction = "Add clear structure with timings for each section."
-                regen_message = "Lesson updated with clearer structure and timings."
-            elif regen_style == "🧩 Simplify for lower ability":
-                extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                regen_message = "Lesson simplified for lower ability."
-            elif regen_style == "🚀 Challenge for higher ability":
-                extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                regen_message = "Lesson updated with higher ability challenge tasks."
-            else:
-                regen_message = "Here’s a new updated version of your lesson plan."
-        else:
-            extra_instruction = custom_instruction
-            regen_message = f"Lesson updated: {custom_instruction}"
-
-        new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
-        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
-
-# --- Sidebar: lesson history (unchanged) ---
-st.sidebar.header("📚 Lesson History")
-for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
-    if st.sidebar.button(lesson["title"], key=i):
-        st.text_area(f"Lesson History: {lesson['title']}", value=lesson["content"], height=400)
+    custom_instruction = st.text
