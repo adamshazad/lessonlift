@@ -1,20 +1,25 @@
 import streamlit as st
-import google.generativeai as genai
-import re
-import base64
 import json
 import os
+import base64
+import re
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.lib import colors
 from docx import Document
+import google.generativeai as genai
 
-# --- Page Config ---
-st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
+# -------------------------------
+# Page config
+# -------------------------------
+st.set_page_config(page_title="LessonLift AI", page_icon="📘", layout="centered")
 
-# --- CSS ---
+# -------------------------------
+# CSS styling
+# -------------------------------
 st.markdown("""
 <style>
 body {background-color: white; color: black;}
@@ -37,7 +42,9 @@ body {background-color: white; color: black;}
 </style>
 """, unsafe_allow_html=True)
 
-# --- User Auth Helpers ---
+# -------------------------------
+# Users file
+# -------------------------------
 USER_FILE = "users.json"
 
 def load_users():
@@ -65,8 +72,10 @@ def login_user(username_or_email, password):
             return True, username
     return False, "Invalid username/email or password."
 
-# --- Show Logo ---
-def show_logo(path="logo.png", width=200):
+# -------------------------------
+# Logo function
+# -------------------------------
+def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
             data = f.read()
@@ -81,17 +90,9 @@ def show_logo(path="logo.png", width=200):
     except FileNotFoundError:
         st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
 
-# --- Gemini API ---
-st.sidebar.title("🔑 API Key Setup")
-api_key = st.secrets.get("gemini_api", None) or st.sidebar.text_input("Gemini API Key", type="password")
-if not api_key:
-    st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
-    st.stop()
-
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-1.5-flash-latest")
-
-# --- Utilities ---
+# -------------------------------
+# Helper functions
+# -------------------------------
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -121,19 +122,122 @@ def create_docx(text):
     buffer.seek(0)
     return buffer
 
+# -------------------------------
+# Initialize session state
+# -------------------------------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+if "lesson_history" not in st.session_state:
+    st.session_state.lesson_history = []
+
+# -------------------------------
+# Gemini AI Setup
+# -------------------------------
+st.sidebar.title("🔑 API Key Setup")
+api_key = st.secrets.get("gemini_api", None) or st.sidebar.text_input("Gemini API Key", type="password")
+if not api_key:
+    st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
+    st.stop()
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-1.5-flash-latest")
+
+# -------------------------------
+# Login Page
+# -------------------------------
+def login_page():
+    st.title("Welcome to LessonLift AI")
+    show_logo("logo.png", width=200)
+    st.write("Create lessons in seconds, powered by AI.")
+    
+    choice = st.radio("Choose an option", ["Login", "Register"])
+    if choice == "Login":
+        username_email = st.text_input("Username or Email", key="login_user")
+        password = st.text_input("Password", type="password", key="login_pass")
+        if st.button("Login", key="login_btn"):
+            success, msg = login_user(username_email, password)
+            if success:
+                st.session_state.logged_in = True
+                st.session_state.username = msg
+                st.success(f"Welcome back, {msg}!")
+                st.experimental_rerun()
+            else:
+                st.error(msg)
+    elif choice == "Register":
+        reg_user = st.text_input("Choose a username", key="reg_user")
+        reg_email = st.text_input("Your email", key="reg_email")
+        reg_pass = st.text_input("Choose a password", type="password", key="reg_pass")
+        reg_confirm = st.text_input("Confirm password", type="password", key="reg_confirm")
+        if st.button("Register", key="reg_btn"):
+            if reg_pass != reg_confirm:
+                st.error("Passwords do not match.")
+            else:
+                success, msg = register_user(reg_user, reg_email, reg_pass)
+                if success:
+                    st.success(msg + " Please login now.")
+                else:
+                    st.error(msg)
+
+# -------------------------------
+# Lesson Generator Page
+# -------------------------------
+def lesson_generator_page():
+    st.title("📚 LessonLift AI - Lesson Generator")
+    show_logo("logo.png", width=200)
+    st.write("Generate tailored UK primary school lesson plans in seconds!")
+
+    st.sidebar.header("📚 Lesson History")
+    for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
+        if st.sidebar.button(lesson["title"], key=f"hist_{i}"):
+            st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
+
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.experimental_rerun()
+
+    lesson_data = {}
+    with st.form("lesson_form"):
+        st.subheader("Lesson Details")
+        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
+        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
+        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
+        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
+        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
+        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
+        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
+        submitted = st.form_submit_button("🚀 Generate Lesson Plan")
+
+    if submitted:
+        prompt = f"""
+Create a detailed UK primary school lesson plan:
+
+Year Group: {lesson_data['year_group']}
+Ability Level: {lesson_data['ability_level']}
+Lesson Duration: {lesson_data['lesson_duration']}
+Subject: {lesson_data['subject']}
+Topic: {lesson_data['topic']}
+Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
+SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
+"""
+        generate_and_display_plan(prompt, title="Original")
+
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
             clean_output = strip_markdown(output)
-            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
+            st.session_state.lesson_history.append({"title": title, "content": clean_output})
+
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Sections
-            sections = ["Lesson title","Learning outcomes","Starter activity","Main activity",
-                        "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
+            sections = [
+                "Lesson title","Learning outcomes","Starter activity","Main activity",
+                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
+            ]
             pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
             matches = list(pattern.finditer(clean_output))
             for i, match in enumerate(matches):
@@ -161,7 +265,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 </a>
             </div>
             """, unsafe_allow_html=True)
-
         except Exception as e:
             error_msg = str(e)
             if "API key" in error_msg:
@@ -171,130 +274,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.error(f"Error generating lesson plan: {e}")
 
-# --- Session State ---
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "lesson_history" not in st.session_state:
-    st.session_state.lesson_history = []
-
-# --- Login Page ---
-def login_page():
-    st.title("📚 LessonLift - AI Lesson Planner")
-    show_logo()
-    st.write("Generate tailored UK primary school lesson plans in seconds!")
-
-    choice = st.radio("Choose an option", ["Login", "Register"])
-    if choice == "Login":
-        login_input = st.text_input("Username or Email", key="login_user")
-        login_pass = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login"):
-            success, msg = login_user(login_input, login_pass)
-            if success:
-                st.session_state.logged_in = True
-                st.session_state.username = msg
-                st.success(f"Welcome back, {msg}!")
-                st.session_state.show_continue_button = True
-                st.experimental_rerun()
-            else:
-                st.error(msg)
-    elif choice == "Register":
-        reg_user = st.text_input("Choose a username", key="reg_user")
-        reg_email = st.text_input("Your email", key="reg_email")
-        reg_pass = st.text_input("Choose a password", type="password", key="reg_pass")
-        reg_pass2 = st.text_input("Confirm password", type="password", key="reg_pass2")
-        if st.button("Register"):
-            if reg_pass != reg_pass2:
-                st.error("Passwords do not match.")
-            else:
-                success, msg = register_user(reg_user, reg_email, reg_pass)
-                if success:
-                    st.success(msg + " Please login now.")
-                else:
-                    st.error(msg)
-
-    if st.session_state.get("show_continue_button", False):
-        if st.button("Continue to Generator"):
-            st.session_state.current_page = "generator"
-            st.experimental_rerun()
-
-# --- Generator Page ---
-def generator_page():
-    show_logo()
-    st.title("📚 LessonLift - AI Lesson Planner")
-    st.write("Generate tailored UK primary school lesson plans in seconds!")
-    st.write(f"Logged in as {st.session_state.username}")
-
-    if st.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.current_page = "login"
-        st.experimental_rerun()
-
-    submitted = False
-    lesson_data = {}
-    with st.form("lesson_form"):
-        st.subheader("Lesson Details")
-        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
-        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
-        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
-        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
-        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
-        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
-        submitted = st.form_submit_button("🚀 Generate Lesson Plan")
-
-    if submitted:
-        prompt = f"""
-Create a detailed UK primary school lesson plan:
-
-Year Group: {lesson_data['year_group']}
-Ability Level: {lesson_data['ability_level']}
-Lesson Duration: {lesson_data['lesson_duration']}
-Subject: {lesson_data['subject']}
-Topic: {lesson_data['topic']}
-Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
-SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
-"""
-        st.session_state["last_prompt"] = prompt
-        generate_and_display_plan(prompt, title="Original")
-
-    # Regeneration options
-    if "last_prompt" in st.session_state:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ]
-        )
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities"
-        )
-        if st.button("🔁 Regenerate Lesson Plan"):
-            extra_instruction = custom_instruction if custom_instruction else ""
-            regen_message = f"Lesson updated: {custom_instruction}" if custom_instruction else f"Lesson updated: {regen_style}"
-            new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
-
-    # Sidebar lesson history
-    st.sidebar.header("📚 Lesson History")
-    for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
-        if st.sidebar.button(lesson["title"], key=i):
-            st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
-
-# --- Main ---
+# -------------------------------
+# Main
+# -------------------------------
 def main():
-    if "current_page" not in st.session_state:
-        st.session_state.current_page = "login"
-    if st.session_state.current_page == "login":
-        login_page()
+    if st.session_state.logged_in:
+        lesson_generator_page()
     else:
-        generator_page()
+        login_page()
 
 main()
