@@ -4,11 +4,10 @@ import re
 import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-import textwrap
 from docx import Document
+import textwrap
 
 # --- Page config ---
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
@@ -39,12 +38,10 @@ body {background-color: white; color: black;}
 # --- Sidebar: API Key ---
 st.sidebar.title("🔑 API Key Setup")
 
-# Secure API key loading
 api_key = None
 if "gemini_api" in st.secrets:
     api_key = st.secrets["gemini_api"]
 
-# Fallback: user input
 if not api_key:
     api_key = st.sidebar.text_input("Gemini API Key", type="password")
 
@@ -84,11 +81,31 @@ def strip_markdown(md_text):
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
+# --- Formatter for neat exports ---
+def format_lesson_text(clean_output):
+    sections = [
+        "Lesson title","Learning outcomes","Starter activity","Main activity",
+        "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
+    ]
+    pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
+
+    matches = list(pattern.finditer(clean_output))
+    formatted = []
+    for i, match in enumerate(matches):
+        sec_name = match.group(1).title()
+        start_idx = match.end()
+        end_idx = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
+        section_text = clean_output[start_idx:end_idx].strip()
+
+        formatted.append(f"{sec_name}\n{'-'*len(sec_name)}\n{section_text}\n")
+
+    return "\n\n".join(formatted).strip()
+
 # --- Initialize session state ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- Function to generate improved PDF with Platypus ---
+# --- Function to generate improved PDF ---
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -96,17 +113,24 @@ def create_pdf(text):
     story = []
     for paragraph in text.split("\n"):
         if paragraph.strip():
-            story.append(Paragraph(paragraph, styles["Normal"]))
+            if re.match(r"^[A-Za-z ]+\n[-]+$", paragraph):  # header style
+                story.append(Paragraph(f"<b>{paragraph.splitlines()[0]}</b>", styles["Heading2"]))
+            else:
+                story.append(Paragraph(paragraph, styles["Normal"]))
             story.append(Spacer(1, 12))
     doc.build(story)
     buffer.seek(0)
     return buffer
 
-# --- Function to generate .docx file ---
+# --- Function to generate DOCX ---
 def create_docx(text):
     doc = Document()
     for paragraph in text.split("\n"):
-        doc.add_paragraph(paragraph)
+        if paragraph.strip():
+            if re.match(r"^[A-Za-z ]+\n[-]+$", paragraph):  # header
+                doc.add_heading(paragraph.split("\n")[0], level=2)
+            else:
+                doc.add_paragraph(paragraph)
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -120,36 +144,29 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
+            neat_text = format_lesson_text(clean_output)
+
+            st.session_state["lesson_history"].append({"title": title, "content": neat_text})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # --- Section parsing with regex ---
-            sections = [
-                "Lesson title","Learning outcomes","Starter activity","Main activity",
-                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
-            ]
-            pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
+            # Show formatted sections in cards
+            for section in neat_text.split("\n\n"):
+                if section.strip():
+                    st.markdown(f"<div class='stCard'>{section}</div>", unsafe_allow_html=True)
 
-            matches = list(pattern.finditer(clean_output))
-            for i, match in enumerate(matches):
-                sec_name = match.group(1).capitalize()
-                start_idx = match.end()
-                end_idx = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
-                section_text = clean_output[start_idx:end_idx].strip()
-                st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
-
-            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
+            # Full plan text area
+            st.text_area("Full Lesson Plan (copyable)", value=neat_text, height=400)
 
             # Export buttons
-            pdf_buffer = create_pdf(clean_output)
-            docx_buffer = create_docx(clean_output)
+            pdf_buffer = create_pdf(neat_text)
+            docx_buffer = create_docx(neat_text)
 
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                    <a href="data:text/plain;base64,{base64.b64encode(neat_text.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
@@ -252,4 +269,4 @@ if "last_prompt" in st.session_state:
 st.sidebar.header("📚 Lesson History")
 for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
     if st.sidebar.button(lesson["title"], key=i):
-        st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content'].replace('\n','<br>')}</div>", unsafe_allow_html=True)
