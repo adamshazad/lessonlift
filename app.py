@@ -4,17 +4,21 @@ import re
 import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
 from docx import Document
 import json
 import os
 
-# --- Page config ---
+# -------------------------------
+# Page configuration
+# -------------------------------
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# --- CSS ---
+# -------------------------------
+# CSS styling
+# -------------------------------
 st.markdown("""
 <style>
 body {background-color: white; color: black;}
@@ -36,6 +40,36 @@ body {background-color: white; color: black;}
 }
 </style>
 """, unsafe_allow_html=True)
+
+# -------------------------------
+# Sidebar: API key
+# -------------------------------
+st.sidebar.title("🔑 API Key Setup")
+api_key = st.secrets.get("gemini_api", None) or st.sidebar.text_input("Gemini API Key", type="password")
+if not api_key:
+    st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
+    st.stop()
+
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-1.5-flash-latest")
+
+# -------------------------------
+# Logo function
+# -------------------------------
+def show_logo(path="logo.png", width=200):
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        b64 = base64.b64encode(data).decode()
+        st.markdown(f"""
+        <div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
+            <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
+                <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
 
 # -------------------------------
 # Authentication
@@ -68,36 +102,7 @@ def login_user(username_or_email, password):
     return False, "Invalid username/email or password."
 
 # -------------------------------
-# API key setup
-# -------------------------------
-st.sidebar.title("🔑 API Key Setup")
-api_key = st.secrets.get("gemini_api", None) or st.sidebar.text_input("Gemini API Key", type="password")
-if not api_key:
-    st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
-    st.stop()
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-1.5-flash-latest")
-
-# -------------------------------
-# Logo display
-# -------------------------------
-def show_logo(path="logo.png", width=200):
-    try:
-        with open(path, "rb") as f:
-            data = f.read()
-        b64 = base64.b64encode(data).decode()
-        st.markdown(f"""
-        <div style="text-align:center; margin-bottom:20px;">
-            <div style="display:inline-block; box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
-                <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
-
-# -------------------------------
-# PDF and DOCX generation
+# PDF / DOCX functions
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
@@ -123,7 +128,7 @@ def create_docx(text):
     return buffer
 
 # -------------------------------
-# Helper function
+# Helper
 # -------------------------------
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
@@ -132,21 +137,19 @@ def strip_markdown(md_text):
     return text
 
 # -------------------------------
-# Session state defaults
+# Session state init
 # -------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
     st.session_state.username = ""
-if "current_page" not in st.session_state:
-    st.session_state.current_page = "Login / Register"
 if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
 
 # -------------------------------
 # Pages
 # -------------------------------
-def login_register_page():
+def login_page():
     show_logo()
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
@@ -161,8 +164,7 @@ def login_register_page():
             if success:
                 st.session_state.logged_in = True
                 st.session_state.username = msg
-                st.session_state.current_page = "Lesson Generator"
-                st.success(f"Welcome back, {msg}!")
+                st.experimental_rerun()
             else:
                 st.error(msg)
 
@@ -183,7 +185,12 @@ def lesson_generator_page():
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
     st.success(f"Logged in as {st.session_state.username}")
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.experimental_rerun()
 
+    # --- Lesson form ---
     submitted = False
     lesson_data = {}
 
@@ -214,7 +221,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state["last_prompt"] = prompt
         generate_and_display_plan(prompt, title="Original")
 
-    # Regeneration options
+    # --- Regeneration options ---
     if "last_prompt" in st.session_state:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
@@ -259,22 +266,14 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
 
-    # Sidebar lesson history
+    # --- Sidebar lesson history ---
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
         if st.sidebar.button(lesson["title"], key=i):
             st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
 
 # -------------------------------
-# Main app logic
-# -------------------------------
-if st.session_state.current_page == "Login / Register" or not st.session_state.logged_in:
-    login_register_page()
-else:
-    lesson_generator_page()
-
-# -------------------------------
-# Lesson generation function
+# Display plan function
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
@@ -330,3 +329,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 st.error("⚠️ API quota exceeded. Please try again later.")
             else:
                 st.error(f"Error generating lesson plan: {e}")
+
+# -------------------------------
+# Main app logic
+# -------------------------------
+if not st.session_state.logged_in:
+    login_page()
+else:
+    lesson_generator_page()
