@@ -31,16 +31,12 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
 }
-button {
-    cursor:pointer;
-}
 </style>
 """, unsafe_allow_html=True)
 
 # --- Sidebar: API Key ---
 st.sidebar.title("🔑 API Key Setup")
 api_key = st.secrets.get("gemini_api", None) or st.sidebar.text_input("Gemini API Key", type="password")
-
 if not api_key:
     st.warning("Please enter your Gemini API key in the sidebar or configure it in st.secrets.")
     st.stop()
@@ -48,14 +44,14 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
-# --- Show logo ---
-def show_logo(path="logo.png", width=200):
+# --- Function to show logo ---
+def show_logo(path, width=200):
     try:
         with open(path, "rb") as f:
             data = f.read()
         b64 = base64.b64encode(data).decode()
         st.markdown(f"""
-        <div style="display:flex; justify-content:center; margin-bottom:20px;">
+        <div style="display:flex; justify-content:center; align-items:center; margin-bottom:20px;">
             <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
                 <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;">
             </div>
@@ -64,34 +60,27 @@ def show_logo(path="logo.png", width=200):
     except FileNotFoundError:
         st.warning("Logo file not found. Please upload 'logo.png' in the app folder.")
 
-show_logo()
+show_logo("logo.png", width=200)
 
 # --- App Title ---
 st.title("📚 LessonLift - AI Lesson Planner")
 st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# --- Helper to strip Markdown ---
-def strip_markdown(md_text):
-    text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    return text
-
-# --- Session state ---
+# --- Initialize session state ---
 if "lesson_history" not in st.session_state:
     st.session_state["lesson_history"] = []
 
-# --- PDF / DOCX creators ---
+# --- Functions to create PDF/DOCX ---
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
-    story = [Paragraph(p, styles["Normal"]) for p in text.split("\n") if p.strip()]
-    story_with_spacer = []
-    for s in story:
-        story_with_spacer.append(s)
-        story_with_spacer.append(Spacer(1, 12))
-    doc.build(story_with_spacer)
+    story = []
+    for paragraph in text.split("\n"):
+        if paragraph.strip():
+            story.append(Paragraph(paragraph, styles["Normal"]))
+            story.append(Spacer(1, 12))
+    doc.build(story)
     buffer.seek(0)
     return buffer
 
@@ -111,11 +100,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             response = model.generate_content(prompt)
             output = response.text.strip()
 
-            # Remove headings like ##
-            clean_output = re.sub(r'^\s*#+\s*', '', output, flags=re.MULTILINE)
-            clean_output = strip_markdown(clean_output)
-
-            st.session_state["lesson_history"].append({"title": title, "content": clean_output})
+            st.session_state["lesson_history"].append({"title": title, "content": output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -126,37 +111,38 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
             ]
             pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
-            matches = list(pattern.finditer(clean_output))
+            matches = list(pattern.finditer(output))
 
             st.markdown("### 📌 Lesson Plan Overview")
             for i, match in enumerate(matches):
                 sec_name = match.group(1).title()
                 start_idx = match.end()
-                end_idx = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
-                section_text = clean_output[start_idx:end_idx].strip().replace("\n","<br>")
-                st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
+                end_idx = matches[i+1].start() if i+1 < len(matches) else len(output)
+                section_text = output[start_idx:end_idx].strip()
+                st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text.replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
 
-            # --- Full scrollable area ---
-            st.text_area("📝 Full Lesson Plan", value=clean_output, height=400)
+            # --- Full lesson plan (matches PDF/DOCX) ---
+            st.markdown("### 📝 Full Lesson Plan")
+            st.markdown(output)
 
             # --- Export buttons ---
-            pdf_buffer = create_pdf(clean_output)
-            docx_buffer = create_docx(clean_output)
+            pdf_buffer = create_pdf(output)
+            docx_buffer = create_docx(output)
+
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white;">⬇ TXT</button>
+                    <a href="data:text/plain;base64,{base64.b64encode(output.encode()).decode()}" download="lesson_plan.txt">
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white;">⬇ PDF</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
                     </a>
                     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white;">⬇ DOCX</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
                     </a>
                 </div>
-                """,
-                unsafe_allow_html=True
+                """, unsafe_allow_html=True
             )
 
         except Exception as e:
@@ -168,12 +154,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.error(f"Error generating lesson plan: {e}")
 
-# --- Lesson form ---
-submitted = False
-lesson_data = {}
-
+# --- Lesson Form ---
 with st.form("lesson_form"):
     st.subheader("Lesson Details")
+    lesson_data = {}
     lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
     lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
     lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
@@ -211,11 +195,7 @@ if "last_prompt" in st.session_state:
             "🚀 Challenge for higher ability"
         ]
     )
-    custom_instruction = st.text_input(
-        "Or type your own custom instruction (optional)",
-        placeholder="e.g. Make it more interactive with outdoor activities"
-    )
-
+    custom_instruction = st.text_input("Or type your own custom instruction (optional)")
     if st.button("🔁 Regenerate Lesson Plan"):
         extra_instruction = ""
         regen_message = ""
@@ -239,10 +219,11 @@ if "last_prompt" in st.session_state:
             regen_message = f"Lesson updated: {custom_instruction}"
 
         new_prompt = st.session_state["last_prompt"] + "\n\n" + extra_instruction
-        generate_and_display_plan(new_prompt, title="Regenerated", regen_message=regen_message)
+        generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state['lesson_history'])+1}", regen_message=regen_message)
 
-# --- Lesson History ---
+# --- History ---
 if st.session_state["lesson_history"]:
-    st.sidebar.markdown("### 📝 Lesson History")
-    for i, lesson in enumerate(st.session_state["lesson_history"]):
-        st.sidebar.markdown(f"**{i+1}. {lesson['title']}**")
+    st.markdown("### 📜 Lesson History")
+    for idx, lesson in enumerate(reversed(st.session_state["lesson_history"][-5:])):
+        st.markdown(f"**{lesson['title']}**")
+        st.markdown(lesson['content'][:250].replace('\n','<br>') + ("..." if len(lesson['content'])>250 else ""), unsafe_allow_html=True)
