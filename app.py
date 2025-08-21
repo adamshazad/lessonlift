@@ -210,4 +210,16 @@ if "last_prompt" in st.session_state:
         ]
     )
 
-    custom_instruction = st.text
+    custom_instruction = st.text_area("Optional: Custom instruction for regeneration")
+
+    if st.button("Regenerate Plan"):
+        regen_prompt = st.session_state["last_prompt"] + f"\nRegeneration style: {regen_style}"
+        if custom_instruction:
+            regen_prompt += f"\nAdditional instruction: {custom_instruction}"
+        generate_and_display_plan(regen_prompt, title="Regenerated", regen_message="Plan regenerated based on your preferences!")
+
+# --- History ---
+if st.session_state["lesson_history"]:
+    st.markdown("### 🕘 Your Generated Lessons")
+    for i, lesson in enumerate(reversed(st.session_state["lesson_history"])):
+        st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content'][:500]}{'...' if len(lesson['content'])>500 else ''}</div>", unsafe_allow_html=True)
