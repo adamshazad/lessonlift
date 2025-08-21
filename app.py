@@ -292,4 +292,32 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             docx_buffer = create_docx(clean_output)
             st.markdown(f"""
             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                <a href="data:text/plain;base64,{base64.b
+                <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
+                </a>
+                <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
+                </a>
+                <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
+
+        except Exception as e:
+            st.error(f"Error generating lesson plan: {e}")
+
+# -------------------------------
+# Main
+# -------------------------------
+def main():
+    if st.session_state.logged_in:
+        st.session_state.page = "generator"
+
+    if st.session_state.page == "login":
+        login_page()
+    elif st.session_state.page == "generator":
+        lesson_generator_page()
+
+if __name__ == "__main__":
+    main()
