@@ -50,16 +50,15 @@ if "needs_rerun" not in st.session_state:
 # -------------------------------
 # Session defaults
 # -------------------------------
-if "page" not in st.session_state:
-    st.session_state.page = "login"
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "lesson_history" not in st.session_state:
-    st.session_state.lesson_history = []
-if "last_prompt" not in st.session_state:
-    st.session_state.last_prompt = None
+for key, default in {
+    "page": "login",
+    "logged_in": False,
+    "username": "",
+    "lesson_history": [],
+    "last_prompt": None,
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
 
 # -------------------------------
 # Users store (JSON)
@@ -182,14 +181,27 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # Append to history
+            # Only keep small card view
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Only show scrollable box (no large card)
-            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
+            sections = [
+                "Lesson title","Learning outcomes","Starter activity","Main activity",
+                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
+            ]
+            pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
+            matches = list(pattern.finditer(clean_output))
+            if matches:
+                for i,m in enumerate(matches):
+                    sec_name = m.group(1).capitalize()
+                    start_idx = m.end()
+                    end_idx = matches[i+1].start() if i+1<len(matches) else len(clean_output)
+                    section_text = clean_output[start_idx:end_idx].strip()
+                    st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -233,15 +245,19 @@ def login_page():
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
         login_password = st.text_input("Password", type="password", key="login_password")
-        if st.button("Login", key="login_btn"):
-            success, result = login_user(login_user_or_email, login_password)
-            if success:
-                st.session_state.logged_in = True
-                st.session_state.username = result
-                st.session_state.page = "generator"
-                st.experimental_rerun()
-            else:
-                st.error(result)
+        colA,colB = st.columns([1,1])
+        with colA:
+            if st.button("Login", key="login_btn"):
+                success,result = login_user(login_user_or_email, login_password)
+                if success:
+                    st.session_state.logged_in = True
+                    st.session_state.username = result
+                    st.session_state.page = "generator"
+                    st.experimental_rerun()
+                else:
+                    st.error(result)
+        with colB:
+            st.write("")
 
     with tab_register:
         reg_username = st.text_input("Choose a username", key="reg_username")
@@ -284,8 +300,8 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    lesson_data = {}
     submitted = False
+    lesson_data = {}
 
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
