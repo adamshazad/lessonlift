@@ -103,7 +103,6 @@ if not api_key:
     st.sidebar.title("🔑 API Key Setup")
     api_key = st.sidebar.text_input("Gemini API Key", type="password")
 
-# We only block generation if missing; login page remains usable.
 if api_key:
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash-latest")
@@ -145,9 +144,6 @@ def strip_markdown(md_text):
 # Exporters (PDF & DOCX)
 # -------------------------------
 def create_pdf(text):
-    """
-    Formats like the TXT (line-by-line), keeps margins so nothing falls off.
-    """
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -157,7 +153,6 @@ def create_pdf(text):
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
-
     for raw in text.splitlines():
         line = raw.rstrip()
         if not line.strip():
@@ -185,25 +180,20 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if not model:
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
-
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
             clean_output = strip_markdown(output)
-
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
-
             if regen_message:
                 st.info(f"🔄 {regen_message}")
-
             sections = [
                 "Lesson title","Learning outcomes","Starter activity","Main activity",
                 "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
             ]
             pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
             matches = list(pattern.finditer(clean_output))
-
             if matches:
                 for i, m in enumerate(matches):
                     sec_name = m.group(1).capitalize()
@@ -213,9 +203,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                     st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
             else:
                 st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
-
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
-
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -234,7 +222,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 """,
                 unsafe_allow_html=True
             )
-
         except Exception as e:
             msg = str(e).lower()
             if "api key" in msg:
@@ -250,10 +237,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def login_page():
     show_logo("logo.png", width=200)
     title_and_tagline()
-
     st.subheader("Teacher Sign In / Register")
     tab_login, tab_register = st.tabs(["🔓 Login", "🆕 Register"])
-
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
         login_password = st.text_input("Password", type="password", key="login_password")
@@ -266,12 +251,10 @@ def login_page():
                     st.session_state.username = result
                     st.session_state.page = "generator"
                     st.session_state.needs_rerun = True
-                    st.success(f"Welcome back, {result}!")
                 else:
                     st.error(result)
         with colB:
             st.write("")
-
     with tab_register:
         reg_username = st.text_input("Choose a username", key="reg_username")
         reg_email = st.text_input("Your email", key="reg_email")
@@ -288,7 +271,6 @@ def login_page():
                     st.success(msg)
                 else:
                     st.error(msg)
-
     if not api_key:
         st.info("Tip: Add your Gemini API key in the sidebar to enable plan generation.")
 
@@ -315,6 +297,7 @@ def lesson_generator_page():
 
     submitted = False
     lesson_data = {}
+
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
@@ -354,13 +337,11 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             ],
             key="regen_style"
         )
-
         custom_instruction = st.text_input(
             "Or type your own custom instruction (optional)",
             placeholder="e.g. Make it more interactive with outdoor activities",
             key="custom_instruction"
         )
-
         if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
             extra_instruction = ""
             regen_message = ""
@@ -382,7 +363,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             else:
                 extra_instruction = custom_instruction
                 regen_message = f"Lesson updated: {custom_instruction}"
-
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
@@ -400,6 +380,7 @@ def main():
     else:
         lesson_generator_page()
 
+    # Safe rerun trigger
     if st.session_state.needs_rerun:
         st.session_state.needs_rerun = False
         st.experimental_rerun()
