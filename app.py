@@ -37,14 +37,12 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
-    max-height: 300px; 
-    overflow-y: auto; 
 }
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Safe rerun flag (fix double-tap)
+# Safe rerun flag
 # -------------------------------
 if "needs_rerun" not in st.session_state:
     st.session_state.needs_rerun = False
@@ -189,8 +187,21 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Only display small scrollable box
-            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            sections = [
+                "Lesson title","Learning outcomes","Starter activity","Main activity",
+                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
+            ]
+            pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
+            matches = list(pattern.finditer(clean_output))
+            if matches:
+                for i,m in enumerate(matches):
+                    sec_name = m.group(1).capitalize()
+                    start_idx = m.end()
+                    end_idx = matches[i+1].start() if i+1<len(matches) else len(clean_output)
+                    section_text = clean_output[start_idx:end_idx].strip()
+                    st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
 # -------------------------------
 # Pages
@@ -213,8 +224,7 @@ def login_page():
                     st.session_state.logged_in = True
                     st.session_state.username = result
                     st.session_state.page = "generator"
-                    st.session_state.needs_rerun = True  # triggers one safe rerun
-                    st.success(f"Welcome back, {result}!")
+                    st.session_state.needs_rerun = True
                 else:
                     st.error(result)
         with colB:
@@ -246,12 +256,12 @@ def lesson_generator_page():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.page = "login"
-        st.session_state.needs_rerun = True  # safe rerun to prevent blank screen
+        st.session_state.needs_rerun = True
 
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
         if st.sidebar.button(lesson["title"], key=f"hist_{i}"):
-            st.markdown(f"<div class='stCard'>{lesson['content']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
 
     show_logo()
     title_and_tagline()
@@ -304,10 +314,12 @@ def main():
     else:
         lesson_generator_page()
 
-    # Safe rerun trigger
-    if st.session_state.needs_rerun:
+    if st.session_state.get("needs_rerun", False):
         st.session_state.needs_rerun = False
-        st.experimental_rerun()
+        try:
+            st.experimental_rerun()
+        except Exception:
+            pass
 
 # -------------------------------
 # Run
