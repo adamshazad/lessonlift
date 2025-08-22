@@ -203,8 +203,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # small scrollable box only
-            st.text_area("Full Lesson Plan (scrollable)", value=clean_output, height=400)
+            # Keep only the neat small scrollable box for copying
+            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -248,19 +248,15 @@ def login_page():
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
         login_password = st.text_input("Password", type="password", key="login_password")
-        colA,colB = st.columns([1,1])
-        with colA:
-            if st.button("Login", key="login_btn"):
-                success,result = login_user(login_user_or_email, login_password)
-                if success:
-                    st.session_state.logged_in = True
-                    st.session_state.username = result
-                    st.session_state.page = "generator"
-                    st.experimental_rerun()
-                else:
-                    st.error(result)
-        with colB:
-            st.write("")
+        if st.button("Login", key="login_btn"):
+            success,result = login_user(login_user_or_email, login_password)
+            if success:
+                st.session_state.logged_in = True
+                st.session_state.username = result
+                st.session_state.page = "generator"
+                st.experimental_rerun()
+            else:
+                st.error(result)
 
     with tab_register:
         reg_username = st.text_input("Choose a username", key="reg_username")
@@ -332,7 +328,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
 
-    # Regeneration options
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
