@@ -51,7 +51,7 @@ if "needs_rerun" not in st.session_state:
 # Session defaults
 # -------------------------------
 if "page" not in st.session_state:
-    st.session_state.page = "login"   # "login" or "generator"
+    st.session_state.page = "login"
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -81,7 +81,6 @@ def save_users(users):
 
 def register_user(username, email, password):
     users = load_users()
-    # Uniqueness: username and email
     if username in users or any(u.get("email","").lower() == email.lower() for u in users.values()):
         return False, "Username or email already exists."
     users[username] = {"email": email, "password": password}
@@ -96,7 +95,7 @@ def login_user(username_or_email, password):
     return False, "Invalid username/email or password."
 
 # -------------------------------
-# API key setup (secrets or sidebar)
+# API key setup
 # -------------------------------
 api_key = st.secrets.get("gemini_api", None)
 if not api_key:
@@ -136,38 +135,33 @@ def title_and_tagline():
 
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
+    text = re.sub(r'\*(.*?)\*', r'\1', md_text)
     return text
 
 # -------------------------------
-# Exporters (PDF & DOCX)
+# Exporters
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        rightMargin=20*mm, leftMargin=20*mm,
-        topMargin=20*mm, bottomMargin=20*mm
-    )
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
-    for raw in text.splitlines():
-        line = raw.rstrip()
-        if not line.strip():
-            story.append(Spacer(1, 6))
+    for line in text.splitlines():
+        line_safe = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        if line.strip() == "":
+            story.append(Spacer(1,6))
         else:
-            safe = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            story.append(Paragraph(safe, normal))
+            story.append(Paragraph(line_safe, normal))
     doc.build(story)
     buffer.seek(0)
     return buffer
 
 def create_docx(text):
     doc = Document()
-    for raw in text.splitlines():
-        doc.add_paragraph(raw.rstrip())
+    for line in text.splitlines():
+        doc.add_paragraph(line)
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
@@ -185,15 +179,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             response = model.generate_content(prompt)
             output = response.text.strip()
             clean_output = strip_markdown(output)
+
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
+
             if regen_message:
                 st.info(f"🔄 {regen_message}")
-            sections = [
-                "Lesson title","Learning outcomes","Starter activity","Main activity",
-                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
-            ]
+
+            sections = ["Lesson title","Learning outcomes","Starter activity","Main activity","Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
             pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
             matches = list(pattern.finditer(clean_output))
+
             if matches:
                 for i, m in enumerate(matches):
                     sec_name = m.group(1).capitalize()
@@ -203,7 +198,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                     st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
             else:
                 st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+
             st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
+
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -238,6 +235,7 @@ def login_page():
     show_logo("logo.png", width=200)
     title_and_tagline()
     st.subheader("Teacher Sign In / Register")
+
     tab_login, tab_register = st.tabs(["🔓 Login", "🆕 Register"])
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
@@ -251,10 +249,12 @@ def login_page():
                     st.session_state.username = result
                     st.session_state.page = "generator"
                     st.session_state.needs_rerun = True
+                    return
                 else:
                     st.error(result)
         with colB:
             st.write("")
+
     with tab_register:
         reg_username = st.text_input("Choose a username", key="reg_username")
         reg_email = st.text_input("Your email", key="reg_email")
@@ -271,6 +271,7 @@ def login_page():
                     st.success(msg)
                 else:
                     st.error(msg)
+
     if not api_key:
         st.info("Tip: Add your Gemini API key in the sidebar to enable plan generation.")
 
@@ -281,6 +282,7 @@ def lesson_generator_page():
         st.session_state.username = ""
         st.session_state.page = "login"
         st.session_state.needs_rerun = True
+        return
 
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
@@ -363,6 +365,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             else:
                 extra_instruction = custom_instruction
                 regen_message = f"Lesson updated: {custom_instruction}"
+
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
@@ -380,7 +383,6 @@ def main():
     else:
         lesson_generator_page()
 
-    # Safe rerun trigger
     if st.session_state.needs_rerun:
         st.session_state.needs_rerun = False
         st.experimental_rerun()
