@@ -203,8 +203,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
-
+            # ✅ Removed the big scrollable text area
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
 
@@ -256,7 +255,6 @@ def login_page():
                     st.session_state.username = result
                     st.session_state.page = "generator"
                     st.success(f"Welcome back, {result}!")
-                    st.rerun()  # 🔑 Forces immediate rerun so no double click
                 else:
                     st.error(result)
         with colB:
@@ -288,7 +286,6 @@ def lesson_generator_page():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.page = "login"
-        st.rerun()  # 🔑 Forces immediate rerun so no blank screen
 
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
