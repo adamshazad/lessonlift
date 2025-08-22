@@ -256,6 +256,7 @@ def login_page():
                     st.session_state.username = result
                     st.session_state.page = "generator"
                     st.success(f"Welcome back, {result}!")
+                    st.rerun()  # 🔑 Forces immediate rerun so no double click
                 else:
                     st.error(result)
         with colB:
@@ -287,6 +288,7 @@ def lesson_generator_page():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.page = "login"
+        st.rerun()  # 🔑 Forces immediate rerun so no blank screen
 
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
