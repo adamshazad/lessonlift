@@ -17,7 +17,7 @@ from docx import Document
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS
+# CSS (keep your look & feel)
 # -------------------------------
 st.markdown("""
 <style>
@@ -42,21 +42,10 @@ body {background-color: white; color: black;}
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Safe rerun wrapper
-# -------------------------------
-def safe_rerun():
-    try:
-        st.experimental_rerun()
-    except Exception:
-        pass  # ignore first-click rerun errors
-
-# -------------------------------
 # Session defaults
 # -------------------------------
-if "needs_rerun" not in st.session_state:
-    st.session_state.needs_rerun = False
 if "page" not in st.session_state:
-    st.session_state.page = "login"
+    st.session_state.page = "login"   # "login" or "generator"
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -149,12 +138,15 @@ def strip_markdown(md_text):
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                            rightMargin=20*mm, leftMargin=20*mm,
-                            topMargin=20*mm, bottomMargin=20*mm)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=20*mm, leftMargin=20*mm,
+        topMargin=20*mm, bottomMargin=20*mm
+    )
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
+
     for raw in text.splitlines():
         line = raw.rstrip()
         if not line.strip():
@@ -176,18 +168,20 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Core generator
+# Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if not model:
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
+
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
             clean_output = strip_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
+
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
@@ -197,6 +191,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             ]
             pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
             matches = list(pattern.finditer(clean_output))
+
             if matches:
                 for i, m in enumerate(matches):
                     sec_name = m.group(1).capitalize()
@@ -227,6 +222,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 """,
                 unsafe_allow_html=True
             )
+
         except Exception as e:
             msg = str(e).lower()
             if "api key" in msg:
@@ -242,9 +238,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def login_page():
     show_logo("logo.png", width=200)
     title_and_tagline()
-    st.subheader("Teacher Sign In / Register")
 
+    st.subheader("Teacher Sign In / Register")
     tab_login, tab_register = st.tabs(["🔓 Login", "🆕 Register"])
+
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
         login_password = st.text_input("Password", type="password", key="login_password")
@@ -256,12 +253,9 @@ def login_page():
                     st.session_state.logged_in = True
                     st.session_state.username = result
                     st.session_state.page = "generator"
-                    st.session_state.needs_rerun = True
-                    return  # safe first-click
+                    return
                 else:
                     st.error(result)
-        with colB:
-            st.write("")
 
     with tab_register:
         reg_username = st.text_input("Choose a username", key="reg_username")
@@ -289,7 +283,6 @@ def lesson_generator_page():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.page = "login"
-        st.session_state.needs_rerun = True
         return
 
     st.sidebar.header("📚 Lesson History")
@@ -305,9 +298,7 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    submitted = False
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
@@ -347,14 +338,17 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             ],
             key="regen_style"
         )
+
         custom_instruction = st.text_input(
             "Or type your own custom instruction (optional)",
             placeholder="e.g. Make it more interactive with outdoor activities",
             key="custom_instruction"
         )
+
         if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
             extra_instruction = ""
             regen_message = ""
+
             if not custom_instruction:
                 if regen_style == "🎨 More creative & engaging activities":
                     extra_instruction = "Make activities more creative, interactive, and fun."
@@ -373,6 +367,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             else:
                 extra_instruction = custom_instruction
                 regen_message = f"Lesson updated: {custom_instruction}"
+
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
@@ -389,10 +384,6 @@ def main():
         login_page()
     else:
         lesson_generator_page()
-
-    if st.session_state.needs_rerun:
-        st.session_state.needs_rerun = False
-        safe_rerun()
 
 # -------------------------------
 # Run
