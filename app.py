@@ -37,6 +37,8 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
+    max-height: 400px;
+    overflow-y: auto;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -50,15 +52,16 @@ if "needs_rerun" not in st.session_state:
 # -------------------------------
 # Session defaults
 # -------------------------------
-for key, default in {
-    "page": "login",
-    "logged_in": False,
-    "username": "",
-    "lesson_history": [],
-    "last_prompt": None,
-}.items():
-    if key not in st.session_state:
-        st.session_state[key] = default
+if "page" not in st.session_state:
+    st.session_state.page = "login"
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+if "lesson_history" not in st.session_state:
+    st.session_state.lesson_history = []
+if "last_prompt" not in st.session_state:
+    st.session_state.last_prompt = None
 
 # -------------------------------
 # Users store (JSON)
@@ -181,31 +184,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # Only keep small card view
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            sections = [
-                "Lesson title","Learning outcomes","Starter activity","Main activity",
-                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
-            ]
-            pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
-            matches = list(pattern.finditer(clean_output))
-            if matches:
-                for i,m in enumerate(matches):
-                    sec_name = m.group(1).capitalize()
-                    start_idx = m.end()
-                    end_idx = matches[i+1].start() if i+1<len(matches) else len(clean_output)
-                    section_text = clean_output[start_idx:end_idx].strip()
-                    st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            # Only one small scrollable box
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
+            # Downloads match small box
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
-
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
@@ -222,7 +211,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 """,
                 unsafe_allow_html=True
             )
-
         except Exception as e:
             msg = str(e).lower()
             if "api key" in msg:
@@ -238,26 +226,21 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def login_page():
     show_logo()
     title_and_tagline()
-
     st.subheader("Teacher Sign In / Register")
     tab_login, tab_register = st.tabs(["🔓 Login","🆕 Register"])
 
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
         login_password = st.text_input("Password", type="password", key="login_password")
-        colA,colB = st.columns([1,1])
-        with colA:
-            if st.button("Login", key="login_btn"):
-                success,result = login_user(login_user_or_email, login_password)
-                if success:
-                    st.session_state.logged_in = True
-                    st.session_state.username = result
-                    st.session_state.page = "generator"
-                    st.experimental_rerun()
-                else:
-                    st.error(result)
-        with colB:
-            st.write("")
+        if st.button("Login", key="login_btn"):
+            success,result = login_user(login_user_or_email, login_password)
+            if success:
+                st.session_state.logged_in = True
+                st.session_state.username = result
+                st.session_state.page = "generator"
+                st.experimental_rerun()
+            else:
+                st.error(result)
 
     with tab_register:
         reg_username = st.text_input("Choose a username", key="reg_username")
@@ -290,7 +273,7 @@ def lesson_generator_page():
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
         if st.sidebar.button(lesson["title"], key=f"hist_{i}"):
-            st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{lesson['content']}</div>", unsafe_allow_html=True)
 
     show_logo()
     title_and_tagline()
@@ -300,9 +283,7 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    submitted = False
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
@@ -329,61 +310,14 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
 
-    if st.session_state.last_prompt:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ],
-            key="regen_style"
-        )
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities",
-            key="custom_instruction"
-        )
-        if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
-            extra_instruction = ""
-            regen_message = ""
-            if not custom_instruction:
-                if regen_style == "🎨 More creative & engaging activities":
-                    extra_instruction = "Make activities more creative, interactive, and fun."
-                    regen_message = "Lesson updated with more creative and engaging activities."
-                elif regen_style == "📋 More structured with timings":
-                    extra_instruction = "Add clear structure with timings for each section."
-                    regen_message = "Lesson updated with clearer structure and timings."
-                elif regen_style == "🧩 Simplify for lower ability":
-                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                    regen_message = "Lesson simplified for lower ability."
-                elif regen_style == "🚀 Challenge for higher ability":
-                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                    regen_message = "Lesson updated with higher ability challenge tasks."
-                else:
-                    regen_message = "Here’s a new updated version of your lesson plan."
-            else:
-                extra_instruction = custom_instruction
-                regen_message = f"Lesson updated: {custom_instruction}"
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
-
 # -------------------------------
 # Main router
 # -------------------------------
 def main():
     if st.session_state.logged_in:
-        st.session_state.page = "generator"
-    else:
-        st.session_state.page = "login"
-
-    if st.session_state.page == "login":
-        login_page()
-    else:
         lesson_generator_page()
+    else:
+        login_page()
 
 # -------------------------------
 # Run
