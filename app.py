@@ -203,8 +203,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # Only the small scrollable text area
-            st.text_area("Full Lesson Plan (scrollable)", value=clean_output, height=400)
+            # Small scrollable box (keep only this)
+            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -241,22 +241,27 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def login_page():
     show_logo()
     title_and_tagline()
+
     st.subheader("Teacher Sign In / Register")
     tab_login, tab_register = st.tabs(["🔓 Login","🆕 Register"])
 
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
         login_password = st.text_input("Password", type="password", key="login_password")
-        if st.button("Login", key="login_btn"):
-            success,result = login_user(login_user_or_email, login_password)
-            if success:
-                st.session_state.logged_in = True
-                st.session_state.username = result
-                st.session_state.page = "generator"
-                st.success(f"Welcome back, {result}!")
-                st.experimental_rerun()  # safe rerun
-            else:
-                st.error(result)
+        colA,colB = st.columns([1,1])
+        with colA:
+            if st.button("Login", key="login_btn"):
+                success,result = login_user(login_user_or_email, login_password)
+                if success:
+                    st.session_state.logged_in = True
+                    st.session_state.username = result
+                    st.session_state.page = "generator"
+                    st.session_state.needs_rerun = True
+                    st.experimental_rerun()
+                else:
+                    st.error(result)
+        with colB:
+            st.write("")
 
     with tab_register:
         reg_username = st.text_input("Choose a username", key="reg_username")
@@ -284,7 +289,8 @@ def lesson_generator_page():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.page = "login"
-        st.experimental_rerun()  # safe rerun
+        st.session_state.needs_rerun = True
+        st.experimental_rerun()
 
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
@@ -299,8 +305,9 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    lesson_data = {}
     submitted = False
+    lesson_data = {}
+
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
