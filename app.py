@@ -42,12 +42,6 @@ body {background-color: white; color: black;}
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Safe rerun flag
-# -------------------------------
-if "needs_rerun" not in st.session_state:
-    st.session_state.needs_rerun = False
-
-# -------------------------------
 # Session defaults
 # -------------------------------
 if "page" not in st.session_state:
@@ -203,8 +197,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # Small scrollable box (keep only this)
-            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=400)
+            # Keep only the neat small scrollable box
+            st.text_area("Full Lesson Plan (copyable)", value=clean_output, height=300)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -241,10 +235,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def login_page():
     show_logo()
     title_and_tagline()
-
     st.subheader("Teacher Sign In / Register")
     tab_login, tab_register = st.tabs(["🔓 Login","🆕 Register"])
-
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
         login_password = st.text_input("Password", type="password", key="login_password")
@@ -256,13 +248,10 @@ def login_page():
                     st.session_state.logged_in = True
                     st.session_state.username = result
                     st.session_state.page = "generator"
-                    st.session_state.needs_rerun = True
-                    st.experimental_rerun()
                 else:
                     st.error(result)
         with colB:
             st.write("")
-
     with tab_register:
         reg_username = st.text_input("Choose a username", key="reg_username")
         reg_email = st.text_input("Your email", key="reg_email")
@@ -279,7 +268,6 @@ def login_page():
                     st.success(msg)
                 else:
                     st.error(msg)
-
     if not api_key:
         st.info("Tip: Add your Gemini API key in the sidebar to enable plan generation.")
 
@@ -289,25 +277,18 @@ def lesson_generator_page():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.page = "login"
-        st.session_state.needs_rerun = True
-        st.experimental_rerun()
-
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
         if st.sidebar.button(lesson["title"], key=f"hist_{i}"):
             st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
-
     show_logo()
     title_and_tagline()
     st.caption(f"Logged in as **{st.session_state.username}**")
-
     if not api_key:
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
-
     submitted = False
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
@@ -318,7 +299,6 @@ def lesson_generator_page():
         lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
-
     if submitted:
         prompt = f"""
 Create a detailed UK primary school lesson plan:
@@ -333,7 +313,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
-
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
@@ -384,7 +363,6 @@ def main():
         st.session_state.page = "generator"
     else:
         st.session_state.page = "login"
-
     if st.session_state.page == "login":
         login_page()
     else:
