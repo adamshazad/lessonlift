@@ -37,12 +37,14 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
+    max-height: 300px; 
+    overflow-y: auto; 
 }
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Safe rerun flag
+# Safe rerun flag (fix double-tap)
 # -------------------------------
 if "needs_rerun" not in st.session_state:
     st.session_state.needs_rerun = False
@@ -187,51 +189,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            sections = [
-                "Lesson title","Learning outcomes","Starter activity","Main activity",
-                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
-            ]
-            pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
-            matches = list(pattern.finditer(clean_output))
-            if matches:
-                for i,m in enumerate(matches):
-                    sec_name = m.group(1).capitalize()
-                    start_idx = m.end()
-                    end_idx = matches[i+1].start() if i+1<len(matches) else len(clean_output)
-                    section_text = clean_output[start_idx:end_idx].strip()
-                    st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
-
-            # ✅ Removed the big scrollable text area
-            pdf_buffer = create_pdf(clean_output)
-            docx_buffer = create_docx(clean_output)
-
-            st.markdown(
-                f"""
-                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
-                    </a>
-                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
-                    </a>
-                    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
-                    </a>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-        except Exception as e:
-            msg = str(e).lower()
-            if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
-            elif "quota" in msg:
-                st.error("⚠️ API quota exceeded. Please try again later.")
-            else:
-                st.error(f"Error generating lesson plan: {e}")
+            # Only display small scrollable box
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
 # -------------------------------
 # Pages
@@ -254,6 +213,7 @@ def login_page():
                     st.session_state.logged_in = True
                     st.session_state.username = result
                     st.session_state.page = "generator"
+                    st.session_state.needs_rerun = True  # triggers one safe rerun
                     st.success(f"Welcome back, {result}!")
                 else:
                     st.error(result)
@@ -286,11 +246,12 @@ def lesson_generator_page():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.page = "login"
+        st.session_state.needs_rerun = True  # safe rerun to prevent blank screen
 
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
         if st.sidebar.button(lesson["title"], key=f"hist_{i}"):
-            st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{lesson['content']}</div>", unsafe_allow_html=True)
 
     show_logo()
     title_and_tagline()
@@ -329,48 +290,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
 
-    if st.session_state.last_prompt:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ],
-            key="regen_style"
-        )
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities",
-            key="custom_instruction"
-        )
-        if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
-            extra_instruction = ""
-            regen_message = ""
-            if not custom_instruction:
-                if regen_style == "🎨 More creative & engaging activities":
-                    extra_instruction = "Make activities more creative, interactive, and fun."
-                    regen_message = "Lesson updated with more creative and engaging activities."
-                elif regen_style == "📋 More structured with timings":
-                    extra_instruction = "Add clear structure with timings for each section."
-                    regen_message = "Lesson updated with clearer structure and timings."
-                elif regen_style == "🧩 Simplify for lower ability":
-                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                    regen_message = "Lesson simplified for lower ability."
-                elif regen_style == "🚀 Challenge for higher ability":
-                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                    regen_message = "Lesson updated with higher ability challenge tasks."
-                else:
-                    regen_message = "Here’s a new updated version of your lesson plan."
-            else:
-                extra_instruction = custom_instruction
-                regen_message = f"Lesson updated: {custom_instruction}"
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
-
 # -------------------------------
 # Main router
 # -------------------------------
@@ -384,6 +303,11 @@ def main():
         login_page()
     else:
         lesson_generator_page()
+
+    # Safe rerun trigger
+    if st.session_state.needs_rerun:
+        st.session_state.needs_rerun = False
+        st.experimental_rerun()
 
 # -------------------------------
 # Run
