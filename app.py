@@ -37,17 +37,11 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
-    max-height: 400px; 
+    max-height: 400px;
     overflow-y: auto;
 }
 </style>
 """, unsafe_allow_html=True)
-
-# -------------------------------
-# Safe rerun flag
-# -------------------------------
-if "needs_rerun" not in st.session_state:
-    st.session_state.needs_rerun = False
 
 # -------------------------------
 # Session defaults
@@ -64,7 +58,7 @@ if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
 
 # -------------------------------
-# Users store (JSON)
+# Users store
 # -------------------------------
 USER_FILE = "users.json"
 
@@ -184,6 +178,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
+            # Save to history but only show small card (avoid duplication)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -205,11 +200,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # Only show the scrollable card; remove the large text_area
-
+            # Exports
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
-
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
@@ -242,6 +235,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def login_page():
     show_logo()
     title_and_tagline()
+
     st.subheader("Teacher Sign In / Register")
     tab_login, tab_register = st.tabs(["🔓 Login","🆕 Register"])
 
@@ -256,7 +250,6 @@ def login_page():
                     st.session_state.logged_in = True
                     st.session_state.username = result
                     st.session_state.page = "generator"
-                    # Trigger safe rerun for mobile and first-click
                     st.experimental_rerun()
                 else:
                     st.error(result)
@@ -289,7 +282,7 @@ def lesson_generator_page():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.page = "login"
-        st.experimental_rerun()  # Safe rerun to fix double click
+        st.experimental_rerun()
 
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
@@ -304,7 +297,6 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    submitted = False
     lesson_data = {}
 
     with st.form("lesson_form"):
