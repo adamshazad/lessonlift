@@ -95,7 +95,7 @@ def login_user(username_or_email, password):
     return False, "Invalid username/email or password."
 
 # -------------------------------
-# API key setup
+# API key setup (secrets or sidebar)
 # -------------------------------
 api_key = st.secrets.get("gemini_api", None)
 if not api_key:
@@ -135,33 +135,39 @@ def title_and_tagline():
 
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
-    text = re.sub(r'\*(.*?)\*', r'\1', md_text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
 # -------------------------------
-# Exporters
+# Exporters (PDF & DOCX)
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=20*mm, leftMargin=20*mm,
+        topMargin=20*mm, bottomMargin=20*mm
+    )
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
-    for line in text.splitlines():
-        line_safe = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        if line.strip() == "":
-            story.append(Spacer(1,6))
+
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            story.append(Spacer(1, 6))
         else:
-            story.append(Paragraph(line_safe, normal))
+            safe = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
     return buffer
 
 def create_docx(text):
     doc = Document()
-    for line in text.splitlines():
-        doc.add_paragraph(line)
+    for raw in text.splitlines():
+        doc.add_paragraph(raw.rstrip())
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
@@ -174,18 +180,21 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if not model:
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
+
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
             clean_output = strip_markdown(output)
-
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            sections = ["Lesson title","Learning outcomes","Starter activity","Main activity","Plenary activity","Resources needed","Differentiation ideas","Assessment methods"]
+            sections = [
+                "Lesson title","Learning outcomes","Starter activity","Main activity",
+                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
+            ]
             pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
             matches = list(pattern.finditer(clean_output))
 
@@ -219,6 +228,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 """,
                 unsafe_allow_html=True
             )
+
         except Exception as e:
             msg = str(e).lower()
             if "api key" in msg:
@@ -234,9 +244,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def login_page():
     show_logo("logo.png", width=200)
     title_and_tagline()
-    st.subheader("Teacher Sign In / Register")
 
+    st.subheader("Teacher Sign In / Register")
     tab_login, tab_register = st.tabs(["🔓 Login", "🆕 Register"])
+
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
         login_password = st.text_input("Password", type="password", key="login_password")
@@ -249,7 +260,8 @@ def login_page():
                     st.session_state.username = result
                     st.session_state.page = "generator"
                     st.session_state.needs_rerun = True
-                    return
+                    st.success(f"Welcome back, {result}!")
+                    return  # immediately stop rest of page to avoid first-click errors
                 else:
                     st.error(result)
         with colB:
@@ -282,7 +294,7 @@ def lesson_generator_page():
         st.session_state.username = ""
         st.session_state.page = "login"
         st.session_state.needs_rerun = True
-        return
+        return  # safe rerun
 
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
@@ -339,14 +351,17 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             ],
             key="regen_style"
         )
+
         custom_instruction = st.text_input(
             "Or type your own custom instruction (optional)",
             placeholder="e.g. Make it more interactive with outdoor activities",
             key="custom_instruction"
         )
+
         if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
             extra_instruction = ""
             regen_message = ""
+
             if not custom_instruction:
                 if regen_style == "🎨 More creative & engaging activities":
                     extra_instruction = "Make activities more creative, interactive, and fun."
