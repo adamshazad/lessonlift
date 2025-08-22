@@ -17,7 +17,7 @@ from docx import Document
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (keep your look & feel)
+# CSS
 # -------------------------------
 st.markdown("""
 <style>
@@ -42,10 +42,16 @@ body {background-color: white; color: black;}
 """, unsafe_allow_html=True)
 
 # -------------------------------
+# Safe rerun flag
+# -------------------------------
+if "needs_rerun" not in st.session_state:
+    st.session_state.needs_rerun = False
+
+# -------------------------------
 # Session defaults
 # -------------------------------
 if "page" not in st.session_state:
-    st.session_state.page = "login"   # "login" or "generator"
+    st.session_state.page = "login"
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -56,7 +62,7 @@ if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
 
 # -------------------------------
-# Users store (simple JSON)
+# Users store (JSON)
 # -------------------------------
 USER_FILE = "users.json"
 
@@ -138,21 +144,16 @@ def strip_markdown(md_text):
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        rightMargin=20*mm, leftMargin=20*mm,
-        topMargin=20*mm, bottomMargin=20*mm
-    )
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
-
     for raw in text.splitlines():
         line = raw.rstrip()
         if not line.strip():
-            story.append(Spacer(1, 6))
+            story.append(Spacer(1,6))
         else:
-            safe = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
             story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
@@ -180,6 +181,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             response = model.generate_content(prompt)
             output = response.text.strip()
             clean_output = strip_markdown(output)
+
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -191,12 +193,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             ]
             pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
             matches = list(pattern.finditer(clean_output))
-
             if matches:
-                for i, m in enumerate(matches):
+                for i,m in enumerate(matches):
                     sec_name = m.group(1).capitalize()
                     start_idx = m.end()
-                    end_idx = matches[i+1].start() if i+1 < len(matches) else len(clean_output)
+                    end_idx = matches[i+1].start() if i+1<len(matches) else len(clean_output)
                     section_text = clean_output[start_idx:end_idx].strip()
                     st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
             else:
@@ -206,6 +207,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
+
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
@@ -236,26 +238,28 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 # Pages
 # -------------------------------
 def login_page():
-    show_logo("logo.png", width=200)
+    show_logo()
     title_and_tagline()
 
     st.subheader("Teacher Sign In / Register")
-    tab_login, tab_register = st.tabs(["🔓 Login", "🆕 Register"])
+    tab_login, tab_register = st.tabs(["🔓 Login","🆕 Register"])
 
     with tab_login:
         login_user_or_email = st.text_input("Username or Email", key="login_username_email")
         login_password = st.text_input("Password", type="password", key="login_password")
-        colA, colB = st.columns([1,1])
+        colA,colB = st.columns([1,1])
         with colA:
             if st.button("Login", key="login_btn"):
-                success, result = login_user(login_user_or_email, login_password)
+                success,result = login_user(login_user_or_email, login_password)
                 if success:
                     st.session_state.logged_in = True
                     st.session_state.username = result
                     st.session_state.page = "generator"
-                    return
+                    st.success(f"Welcome back, {result}!")
                 else:
                     st.error(result)
+        with colB:
+            st.write("")
 
     with tab_register:
         reg_username = st.text_input("Choose a username", key="reg_username")
@@ -268,7 +272,7 @@ def login_page():
             elif reg_password != reg_password2:
                 st.error("Passwords do not match.")
             else:
-                ok, msg = register_user(reg_username, reg_email, reg_password)
+                ok,msg = register_user(reg_username, reg_email, reg_password)
                 if ok:
                     st.success(msg)
                 else:
@@ -283,14 +287,13 @@ def lesson_generator_page():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.page = "login"
-        return
 
     st.sidebar.header("📚 Lesson History")
     for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
         if st.sidebar.button(lesson["title"], key=f"hist_{i}"):
             st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
 
-    show_logo("logo.png", width=200)
+    show_logo()
     title_and_tagline()
     st.caption(f"Logged in as **{st.session_state.username}**")
 
@@ -298,7 +301,9 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
+    submitted = False
     lesson_data = {}
+
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
@@ -338,17 +343,14 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             ],
             key="regen_style"
         )
-
         custom_instruction = st.text_input(
             "Or type your own custom instruction (optional)",
             placeholder="e.g. Make it more interactive with outdoor activities",
             key="custom_instruction"
         )
-
         if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
             extra_instruction = ""
             regen_message = ""
-
             if not custom_instruction:
                 if regen_style == "🎨 More creative & engaging activities":
                     extra_instruction = "Make activities more creative, interactive, and fun."
@@ -367,7 +369,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             else:
                 extra_instruction = custom_instruction
                 regen_message = f"Lesson updated: {custom_instruction}"
-
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
