@@ -81,6 +81,7 @@ def save_users(users):
 
 def register_user(username, email, password):
     users = load_users()
+    # Uniqueness: username and email
     if username in users or any(u.get("email","").lower() == email.lower() for u in users.values()):
         return False, "Username or email already exists."
     users[username] = {"email": email, "password": password}
@@ -102,6 +103,7 @@ if not api_key:
     st.sidebar.title("🔑 API Key Setup")
     api_key = st.sidebar.text_input("Gemini API Key", type="password")
 
+# We only block generation if missing; login page remains usable.
 if api_key:
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash-latest")
@@ -143,6 +145,9 @@ def strip_markdown(md_text):
 # Exporters (PDF & DOCX)
 # -------------------------------
 def create_pdf(text):
+    """
+    Formats like the TXT (line-by-line), keeps margins so nothing falls off.
+    """
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -247,7 +252,6 @@ def login_page():
     title_and_tagline()
 
     st.subheader("Teacher Sign In / Register")
-
     tab_login, tab_register = st.tabs(["🔓 Login", "🆕 Register"])
 
     with tab_login:
@@ -261,8 +265,8 @@ def login_page():
                     st.session_state.logged_in = True
                     st.session_state.username = result
                     st.session_state.page = "generator"
-                    st.success(f"Welcome back, {result}!")
                     st.session_state.needs_rerun = True
+                    st.success(f"Welcome back, {result}!")
                 else:
                     st.error(result)
         with colB:
@@ -311,19 +315,15 @@ def lesson_generator_page():
 
     submitted = False
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
-
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
         lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"], key="ability_level")
         lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"], key="lesson_duration")
-
         lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science", key="subject")
         lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth", key="topic")
         lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
-
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
@@ -364,7 +364,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
             extra_instruction = ""
             regen_message = ""
-
             if not custom_instruction:
                 if regen_style == "🎨 More creative & engaging activities":
                     extra_instruction = "Make activities more creative, interactive, and fun."
