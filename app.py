@@ -2,8 +2,6 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import base64
-import json
-import os
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -37,8 +35,6 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
-    max-height: 400px;
-    overflow-y: auto;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -139,28 +135,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # ✅ Save to history
+            # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            sections = [
-                "Lesson title","Learning outcomes","Starter activity","Main activity",
-                "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
-            ]
-            pattern = re.compile(r"(" + "|".join(sections) + r")[:\s]*", re.IGNORECASE)
-            matches = list(pattern.finditer(clean_output))
-            if matches:
-                for i,m in enumerate(matches):
-                    sec_name = m.group(1).capitalize()
-                    start_idx = m.end()
-                    end_idx = matches[i+1].start() if i+1<len(matches) else len(clean_output)
-                    section_text = clean_output[start_idx:end_idx].strip()
-                    st.markdown(f"<div class='stCard'><b>{sec_name}</b><br>{section_text}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            # Show latest plan (formatted like history)
+            st.markdown(f"### 📖 {title}")
+            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
+            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -270,15 +255,21 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
-    # ✅ Show lesson history at the bottom
+# -------------------------------
+# Sidebar history
+# -------------------------------
+def show_lesson_history():
+    st.sidebar.title("📜 Lesson History")
     if st.session_state.lesson_history:
-        st.markdown("## 📜 Lesson History")
-        for i, entry in enumerate(st.session_state.lesson_history, 1):
-            with st.expander(f"{i}. {entry['title']}"):
-                st.text(entry['content'])
+        for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
+            with st.sidebar.expander(f"{entry['title']}"):
+                st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+    else:
+        st.sidebar.write("No lesson history yet.")
 
 # -------------------------------
 # Run
 # -------------------------------
 if __name__ == "__main__":
+    show_lesson_history()
     lesson_generator_page()
