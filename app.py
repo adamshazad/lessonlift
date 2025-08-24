@@ -35,6 +35,8 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
+    max-height: 300px;   /* limit height */
+    overflow-y: auto;    /* make it scrollable */
 }
 </style>
 """, unsafe_allow_html=True)
