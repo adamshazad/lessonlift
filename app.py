@@ -46,49 +46,10 @@ body {background-color: white; color: black;}
 # -------------------------------
 # Session defaults
 # -------------------------------
-if "page" not in st.session_state:
-    st.session_state.page = "login"
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
 if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
 if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
-
-# -------------------------------
-# Users store
-# -------------------------------
-USER_FILE = "users.json"
-
-def load_users():
-    if os.path.exists(USER_FILE):
-        with open(USER_FILE, "r") as f:
-            try:
-                return json.load(f)
-            except Exception:
-                return {}
-    return {}
-
-def save_users(users):
-    with open(USER_FILE, "w") as f:
-        json.dump(users, f)
-
-def register_user(username, email, password):
-    users = load_users()
-    if username in users or any(u.get("email","").lower() == email.lower() for u in users.values()):
-        return False, "Username or email already exists."
-    users[username] = {"email": email, "password": password}
-    save_users(users)
-    return True, "Registration successful! Please login."
-
-def login_user(username_or_email, password):
-    users = load_users()
-    for uname, data in users.items():
-        if (uname.lower() == username_or_email.lower() or data.get("email","").lower() == username_or_email.lower()) and data.get("password") == password:
-            return True, uname
-    return False, "Invalid username/email or password."
 
 # -------------------------------
 # API key setup
@@ -178,13 +139,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # Save ONLY to history (don’t print full duplicate here)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show plan content once
             sections = [
                 "Lesson title","Learning outcomes","Starter activity","Main activity",
                 "Plenary activity","Resources needed","Differentiation ideas","Assessment methods"
@@ -201,7 +160,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # Exports
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -222,71 +180,20 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
 
         except Exception as e:
-            st.error(f"⚠️ Error: {e}")
-
-# -------------------------------
-# Pages
-# -------------------------------
-def login_page():
-    show_logo()
-    title_and_tagline()
-
-    st.subheader("Teacher Sign In / Register")
-    tab_login, tab_register = st.tabs(["🔓 Login","🆕 Register"])
-
-    with tab_login:
-        login_user_or_email = st.text_input("Username or Email", key="login_username_email")
-        login_password = st.text_input("Password", type="password", key="login_password")
-        colA,colB = st.columns([1,1])
-        with colA:
-            if st.button("Login", key="login_btn"):
-                success,result = login_user(login_user_or_email, login_password)
-                if success:
-                    st.session_state.logged_in = True
-                    st.session_state.username = result
-                    st.session_state.page = "generator"
-                    st.rerun()
-                else:
-                    st.error(result)
-        with colB:
-            st.write("")
-
-    with tab_register:
-        reg_username = st.text_input("Choose a username", key="reg_username")
-        reg_email = st.text_input("Your email", key="reg_email")
-        reg_password = st.text_input("Choose a password", type="password", key="reg_password")
-        reg_password2 = st.text_input("Confirm password", type="password", key="reg_password2")
-        if st.button("Create account", key="register_btn"):
-            if not reg_username or not reg_email or not reg_password:
-                st.error("Please fill in all fields.")
-            elif reg_password != reg_password2:
-                st.error("Passwords do not match.")
+            msg = str(e).lower()
+            if "api key" in msg:
+                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
+            elif "quota" in msg:
+                st.error("⚠️ API quota exceeded. Please try again later.")
             else:
-                ok,msg = register_user(reg_username, reg_email, reg_password)
-                if ok:
-                    st.success(msg)
-                else:
-                    st.error(msg)
+                st.error(f"Error generating lesson plan: {e}")
 
-    if not api_key:
-        st.info("Tip: Add your Gemini API key in the sidebar to enable plan generation.")
-
+# -------------------------------
+# Main generator page
+# -------------------------------
 def lesson_generator_page():
-    st.sidebar.header("Account")
-    if st.sidebar.button("🚪 Logout", key="logout_btn"):
-        st.session_state.logged_in = False
-        st.session_state.username = ""
-        st.session_state.page = "login"
-        st.rerun()
-
-    st.sidebar.header("📚 Lesson History")
-    for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
-        if st.sidebar.button(lesson["title"], key=f"hist_{i}"):
-            st.markdown(f"<div class='stCard'><b>{lesson['title']}</b><br>{lesson['content']}</div>", unsafe_allow_html=True)
-
     show_logo()
     title_and_tagline()
-    st.caption(f"Logged in as **{st.session_state.username}**")
 
     if not api_key:
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
@@ -363,21 +270,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
 # -------------------------------
-# Main router
-# -------------------------------
-def main():
-    if st.session_state.logged_in:
-        st.session_state.page = "generator"
-    else:
-        st.session_state.page = "login"
-
-    if st.session_state.page == "login":
-        login_page()
-    else:
-        lesson_generator_page()
-
-# -------------------------------
 # Run
 # -------------------------------
 if __name__ == "__main__":
-    main()
+    lesson_generator_page()
