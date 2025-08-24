@@ -2,6 +2,8 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import base64
+import os
+import json
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -35,6 +37,8 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
+    max-height: 400px;
+    overflow-y: auto;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -141,11 +145,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show latest plan (formatted like history)
-            st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+            # Show latest plan in a scrollable card
+            st.markdown(f"<h3>📝 Latest Lesson Plan</h3>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
 
-            # Download buttons
+            # Export buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -178,6 +182,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 # Main generator page
 # -------------------------------
 def lesson_generator_page():
+    # Sidebar lesson history
+    st.sidebar.header("📚 Lesson History")
+    for i, lesson in enumerate(reversed(st.session_state.lesson_history)):
+        if st.sidebar.button(lesson["title"], key=f"hist_{i}"):
+            st.markdown(f"<div class='stCard'>{lesson['content'].replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
+
     show_logo()
     title_and_tagline()
 
@@ -256,20 +266,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
 # -------------------------------
-# Sidebar history
-# -------------------------------
-def show_lesson_history():
-    st.sidebar.title("📜 Lesson History")
-    if st.session_state.lesson_history:
-        for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
-            with st.sidebar.expander(f"{entry['title']}"):
-                st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
-    else:
-        st.sidebar.write("No lesson history yet.")
-
-# -------------------------------
 # Run
 # -------------------------------
 if __name__ == "__main__":
-    show_lesson_history()
     lesson_generator_page()
