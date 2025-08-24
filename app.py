@@ -139,6 +139,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
+            # ✅ Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -268,6 +269,13 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                 regen_message = f"Lesson updated: {custom_instruction}"
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
+
+    # ✅ Show lesson history at the bottom
+    if st.session_state.lesson_history:
+        st.markdown("## 📜 Lesson History")
+        for i, entry in enumerate(st.session_state.lesson_history, 1):
+            with st.expander(f"{i}. {entry['title']}"):
+                st.text(entry['content'])
 
 # -------------------------------
 # Run
