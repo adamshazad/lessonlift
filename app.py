@@ -63,18 +63,15 @@ if now >= st.session_state.reset_time:
     st.session_state.reset_time = datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time.min)
 
 # -------------------------------
-# API key setup
+# API key setup from st.secrets
 # -------------------------------
 api_key = st.secrets.get("gemini_api", None)
-if not api_key:
-    st.sidebar.title("🔑 API Key Setup")
-    api_key = st.sidebar.text_input("Gemini API Key", type="password")
-
 if api_key:
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash-latest")
 else:
     model = None
+    st.error("⚠️ No Gemini API key found. Add it in .streamlit/secrets.toml as gemini_api = 'YOUR_KEY'")
 
 # -------------------------------
 # UI helpers
@@ -194,7 +191,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         except Exception as e:
             msg = str(e).lower()
             if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
+                st.error("⚠️ Invalid or missing API key. Please check your Gemini key in st.secrets.")
             elif "quota" in msg:
                 st.error("⚠️ API quota exceeded. Please try again later.")
             else:
@@ -208,7 +205,6 @@ def lesson_generator_page():
     title_and_tagline()
 
     if not api_key:
-        st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
     # Daily usage counter + reset timer
