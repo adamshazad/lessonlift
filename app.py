@@ -232,11 +232,14 @@ def lesson_generator_page():
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-    if submitted:
-        if st.session_state.lesson_count >= 5:
-            st.error("🚫 Daily limit reached. Please wait until tomorrow.")
-        else:
-            prompt = f"""
+if submitted:
+    if st.session_state.lesson_count >= 5:
+        st.error("🚫 Daily limit reached. Please wait until tomorrow.")
+    else:
+        # Increment usage immediately
+        st.session_state.lesson_count += 1
+
+        prompt = f"""
 Create a detailed UK primary school lesson plan:
 
 Year Group: {lesson_data['year_group']}
@@ -247,8 +250,8 @@ Ability Level: {lesson_data['ability_level']}
 Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
-            st.session_state.last_prompt = prompt
-            generate_and_display_plan(prompt, title="Original")
+        st.session_state.last_prompt = prompt
+        generate_and_display_plan(prompt, title="Original")
 
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
