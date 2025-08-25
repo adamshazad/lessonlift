@@ -142,7 +142,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
 
-    # ✅ Increment usage immediately for both original and regenerated
+    # Increment usage immediately
     if st.session_state.lesson_count >= 5:
         st.error("🚫 Daily limit of 5 lesson plans reached. Please try again tomorrow.")
         return
@@ -154,17 +154,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show latest plan (scrollable box)
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
-            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -204,7 +201,7 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    # ✅ Show updated usage at the very top
+    # Show usage at top
     used = st.session_state.lesson_count
     remaining = 5 - used
     now = datetime.datetime.now()
@@ -219,19 +216,16 @@ def lesson_generator_page():
         st.error(f"🚫 You have used {used}/5 lesson plans today.\n\n⏳ Resets in {hours}h {minutes}m")
 
     lesson_data = {}
+    st.subheader("Lesson Details")
+    lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
+    lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"], key="ability_level")
+    lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"], key="lesson_duration")
+    lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science", key="subject")
+    lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth", key="topic")
+    lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
+    lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
 
-    with st.form("lesson_form"):
-        st.subheader("Lesson Details")
-        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
-        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"], key="ability_level")
-        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"], key="lesson_duration")
-        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science", key="subject")
-        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth", key="topic")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
-        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
-        submitted = st.form_submit_button("🚀 Generate Lesson Plan")
-
-    if submitted:
+    if st.button("🚀 Generate Lesson Plan"):
         prompt = f"""
 Create a detailed UK primary school lesson plan:
 
@@ -246,6 +240,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
 
+    # Regeneration section remains unchanged
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
