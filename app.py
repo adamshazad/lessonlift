@@ -101,8 +101,8 @@ def title_and_tagline():
 
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
+    text = re.sub(r'\*(.*?)\*', r'\1', md_text)
     return text
 
 # -------------------------------
@@ -152,9 +152,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
+            # Count usage for both original & regenerated plans
+            st.session_state.lesson_count += 1
+
             # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
-            st.session_state.lesson_count += 1
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
