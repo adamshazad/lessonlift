@@ -204,7 +204,7 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    # Daily usage counter + reset timer
+    # ✅ Show updated usage at the very top
     used = st.session_state.lesson_count
     remaining = 5 - used
     now = datetime.datetime.now()
@@ -232,10 +232,7 @@ def lesson_generator_page():
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
-        if st.session_state.lesson_count > 5:
-            st.error("🚫 Daily limit reached. Please wait until tomorrow.")
-        else:
-            prompt = f"""
+        prompt = f"""
 Create a detailed UK primary school lesson plan:
 
 Year Group: {lesson_data['year_group']}
@@ -246,8 +243,8 @@ Ability Level: {lesson_data['ability_level']}
 Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
-            st.session_state.last_prompt = prompt
-            generate_and_display_plan(prompt, title="Original")
+        st.session_state.last_prompt = prompt
+        generate_and_display_plan(prompt, title="Original")
 
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
@@ -268,29 +265,28 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             key="custom_instruction"
         )
         if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
-            if st.session_state.lesson_count > 5:
-                st.error("🚫 Daily limit reached. Please wait until tomorrow.")
+            extra_instruction = ""
+            regen_message = ""
+            if not custom_instruction:
+                if regen_style == "🎨 More creative & engaging activities":
+                    extra_instruction = "Make activities more creative, interactive, and fun."
+                    regen_message = "Lesson updated with more creative and engaging activities."
+                elif regen_style == "📋 More structured with timings":
+                    extra_instruction = "Add clear structure with timings for each section."
+                    regen_message = "Lesson updated with clearer structure and timings."
+                elif regen_style == "🧩 Simplify for lower ability":
+                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
+                    regen_message = "Lesson simplified for lower ability."
+                elif regen_style == "🚀 Challenge for higher ability":
+                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
+                    regen_message = "Lesson updated with higher ability challenge tasks."
+                else:
+                    regen_message = "Here’s a new updated version of your lesson plan."
             else:
-                extra_instruction = custom_instruction or ""
-                regen_message = f"Lesson updated: {custom_instruction}" if custom_instruction else ""
-                if not custom_instruction:
-                    if regen_style == "🎨 More creative & engaging activities":
-                        extra_instruction = "Make activities more creative, interactive, and fun."
-                        regen_message = "Lesson updated with more creative and engaging activities."
-                    elif regen_style == "📋 More structured with timings":
-                        extra_instruction = "Add clear structure with timings for each section."
-                        regen_message = "Lesson updated with clearer structure and timings."
-                    elif regen_style == "🧩 Simplify for lower ability":
-                        extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                        regen_message = "Lesson simplified for lower ability."
-                    elif regen_style == "🚀 Challenge for higher ability":
-                        extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                        regen_message = "Lesson updated with higher ability challenge tasks."
-                    else:
-                        regen_message = "Here’s a new updated version of your lesson plan."
-
-                new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-                generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
+                extra_instruction = custom_instruction
+                regen_message = f"Lesson updated: {custom_instruction}"
+            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
+            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
 # -------------------------------
 # Sidebar history
