@@ -142,6 +142,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
 
+    # ✅ Increment usage immediately for both original and regenerated
+    if st.session_state.lesson_count >= 5:
+        st.error("🚫 Daily limit of 5 lesson plans reached. Please try again tomorrow.")
+        return
+    st.session_state.lesson_count += 1
+
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
@@ -226,12 +232,9 @@ def lesson_generator_page():
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
-        if st.session_state.lesson_count >= 5:
+        if st.session_state.lesson_count > 5:
             st.error("🚫 Daily limit reached. Please wait until tomorrow.")
         else:
-            # Increment usage immediately when generating
-            st.session_state.lesson_count += 1
-
             prompt = f"""
 Create a detailed UK primary school lesson plan:
 
@@ -265,14 +268,11 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             key="custom_instruction"
         )
         if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
-            if st.session_state.lesson_count >= 5:
+            if st.session_state.lesson_count > 5:
                 st.error("🚫 Daily limit reached. Please wait until tomorrow.")
             else:
-                # Increment usage immediately when regenerating
-                st.session_state.lesson_count += 1
-
-                extra_instruction = ""
-                regen_message = ""
+                extra_instruction = custom_instruction or ""
+                regen_message = f"Lesson updated: {custom_instruction}" if custom_instruction else ""
                 if not custom_instruction:
                     if regen_style == "🎨 More creative & engaging activities":
                         extra_instruction = "Make activities more creative, interactive, and fun."
@@ -288,9 +288,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                         regen_message = "Lesson updated with higher ability challenge tasks."
                     else:
                         regen_message = "Here’s a new updated version of your lesson plan."
-                else:
-                    extra_instruction = custom_instruction
-                    regen_message = f"Lesson updated: {custom_instruction}"
+
                 new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
                 generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
