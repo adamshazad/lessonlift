@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import base64
+import datetime
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -35,8 +36,8 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
-    max-height: 300px;   /* limit height */
-    overflow-y: auto;    /* make it scrollable */
+    max-height: 300px;
+    overflow-y: auto;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -48,6 +49,16 @@ if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
 if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
+if "lesson_count" not in st.session_state:
+    st.session_state.lesson_count = 0
+if "last_reset_date" not in st.session_state:
+    st.session_state.last_reset_date = datetime.date.today()
+
+# Reset counter at midnight
+today = datetime.date.today()
+if st.session_state.last_reset_date != today:
+    st.session_state.lesson_count = 0
+    st.session_state.last_reset_date = today
 
 # -------------------------------
 # API key setup
@@ -131,6 +142,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
 
+    if st.session_state.lesson_count >= 5:
+        st.error("🚫 Daily limit of 5 lesson plans reached. Please try again tomorrow.")
+        return
+
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
@@ -139,11 +154,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
             # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
+            st.session_state.lesson_count += 1
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show latest plan (formatted like history)
+            # Show latest plan (scrollable box)
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
@@ -187,6 +203,20 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
+    # Daily usage counter + reset timer
+    used = st.session_state.lesson_count
+    remaining = 5 - used
+    now = datetime.datetime.now()
+    tomorrow = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time.min)
+    reset_in = tomorrow - now
+    hours, remainder = divmod(reset_in.seconds, 3600)
+    minutes, _ = divmod(remainder, 60)
+
+    if remaining > 0:
+        st.info(f"📊 You have used {used}/5 lesson plans today. ({remaining} remaining)\n\n⏳ Resets in {hours}h {minutes}m")
+    else:
+        st.error(f"🚫 You have used {used}/5 lesson plans today.\n\n⏳ Resets in {hours}h {minutes}m")
+
     lesson_data = {}
 
     with st.form("lesson_form"):
@@ -201,7 +231,10 @@ def lesson_generator_page():
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
-        prompt = f"""
+        if st.session_state.lesson_count >= 5:
+            st.error("🚫 Daily limit reached. Please wait until tomorrow.")
+        else:
+            prompt = f"""
 Create a detailed UK primary school lesson plan:
 
 Year Group: {lesson_data['year_group']}
@@ -212,8 +245,8 @@ Ability Level: {lesson_data['ability_level']}
 Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
-        st.session_state.last_prompt = prompt
-        generate_and_display_plan(prompt, title="Original")
+            st.session_state.last_prompt = prompt
+            generate_and_display_plan(prompt, title="Original")
 
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
@@ -234,28 +267,31 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             key="custom_instruction"
         )
         if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
-            extra_instruction = ""
-            regen_message = ""
-            if not custom_instruction:
-                if regen_style == "🎨 More creative & engaging activities":
-                    extra_instruction = "Make activities more creative, interactive, and fun."
-                    regen_message = "Lesson updated with more creative and engaging activities."
-                elif regen_style == "📋 More structured with timings":
-                    extra_instruction = "Add clear structure with timings for each section."
-                    regen_message = "Lesson updated with clearer structure and timings."
-                elif regen_style == "🧩 Simplify for lower ability":
-                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                    regen_message = "Lesson simplified for lower ability."
-                elif regen_style == "🚀 Challenge for higher ability":
-                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                    regen_message = "Lesson updated with higher ability challenge tasks."
-                else:
-                    regen_message = "Here’s a new updated version of your lesson plan."
+            if st.session_state.lesson_count >= 5:
+                st.error("🚫 Daily limit reached. Please wait until tomorrow.")
             else:
-                extra_instruction = custom_instruction
-                regen_message = f"Lesson updated: {custom_instruction}"
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
+                extra_instruction = ""
+                regen_message = ""
+                if not custom_instruction:
+                    if regen_style == "🎨 More creative & engaging activities":
+                        extra_instruction = "Make activities more creative, interactive, and fun."
+                        regen_message = "Lesson updated with more creative and engaging activities."
+                    elif regen_style == "📋 More structured with timings":
+                        extra_instruction = "Add clear structure with timings for each section."
+                        regen_message = "Lesson updated with clearer structure and timings."
+                    elif regen_style == "🧩 Simplify for lower ability":
+                        extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
+                        regen_message = "Lesson simplified for lower ability."
+                    elif regen_style == "🚀 Challenge for higher ability":
+                        extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
+                        regen_message = "Lesson updated with higher ability challenge tasks."
+                    else:
+                        regen_message = "Here’s a new updated version of your lesson plan."
+                else:
+                    extra_instruction = custom_instruction
+                    regen_message = f"Lesson updated: {custom_instruction}"
+                new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
+                generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
 # -------------------------------
 # Sidebar history
