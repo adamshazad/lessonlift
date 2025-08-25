@@ -51,14 +51,16 @@ if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
 if "lesson_count" not in st.session_state:
     st.session_state.lesson_count = 0
-if "last_reset_date" not in st.session_state:
-    st.session_state.last_reset_date = datetime.date.today()
+if "reset_time" not in st.session_state:
+    now = datetime.datetime.now()
+    midnight = datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time.min)
+    st.session_state.reset_time = midnight
 
 # Reset counter at midnight
-today = datetime.date.today()
-if st.session_state.last_reset_date != today:
+now = datetime.datetime.now()
+if now >= st.session_state.reset_time:
     st.session_state.lesson_count = 0
-    st.session_state.last_reset_date = today
+    st.session_state.reset_time = datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time.min)
 
 # -------------------------------
 # API key setup
@@ -138,13 +140,20 @@ def create_docx(text):
 # Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    if not model:
-        st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
-        return
+    now = datetime.datetime.now()
+    if now >= st.session_state.reset_time:
+        st.session_state.lesson_count = 0
+        st.session_state.reset_time = datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time.min)
 
     if st.session_state.lesson_count >= 5:
-        st.error("🚫 Daily limit of 5 lesson plans reached. Please try again tomorrow.")
+        remaining = st.session_state.reset_time - now
+        hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+        minutes = remainder // 60
+        st.error(f"❌ Daily limit reached (5 plans). Resets in {hours}h {minutes}m.")
         return
+
+    # Count this plan
+    st.session_state.lesson_count += 1
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -154,12 +163,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
             # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
-            st.session_state.lesson_count += 1
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show latest plan (scrollable box)
+            # Show latest plan
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
@@ -207,10 +215,9 @@ def lesson_generator_page():
     used = st.session_state.lesson_count
     remaining = 5 - used
     now = datetime.datetime.now()
-    tomorrow = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time.min)
-    reset_in = tomorrow - now
-    hours, remainder = divmod(reset_in.seconds, 3600)
-    minutes, _ = divmod(remainder, 60)
+    reset_in = st.session_state.reset_time - now
+    hours, remainder = divmod(int(reset_in.total_seconds()), 3600)
+    minutes = (remainder % 3600) // 60
 
     if remaining > 0:
         st.info(f"📊 You have used {used}/5 lesson plans today. ({remaining} remaining)\n\n⏳ Resets in {hours}h {minutes}m")
@@ -231,10 +238,7 @@ def lesson_generator_page():
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
-        if st.session_state.lesson_count >= 5:
-            st.error("🚫 Daily limit reached. Please wait until tomorrow.")
-        else:
-            prompt = f"""
+        prompt = f"""
 Create a detailed UK primary school lesson plan:
 
 Year Group: {lesson_data['year_group']}
@@ -245,8 +249,8 @@ Ability Level: {lesson_data['ability_level']}
 Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
-            st.session_state.last_prompt = prompt
-            generate_and_display_plan(prompt, title="Original")
+        st.session_state.last_prompt = prompt
+        generate_and_display_plan(prompt, title="Original")
 
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
@@ -270,26 +274,8 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             if st.session_state.lesson_count >= 5:
                 st.error("🚫 Daily limit reached. Please wait until tomorrow.")
             else:
-                extra_instruction = ""
-                regen_message = ""
-                if not custom_instruction:
-                    if regen_style == "🎨 More creative & engaging activities":
-                        extra_instruction = "Make activities more creative, interactive, and fun."
-                        regen_message = "Lesson updated with more creative and engaging activities."
-                    elif regen_style == "📋 More structured with timings":
-                        extra_instruction = "Add clear structure with timings for each section."
-                        regen_message = "Lesson updated with clearer structure and timings."
-                    elif regen_style == "🧩 Simplify for lower ability":
-                        extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                        regen_message = "Lesson simplified for lower ability."
-                    elif regen_style == "🚀 Challenge for higher ability":
-                        extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                        regen_message = "Lesson updated with higher ability challenge tasks."
-                    else:
-                        regen_message = "Here’s a new updated version of your lesson plan."
-                else:
-                    extra_instruction = custom_instruction
-                    regen_message = f"Lesson updated: {custom_instruction}"
+                extra_instruction = custom_instruction if custom_instruction else ""
+                regen_message = f"Lesson updated: {extra_instruction}" if custom_instruction else f"Lesson updated ({regen_style})"
                 new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
                 generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
