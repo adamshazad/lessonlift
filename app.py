@@ -75,7 +75,7 @@ else:
     model = None
 
 # -------------------------------
-# UI helpers
+# Helper functions
 # -------------------------------
 def show_logo(path="logo.png", width=200):
     try:
@@ -105,9 +105,6 @@ def strip_markdown(md_text):
     text = re.sub(r'\*(.*?)\*', r'\1', md_text)
     return text
 
-# -------------------------------
-# Exporters
-# -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
@@ -134,9 +131,20 @@ def create_docx(text):
     bio.seek(0)
     return bio
 
-# -------------------------------
-# Generator
-# -------------------------------
+def show_usage():
+    used = st.session_state.lesson_count
+    remaining = 5 - used
+    now = datetime.datetime.now()
+    tomorrow = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time.min)
+    reset_in = tomorrow - now
+    hours, remainder = divmod(reset_in.seconds, 3600)
+    minutes, _ = divmod(remainder, 60)
+    
+    if remaining > 0:
+        st.info(f"📊 You have used {used}/5 lesson plans today. ({remaining} remaining)\n⏳ Resets in {hours}h {minutes}m")
+    else:
+        st.error(f"🚫 You have used {used}/5 lesson plans today.\n⏳ Resets in {hours}h {minutes}m")
+
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if not model:
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
@@ -190,9 +198,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.error(f"Error generating lesson plan: {e}")
 
-# -------------------------------
-# Main generator page
-# -------------------------------
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
@@ -201,19 +206,7 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    # Show usage at top
-    used = st.session_state.lesson_count
-    remaining = 5 - used
-    now = datetime.datetime.now()
-    tomorrow = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time.min)
-    reset_in = tomorrow - now
-    hours, remainder = divmod(reset_in.seconds, 3600)
-    minutes, _ = divmod(remainder, 60)
-
-    if remaining > 0:
-        st.info(f"📊 You have used {used}/5 lesson plans today. ({remaining} remaining)\n\n⏳ Resets in {hours}h {minutes}m")
-    else:
-        st.error(f"🚫 You have used {used}/5 lesson plans today.\n\n⏳ Resets in {hours}h {minutes}m")
+    usage_placeholder = st.empty()  # placeholder for usage info
 
     lesson_data = {}
     st.subheader("Lesson Details")
@@ -239,6 +232,8 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
+        with usage_placeholder:
+            show_usage()
 
     # Regeneration section remains unchanged
     if st.session_state.last_prompt:
@@ -282,6 +277,8 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                 regen_message = f"Lesson updated: {custom_instruction}"
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
+            with usage_placeholder:
+                show_usage()
 
 # -------------------------------
 # Sidebar history
