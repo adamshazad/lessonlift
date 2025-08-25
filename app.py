@@ -99,10 +99,11 @@ def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
+# Updated to remove all hashtags (#) from the generated text
 def strip_markdown(md_text):
-    text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
-    text = re.sub(r'\*(.*?)\*', r'\1', md_text)
+    text = re.sub(r'^[#]+\s*', '', md_text, flags=re.MULTILINE)  # remove # at start of any line
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
 def create_pdf(text):
@@ -145,6 +146,9 @@ def show_usage():
     else:
         st.error(f"🚫 You have used {used}/5 lesson plans today.\n⏳ Resets in {hours}h {minutes}m")
 
+# -------------------------------
+# Main generator
+# -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if not model:
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
@@ -198,6 +202,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             else:
                 st.error(f"Error generating lesson plan: {e}")
 
+# -------------------------------
+# Generator page
+# -------------------------------
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
@@ -235,7 +242,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         with usage_placeholder:
             show_usage()
 
-    # Regeneration section remains unchanged
+    # Regeneration section
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
