@@ -219,8 +219,9 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    usage_placeholder = st.empty()
-    show_usage()
+    usage_placeholder = st.empty()  # <-- top usage placeholder
+    usage_placeholder.show_usage = show_usage
+    usage_placeholder.show_usage()  # initial render
 
     lesson_data = {}
     st.subheader("Lesson Details")
@@ -247,7 +248,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
         usage_placeholder.empty()
-        show_usage()
+        usage_placeholder.show_usage()  # <-- refresh top usage
 
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
@@ -292,7 +293,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             title_text = "Regenerated " + str(len(st.session_state.lesson_history)+1)
             generate_and_display_plan(new_prompt, title=title_text, regen_message=regen_message)
             usage_placeholder.empty()
-            show_usage()
+            usage_placeholder.show_usage()  # <-- refresh top usage
 
 # -------------------------------
 # Sidebar history
