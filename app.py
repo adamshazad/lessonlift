@@ -2,7 +2,6 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import base64
-import datetime
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -32,16 +31,12 @@ body {background-color: white; color: black;}
     background-color: #f9f9f9 !important;
     color: black !important;
     border-radius: 12px !important;
-    padding: 20px !important;
+    padding: 16px !important;
     margin-bottom: 12px !important;
-    box-shadow: 0px 2px 10px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em;
-    max-height: 400px;
-    overflow-y: auto;
-}
-button {
-    border-radius: 8px !important;
-    box-shadow: 0px 2px 5px rgba(0,0,0,0.15) !important;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
+    line-height: 1.5em;
+    max-height: 300px;   /* limit height */
+    overflow-y: auto;    /* make it scrollable */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -53,16 +48,6 @@ if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
 if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
-if "lesson_count" not in st.session_state:
-    st.session_state.lesson_count = 0
-if "last_reset_date" not in st.session_state:
-    st.session_state.last_reset_date = datetime.date.today()
-
-# Reset counter at midnight
-today = datetime.date.today()
-if st.session_state.last_reset_date != today:
-    st.session_state.lesson_count = 0
-    st.session_state.last_reset_date = today
 
 # -------------------------------
 # API key setup
@@ -79,7 +64,7 @@ else:
     model = None
 
 # -------------------------------
-# Helper functions
+# UI helpers
 # -------------------------------
 def show_logo(path="logo.png", width=200):
     try:
@@ -104,17 +89,20 @@ def title_and_tagline():
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 def strip_markdown(md_text):
-    text = re.sub(r'^[#]+\s*', '', md_text, flags=re.MULTILINE)
+    text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
+# -------------------------------
+# Exporters
+# -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
-    story = [Paragraph("LessonLift - Generated Plan", normal), Spacer(1,12)]
+    story = []
     for raw in text.splitlines():
         line = raw.rstrip()
         if not line.strip():
@@ -128,8 +116,6 @@ def create_pdf(text):
 
 def create_docx(text):
     doc = Document()
-    doc.add_paragraph("LessonLift - Generated Plan")
-    doc.add_paragraph("")
     for raw in text.splitlines():
         doc.add_paragraph(raw.rstrip())
     bio = BytesIO()
@@ -137,34 +123,13 @@ def create_docx(text):
     bio.seek(0)
     return bio
 
-def show_usage():
-    used = st.session_state.lesson_count
-    remaining = 5 - used
-    st.progress(used/5)
-    st.caption(f"{used}/5 lessons used today")
-    now = datetime.datetime.now()
-    tomorrow = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time.min)
-    reset_in = tomorrow - now
-    hours, remainder = divmod(reset_in.seconds, 3600)
-    minutes, _ = divmod(remainder, 60)
-    
-    if remaining > 0:
-        st.info(f"📊 {remaining} lesson(s) remaining. Resets in {hours}h {minutes}m")
-    else:
-        st.error(f"🚫 Daily limit reached. Resets in {hours}h {minutes}m")
-
 # -------------------------------
-# Main generator
+# Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if not model:
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
-
-    if st.session_state.lesson_count >= 5:
-        st.error("🚫 Daily limit of 5 lesson plans reached. Please try again tomorrow.")
-        return
-    st.session_state.lesson_count += 1
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -172,27 +137,30 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
+            # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
+            # Show latest plan (formatted like history)
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
+            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                     <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:10px 16px; font-size:14px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:10px 16px; font-size:14px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
                     </a>
                     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                        <button style="padding:10px 16px; font-size:14px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
                     </a>
                 </div>
                 """,
@@ -209,7 +177,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 st.error(f"Error generating lesson plan: {e}")
 
 # -------------------------------
-# Generator page
+# Main generator page
 # -------------------------------
 def lesson_generator_page():
     show_logo()
@@ -219,21 +187,20 @@ def lesson_generator_page():
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
-    usage_placeholder = st.empty()  # <-- top usage placeholder
-    usage_placeholder.show_usage = show_usage
-    usage_placeholder.show_usage()  # initial render
-
     lesson_data = {}
-    st.subheader("Lesson Details")
-    lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
-    lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"], key="ability_level")
-    lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"], key="lesson_duration")
-    lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science", key="subject")
-    lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth", key="topic")
-    lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
-    lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
 
-    if st.button("🚀 Generate Lesson Plan"):
+    with st.form("lesson_form"):
+        st.subheader("Lesson Details")
+        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
+        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"], key="ability_level")
+        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"], key="lesson_duration")
+        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science", key="subject")
+        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth", key="topic")
+        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
+        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
+        submitted = st.form_submit_button("🚀 Generate Lesson Plan")
+
+    if submitted:
         prompt = f"""
 Create a detailed UK primary school lesson plan:
 
@@ -247,8 +214,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
-        usage_placeholder.empty()
-        usage_placeholder.show_usage()  # <-- refresh top usage
 
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
@@ -290,10 +255,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                 extra_instruction = custom_instruction
                 regen_message = f"Lesson updated: {custom_instruction}"
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            title_text = "Regenerated " + str(len(st.session_state.lesson_history)+1)
-            generate_and_display_plan(new_prompt, title=title_text, regen_message=regen_message)
-            usage_placeholder.empty()
-            usage_placeholder.show_usage()  # <-- refresh top usage
+            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
 # -------------------------------
 # Sidebar history
