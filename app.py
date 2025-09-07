@@ -3,7 +3,7 @@ import google.generativeai as genai
 import re
 import base64
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, date
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -52,14 +52,19 @@ if "last_prompt" not in st.session_state:
 if "lessons_used" not in st.session_state:
     st.session_state.lessons_used = 0
 if "last_reset" not in st.session_state:
-    st.session_state.last_reset = datetime.today().date()
+    st.session_state.last_reset = str(date.today())
 
-MAX_LESSONS_PER_DAY = 10
+# -------------------------------
+# Daily reset logic
+# -------------------------------
+def reset_daily_limit():
+    today = str(date.today())
+    if st.session_state.last_reset != today:
+        st.session_state.lessons_used = 0
+        st.session_state.last_reset = today
 
-# Reset lessons used if a new day has started
-if st.session_state.last_reset != datetime.today().date():
-    st.session_state.lessons_used = 0
-    st.session_state.last_reset = datetime.today().date()
+reset_daily_limit()
+DAILY_LIMIT = 10
 
 # -------------------------------
 # API key setup
@@ -99,6 +104,7 @@ def show_logo(path="logo.png", width=200):
 def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
+    st.info(f"📊 Lessons used today: {st.session_state.lessons_used}/{DAILY_LIMIT}")
 
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
@@ -139,13 +145,16 @@ def create_docx(text):
 # Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    if st.session_state.lessons_used >= MAX_LESSONS_PER_DAY:
-        st.error(f"⚠️ You have reached your daily limit of {MAX_LESSONS_PER_DAY} lessons. Please wait until tomorrow to generate more.")
-        return
-
     if not model:
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
+
+    if st.session_state.lessons_used >= DAILY_LIMIT:
+        st.error("🚫 You’ve reached your daily lesson limit. Please try again tomorrow.")
+        return
+
+    # ✅ increment immediately so UI updates right away
+    st.session_state.lessons_used += 1
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -155,7 +164,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
             # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
-            st.session_state.lessons_used += 1
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -184,6 +192,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 unsafe_allow_html=True
             )
 
+            # ✅ Show updated usage immediately
+            st.success(f"📊 You’ve now used {st.session_state.lessons_used}/{DAILY_LIMIT} lessons today.")
+
         except Exception as e:
             msg = str(e).lower()
             if "api key" in msg:
@@ -199,8 +210,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
-
-    st.markdown(f"**Lessons used today:** {st.session_state.lessons_used}/{MAX_LESSONS_PER_DAY}")
 
     if not api_key:
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
