@@ -8,6 +8,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
+import datetime
 
 # -------------------------------
 # Page config
@@ -48,6 +49,16 @@ if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
 if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
+if "lesson_count" not in st.session_state:
+    st.session_state.lesson_count = 0
+if "last_reset_date" not in st.session_state:
+    st.session_state.last_reset_date = datetime.date.today()
+
+# Reset daily count at midnight
+today = datetime.date.today()
+if st.session_state.last_reset_date != today:
+    st.session_state.lesson_count = 0
+    st.session_state.last_reset_date = today
 
 # -------------------------------
 # API key setup
@@ -127,9 +138,15 @@ def create_docx(text):
 # Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
+    if st.session_state.lesson_count >= 10:
+        st.error("🚫 Daily limit reached. Please try again tomorrow.")
+        return
+
     if not model:
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
+
+    st.session_state.lesson_count += 1
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -146,6 +163,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             # Show latest plan (formatted like history)
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+
+            # Show lesson usage
+            used = st.session_state.lesson_count
+            remaining = 10 - used
+            st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
             # Download buttons
             pdf_buffer = create_pdf(clean_output)
