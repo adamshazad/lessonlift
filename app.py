@@ -38,13 +38,17 @@ body {background-color: white; color: black;}
     max-height: 300px;   /* limit height */
     overflow-y: auto;    /* make it scrollable */
 }
-/* Make the sidebar wider */
-.css-1d391kg {
+
+/* Sidebar fix: stable across Streamlit versions */
+[data-testid="stSidebar"] {
     width: 320px !important;
 }
-/* Ensure sidebar text wraps nicely */
-.stSidebar .stMarkdown {
+[data-testid="stSidebar"] .stMarkdown {
     word-wrap: break-word;
+}
+[data-testid="stSidebar"] > div:first-child {
+    overflow-y: auto;
+    max-height: 100vh;
 }
 </style>
 """, unsafe_allow_html=True)
