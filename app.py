@@ -8,7 +8,6 @@ from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
-import datetime
 
 # -------------------------------
 # Page config
@@ -39,8 +38,13 @@ body {background-color: white; color: black;}
     max-height: 300px;   /* limit height */
     overflow-y: auto;    /* make it scrollable */
 }
-.stCard.regenerated {
-    background-color: #fffbe6 !important; /* subtle highlight for regenerated plans */
+/* Make the sidebar wider */
+.css-1d391kg {
+    width: 320px !important;
+}
+/* Ensure sidebar text wraps nicely */
+.stSidebar .stMarkdown {
+    word-wrap: break-word;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -52,18 +56,6 @@ if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
 if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
-if "lesson_count" not in st.session_state:
-    st.session_state.lesson_count = 0
-if "last_reset_date" not in st.session_state:
-    st.session_state.last_reset_date = datetime.date.today()
-
-DAILY_LIMIT = 10
-
-# Reset count if date changed
-today = datetime.date.today()
-if st.session_state.last_reset_date != today:
-    st.session_state.lesson_count = 0
-    st.session_state.last_reset_date = today
 
 # -------------------------------
 # API key setup
@@ -142,13 +134,9 @@ def create_docx(text):
 # -------------------------------
 # Generator
 # -------------------------------
-def generate_and_display_plan(prompt, title="Latest", regen_message="", regenerated=False):
+def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if not model:
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
-        return
-
-    if st.session_state.lesson_count >= DAILY_LIMIT:
-        st.warning(f"⚠️ You’ve reached your daily limit of {DAILY_LIMIT} lessons. Please wait until tomorrow.")
         return
 
     with st.spinner("✨ Creating lesson plan..."):
@@ -158,24 +146,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", regenera
             clean_output = strip_markdown(output)
 
             # Save to history
-            st.session_state.lesson_history.append({
-                "title": title,
-                "content": clean_output,
-                "regenerated": regenerated
-            })
-            st.session_state.lesson_count += 1
+            st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show progress bar
-            st.markdown(f"**📊 Lessons used today:** {st.session_state.lesson_count}/{DAILY_LIMIT}")
-            st.progress(st.session_state.lesson_count / DAILY_LIMIT)
-
             # Show latest plan (formatted like history)
-            card_class = "stCard regenerated" if regenerated else "stCard"
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='{card_class}'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
             # Download buttons
             pdf_buffer = create_pdf(clean_output)
@@ -285,7 +263,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                 extra_instruction = custom_instruction
                 regen_message = f"Lesson updated: {custom_instruction}"
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message, regenerated=True)
+            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
 # -------------------------------
 # Sidebar history
@@ -294,9 +272,8 @@ def show_lesson_history():
     st.sidebar.title("📜 Lesson History")
     if st.session_state.lesson_history:
         for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
-            cls = "stCard regenerated" if entry.get("regenerated") else "stCard"
             with st.sidebar.expander(f"{entry['title']}"):
-                st.markdown(f"<div class='{cls}'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
     else:
         st.sidebar.write("No lesson history yet.")
 
