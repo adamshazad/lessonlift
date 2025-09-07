@@ -3,12 +3,12 @@ import google.generativeai as genai
 import re
 import base64
 from io import BytesIO
-from datetime import datetime, date
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
+from datetime import datetime
 
 # -------------------------------
 # Page config
@@ -36,8 +36,8 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
-    max-height: 300px;
-    overflow-y: auto;
+    max-height: 300px;   /* limit height */
+    overflow-y: auto;    /* make it scrollable */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -51,20 +51,17 @@ if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
 if "lessons_used" not in st.session_state:
     st.session_state.lessons_used = 0
-if "last_reset" not in st.session_state:
-    st.session_state.last_reset = str(date.today())
+if "last_reset_date" not in st.session_state:
+    st.session_state.last_reset_date = datetime.now().date()
 
 # -------------------------------
-# Daily reset logic
+# Daily limit
 # -------------------------------
-def reset_daily_limit():
-    today = str(date.today())
-    if st.session_state.last_reset != today:
-        st.session_state.lessons_used = 0
-        st.session_state.last_reset = today
-
-reset_daily_limit()
 DAILY_LIMIT = 10
+today = datetime.now().date()
+if st.session_state.last_reset_date != today:
+    st.session_state.lessons_used = 0
+    st.session_state.last_reset_date = today
 
 # -------------------------------
 # API key setup
@@ -153,7 +150,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("🚫 You’ve reached your daily lesson limit. Please try again tomorrow.")
         return
 
-    # ✅ increment immediately so UI updates right away
+    # ✅ increment immediately
     st.session_state.lessons_used += 1
 
     with st.spinner("✨ Creating lesson plan..."):
@@ -191,9 +188,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 """,
                 unsafe_allow_html=True
             )
-
-            # ✅ Show updated usage immediately
-            st.success(f"📊 You’ve now used {st.session_state.lessons_used}/{DAILY_LIMIT} lessons today.")
 
         except Exception as e:
             msg = str(e).lower()
