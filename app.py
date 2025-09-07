@@ -8,7 +8,6 @@ from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
-from datetime import datetime
 
 # -------------------------------
 # Page config
@@ -36,8 +35,8 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
-    max-height: 300px;   /* limit height */
-    overflow-y: auto;    /* make it scrollable */
+    max-height: 300px;
+    overflow-y: auto;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -51,17 +50,8 @@ if "last_prompt" not in st.session_state:
     st.session_state.last_prompt = None
 if "lessons_used" not in st.session_state:
     st.session_state.lessons_used = 0
-if "last_reset_date" not in st.session_state:
-    st.session_state.last_reset_date = datetime.now().date()
-
-# -------------------------------
-# Daily limit
-# -------------------------------
-DAILY_LIMIT = 10
-today = datetime.now().date()
-if st.session_state.last_reset_date != today:
-    st.session_state.lessons_used = 0
-    st.session_state.last_reset_date = today
+if "daily_limit" not in st.session_state:
+    st.session_state.daily_limit = 10
 
 # -------------------------------
 # API key setup
@@ -101,7 +91,6 @@ def show_logo(path="logo.png", width=200):
 def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
-    st.info(f"📊 Lessons used today: {st.session_state.lessons_used}/{DAILY_LIMIT}")
 
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
@@ -146,18 +135,19 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
 
-    if st.session_state.lessons_used >= DAILY_LIMIT:
-        st.error("🚫 You’ve reached your daily lesson limit. Please try again tomorrow.")
-        return
-
-    # ✅ increment immediately
-    st.session_state.lessons_used += 1
-
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
-            output = response.text.strip()
-            clean_output = strip_markdown(output)
+
+            # ✅ Safe fallback to always get content
+            output = getattr(response, "text", None)
+            if not output and hasattr(response, "candidates"):
+                output = response.candidates[0].content.parts[0].text
+            if not output:
+                st.error("⚠️ No content generated. Please try again.")
+                return
+
+            clean_output = strip_markdown(output.strip())
 
             # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -205,6 +195,8 @@ def lesson_generator_page():
     show_logo()
     title_and_tagline()
 
+    st.info(f"📊 Lessons used today: {st.session_state.lessons_used}/{st.session_state.daily_limit}")
+
     if not api_key:
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
@@ -223,7 +215,11 @@ def lesson_generator_page():
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
-        prompt = f"""
+        if st.session_state.lessons_used >= st.session_state.daily_limit:
+            st.error("❌ Daily lesson plan limit reached.")
+        else:
+            st.session_state.lessons_used += 1
+            prompt = f"""
 Create a detailed UK primary school lesson plan:
 
 Year Group: {lesson_data['year_group']}
@@ -234,8 +230,8 @@ Ability Level: {lesson_data['ability_level']}
 Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
-        st.session_state.last_prompt = prompt
-        generate_and_display_plan(prompt, title="Original")
+            st.session_state.last_prompt = prompt
+            generate_and_display_plan(prompt, title="Original")
 
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
