@@ -20,14 +20,6 @@ st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered
 # -------------------------------
 st.markdown("""
 <style>
-/* Fix sidebar peek issue */
-[data-testid="stSidebar"][aria-expanded="false"] {
-    margin-left: -320px;
-}
-[data-testid="stSidebar"][aria-expanded="true"] {
-    margin-left: 0;
-}
-
 body {background-color: white; color: black;}
 .stTextInput>div>div>input, textarea, select {
     background-color: white !important;
@@ -46,6 +38,13 @@ body {background-color: white; color: black;}
     line-height: 1.5em;
     max-height: 300px;
     overflow-y: auto;
+}
+/* Sidebar fix */
+[data-testid="stSidebar"][aria-expanded="false"] {
+    transform: translateX(-100%);
+}
+[data-testid="stSidebar"][aria-expanded="true"] {
+    transform: translateX(0);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -107,6 +106,11 @@ def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
+    # Show live lesson usage counter (only here now, not duplicated later)
+    used = st.session_state.lesson_count
+    remaining = 10 - used
+    st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
+
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -154,7 +158,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
 
-    st.session_state.lesson_count += 1  # update before display
+    st.session_state.lesson_count += 1
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -208,16 +212,12 @@ def lesson_generator_page():
     show_logo()
     title_and_tagline()
 
-    # Show usage counter (always up to date)
-    used = st.session_state.lesson_count
-    remaining = 10 - used
-    st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
-
     if not api_key:
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
     lesson_data = {}
+
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
