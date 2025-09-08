@@ -39,26 +39,7 @@ body {background-color: white; color: black;}
     max-height: 300px;
     overflow-y: auto;
 }
-</style>
-""", unsafe_allow_html=True)
-
-# -------------------------------
-# Sidebar CSS to fully hide it
-# -------------------------------
-st.markdown("""
-<style>
-/* Hide the sidebar completely */
-[data-testid="stSidebar"][aria-expanded="true"] {
-    width: 0px;
-}
-[data-testid="stSidebar"][aria-expanded="false"] {
-    width: 0px;
-}
-/* Make main area use full width */
-[data-testid="stAppViewContainer"] {
-    margin-left: 0px;
-    padding-left: 0px;
-}
+.css-18e3th9 {padding-top: 2rem;}  /* fix spacing for lesson-used box */
 </style>
 """, unsafe_allow_html=True)
 
@@ -180,11 +161,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show latest plan
+            # Show latest plan (formatted like history)
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard' style='margin-bottom:16px'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
-            # Show lesson usage (fixed single emoji)
+            # Show lesson usage
             used = st.session_state.lesson_count
             remaining = 10 - used
             st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
@@ -241,6 +222,8 @@ def lesson_generator_page():
         lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
+
+    st.markdown("<br>", unsafe_allow_html=True)  # add space between form and lesson-used info
 
     if submitted:
         prompt = f"""
