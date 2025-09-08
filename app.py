@@ -160,8 +160,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     st.session_state.lesson_count += 1
 
-    # Force rerun so top counter updates immediately
-    st.experimental_rerun()
+    # Use new rerun method
+    st.rerun()
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
