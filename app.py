@@ -39,13 +39,6 @@ body {background-color: white; color: black;}
     max-height: 300px;
     overflow-y: auto;
 }
-/* Sidebar fix - fully hide when collapsed */
-[data-testid="stSidebar"][aria-expanded="false"] {
-    display: none;
-}
-[data-testid="stSidebar"][aria-expanded="true"] {
-    display: block;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -106,11 +99,6 @@ def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-    # Show live lesson usage counter (updates instantly)
-    used = st.session_state.lesson_count
-    remaining = 10 - used
-    st.markdown(f"<div style='background:#e8f0fe; padding:10px; border-radius:8px;'>📊 {used}/10 lessons used today — {remaining} remaining</div>", unsafe_allow_html=True)
-
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -160,9 +148,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     st.session_state.lesson_count += 1
 
-    # Use new rerun method
-    st.rerun()
-
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
@@ -175,7 +160,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show latest plan
+            # Show latest plan (formatted like history)
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
@@ -214,6 +199,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
+
+    # Top lessons used box (always updated)
+    used = st.session_state.lesson_count
+    remaining = 10 - used
+    st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
+
+    st.markdown("---")  # 👈 adds spacing before Lesson Details
 
     if not api_key:
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
