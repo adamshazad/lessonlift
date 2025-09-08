@@ -36,8 +36,28 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
-    max-height: 300px;   /* limit height */
-    overflow-y: auto;    /* make it scrollable */
+    max-height: 300px;
+    overflow-y: auto;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------------
+# Sidebar CSS to fully hide it
+# -------------------------------
+st.markdown("""
+<style>
+/* Hide the sidebar completely */
+[data-testid="stSidebar"][aria-expanded="true"] {
+    width: 0px;
+}
+[data-testid="stSidebar"][aria-expanded="false"] {
+    width: 0px;
+}
+/* Make main area use full width */
+[data-testid="stAppViewContainer"] {
+    margin-left: 0px;
+    padding-left: 0px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -160,14 +180,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show latest plan (formatted like history)
+            # Show latest plan
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard' style='margin-bottom:16px'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
-            # Show lesson usage (fixed: single emoji)
+            # Show lesson usage (fixed single emoji)
             used = st.session_state.lesson_count
             remaining = 10 - used
-            st.info(f"{used}/10 lessons used today — {remaining} remaining", icon="📊")
+            st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
             # Download buttons
             pdf_buffer = create_pdf(clean_output)
