@@ -39,9 +39,9 @@ body {background-color: white; color: black;}
     max-height: 300px;
     overflow-y: auto;
 }
-/* ✅ Fully hide sidebar when collapsed */
-[data-testid="stSidebar"][aria-expanded="false"] {
-    display: none;
+/* Sidebar full-screen fix */
+[data-testid="stSidebar"][style] {
+    width: 280px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -150,7 +150,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
 
-    # ✅ Increment first so counter updates immediately
     st.session_state.lesson_count += 1
 
     with st.spinner("✨ Creating lesson plan..."):
@@ -159,20 +158,33 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
+            # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
+            # Show latest plan (formatted like history)
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+
+            # Add spacing before counter
+            st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+
+            # Show lesson usage immediately
+            used = st.session_state.lesson_count
+            remaining = 10 - used
+            st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
+
+            # Add spacing before downloads
+            st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
 
             # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
                 f"""
-                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
                     <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
                     </a>
@@ -202,13 +214,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
-
-    # ✅ Always updated immediately
-    used = st.session_state.lesson_count
-    remaining = 10 - used
-    st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
-
-    st.markdown("---")  # spacing before form
 
     if not api_key:
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
