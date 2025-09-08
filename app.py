@@ -20,6 +20,14 @@ st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered
 # -------------------------------
 st.markdown("""
 <style>
+/* Fix sidebar peek issue */
+[data-testid="stSidebar"][aria-expanded="false"] {
+    margin-left: -320px;
+}
+[data-testid="stSidebar"][aria-expanded="true"] {
+    margin-left: 0;
+}
+
 body {background-color: white; color: black;}
 .stTextInput>div>div>input, textarea, select {
     background-color: white !important;
@@ -36,8 +44,8 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
-    max-height: 300px;   /* limit height */
-    overflow-y: auto;    /* make it scrollable */
+    max-height: 300px;
+    overflow-y: auto;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -146,7 +154,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
 
-    st.session_state.lesson_count += 1
+    st.session_state.lesson_count += 1  # update before display
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -160,14 +168,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Show latest plan (formatted like history)
+            # Show latest plan
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
-
-            # Show lesson usage (bottom)
-            used = st.session_state.lesson_count
-            remaining = 10 - used
-            st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
             # Download buttons
             pdf_buffer = create_pdf(clean_output)
@@ -205,7 +208,7 @@ def lesson_generator_page():
     show_logo()
     title_and_tagline()
 
-    # Show usage counter at the very top (always visible)
+    # Show usage counter (always up to date)
     used = st.session_state.lesson_count
     remaining = 10 - used
     st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
@@ -215,7 +218,6 @@ def lesson_generator_page():
         return
 
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
