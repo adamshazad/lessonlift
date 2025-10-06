@@ -78,19 +78,28 @@ if not api_key:
 
 if api_key:
     genai.configure(api_key=api_key)
-    # ✅ Updated safe fallback logic for any Gemini SDK version
-    try:
-        # Try the latest model first
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        _ = model.generate_content("test")  # sanity check
-    except Exception:
+    # ✅ Robust fallback chain for different SDK / model name availability
+    # Try models in order until one works for generate_content
+    selected_model_name = None
+    model = None
+    candidates = [
+        "gemini-2.5-flash",
+        "gemini-flash-latest",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "models/gemini-pro",  # legacy/v1beta naming
+    ]
+    for candidate in candidates:
         try:
-            # Fallback to next supported model
-            model = genai.GenerativeModel("gemini-1.5-pro")
-            _ = model.generate_content("test")
+            candidate_model = genai.GenerativeModel(candidate)
+            # quick sanity check call (small prompt)
+            _ = candidate_model.generate_content("test")
+            model = candidate_model
+            selected_model_name = candidate
+            break
         except Exception:
-            # Absolute legacy fallback (old v1beta SDKs)
-            model = genai.GenerativeModel("models/gemini-pro")
+            continue
+    # If none worked, leave model as None (error will be handled later)
 else:
     model = None
 
@@ -163,7 +172,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     if not model:
-        st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
+        st.error("⚠️ No Gemini API key found or no compatible model available. Add your API key in the sidebar and ensure your environment has an updated google-generativeai SDK.")
         return
 
     st.session_state.lesson_count += 1
