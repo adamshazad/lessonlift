@@ -62,7 +62,6 @@ if "lesson_count" not in st.session_state:
 if "last_reset_date" not in st.session_state:
     st.session_state.last_reset_date = datetime.date.today()
 
-# Reset daily count at midnight
 today = datetime.date.today()
 if st.session_state.last_reset_date != today:
     st.session_state.lesson_count = 0
@@ -78,28 +77,16 @@ if not api_key:
 
 if api_key:
     genai.configure(api_key=api_key)
-    # ✅ Robust fallback chain for different SDK / model name availability
-    # Try models in order until one works for generate_content
-    selected_model_name = None
+    # Safe fallback for model availability
     model = None
-    candidates = [
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
-        "models/gemini-pro",  # legacy/v1beta naming
-    ]
-    for candidate in candidates:
+    for candidate in ["gemini-2.5-flash", "gemini-flash-latest", "gemini-1.5-flash"]:
         try:
-            candidate_model = genai.GenerativeModel(candidate)
-            # quick sanity check call (small prompt)
-            _ = candidate_model.generate_content("test")
-            model = candidate_model
-            selected_model_name = candidate
+            model_candidate = genai.GenerativeModel(candidate)
+            _ = model_candidate.generate_content("test")
+            model = model_candidate
             break
         except Exception:
             continue
-    # If none worked, leave model as None (error will be handled later)
 else:
     model = None
 
@@ -129,6 +116,7 @@ def title_and_tagline():
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 def strip_markdown(md_text):
+    # Original function: very simple, no changes to formatting
     text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
@@ -172,7 +160,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     if not model:
-        st.error("⚠️ No Gemini API key found or no compatible model available. Add your API key in the sidebar and ensure your environment has an updated google-generativeai SDK.")
+        st.error("⚠️ No compatible Gemini model found. Add API key in sidebar.")
         return
 
     st.session_state.lesson_count += 1
@@ -183,22 +171,18 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Lesson usage (always up-to-date at the top)
             used = st.session_state.lesson_count
             remaining = 10 - used
             st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
-            # Show latest plan
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
-            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
