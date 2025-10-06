@@ -78,7 +78,10 @@ if not api_key:
 
 if api_key:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")  # ✅ Updated line
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")  # ✅ main model
+    except Exception:
+        model = genai.GenerativeModel("gemini-pro")  # ✅ fallback for older SDKs
 else:
     model = None
 
