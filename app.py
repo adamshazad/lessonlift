@@ -78,13 +78,19 @@ if not api_key:
 
 if api_key:
     genai.configure(api_key=api_key)
-    # ✅ Safe fallback logic
+    # ✅ Updated safe fallback logic for any Gemini SDK version
     try:
+        # Try the latest model first
         model = genai.GenerativeModel("gemini-1.5-flash")
-        # quick check to ensure it’s supported
-        _ = model.generate_content("test")
+        _ = model.generate_content("test")  # sanity check
     except Exception:
-        model = genai.GenerativeModel("gemini-pro")
+        try:
+            # Fallback to next supported model
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            _ = model.generate_content("test")
+        except Exception:
+            # Absolute legacy fallback (old v1beta SDKs)
+            model = genai.GenerativeModel("models/gemini-pro")
 else:
     model = None
 
