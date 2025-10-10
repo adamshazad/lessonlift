@@ -79,13 +79,15 @@ if not api_key:
 model = None
 if api_key:
     genai.configure(api_key=api_key)
-    try:
-        # Use a known working model
-        model = genai.GenerativeModel("gemini-1.5-turbo")
-    except Exception as e:
-        st.error("⚠️ Error setting up model. Please check your API key.")
-        st.exception(e)
 
+    # ✅ Pick a model that supports generateContent
+    # Replace "gemini-2.5-flash" with the model you found from ListModels
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        _ = model.generate_content("Test")  # quick test
+    except Exception as e:
+        st.error(f"⚠
+        
 # -------------------------------
 # UI helpers
 # -------------------------------
