@@ -76,22 +76,25 @@ if not api_key:
     st.sidebar.title("🔑 API Key Setup")
     api_key = st.sidebar.text_input("Gemini API Key", type="password")
 
+model = None
 if api_key:
     genai.configure(api_key=api_key)
     
-    # --- API key check snippet ---
+    # --- List available models in sidebar ---
     try:
-        test_model = genai.GenerativeModel("gemini-1.5-turbo")
-        # quick test call to ensure API key and model work
-        _ = test_model.generate_content("Hello!")
-        st.success("✅ Gemini API key is valid and working!")
+        models = genai.list_models()
+        st.sidebar.write("Available models for your API key:")
+        working_model_found = False
+        for m in models:
+            st.sidebar.write(f"- {m.name}")
+            # Pick the first model that supports generateContent
+            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                working_model_found = True
+        if not working_model_found:
+            st.sidebar.error("⚠️ No models supporting generateContent found for this API key.")
     except Exception as e:
-        st.error(f"⚠️ API key check failed: {e}")
-    # --------------------------------
-    
-    model = genai.GenerativeModel("gemini-1.5-turbo")
-else:
-    model = None
+        st.sidebar.error(f"Could not list models: {e}")
 
 # -------------------------------
 # UI helpers
@@ -162,7 +165,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     if not model:
-        st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
+        st.error("⚠️ No Gemini API key found or no compatible model. Add it in the sidebar or check your API key.")
         return
 
     st.session_state.lesson_count += 1
@@ -215,7 +218,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             elif "quota" in msg:
                 st.error("⚠️ API quota exceeded. Please try again later.")
             else:
-                st.error(f"Error generating lesson plan: {e}")
+                st.error(f"⚠️ Sorry, the lesson plan could not be generated at this time.")
 
 # -------------------------------
 # Main generator page
