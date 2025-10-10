@@ -40,6 +40,7 @@ body {background-color: white; color: black;}
     max-height: 300px;
     overflow-y: auto;
 }
+/* --- Sidebar Fix --- */
 [data-testid="stSidebar"][aria-expanded="false"] {
     display: none !important;
 }
@@ -73,36 +74,24 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 # API key setup
 # -------------------------------
-# Support multiple API keys
-api_keys = st.secrets.get("gemini_api_keys", None)  # expects list of keys
+api_keys = st.secrets.get("gemini_api_keys", None) or []
+current_key_index = 0
+
 if not api_keys:
     st.sidebar.title("🔑 API Key Setup")
-    key_input = st.sidebar.text_input("Gemini API Key (first key)", type="password")
-    if key_input:
-        api_keys = [key_input]
+    key = st.sidebar.text_input("Gemini API Key", type="password")
+    if key:
+        api_keys = [key]
 
-current_key_index = 0
 model = None
-
 def configure_model():
-    global model, current_key_index
-    if not api_keys:
-        return None
-    max_tries = len(api_keys)
-    tries = 0
-    while tries < max_tries:
-        try:
-            genai.configure(api_key=api_keys[current_key_index])
-            model = genai.GenerativeModel("gemini-1.5")
-            # quick test
-            return model
-        except Exception:
-            current_key_index = (current_key_index + 1) % len(api_keys)
-            tries += 1
-    model = None
-    return None
+    global model
+    if api_keys:
+        genai.configure(api_key=api_keys[current_key_index])
+        model = genai.GenerativeModel("gemini-1.5")  # keep original model choice
 
-configure_model()
+if api_keys:
+    configure_model()
 
 # -------------------------------
 # UI helpers
@@ -168,6 +157,7 @@ def create_docx(text):
 # Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
+    global current_key_index  # Fixes UnboundLocalError
     if st.session_state.lesson_count >= 10:
         st.error("🚫 Daily limit reached. Please try again tomorrow.")
         return
@@ -192,7 +182,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                     st.session_state.lesson_cache[prompt_hash] = clean_output
                     break
                 except Exception as e:
-                    # rotate key if API error
                     tries += 1
                     current_key_index = (current_key_index + 1) % len(api_keys)
                     configure_model()
