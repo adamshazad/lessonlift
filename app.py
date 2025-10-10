@@ -76,14 +76,21 @@ if not api_key:
     st.sidebar.title("🔑 API Key Setup")
     api_key = st.sidebar.text_input("Gemini API Key", type="password")
 
+model = None
 if api_key:
     genai.configure(api_key=api_key)
     try:
-        model = genai.GenerativeModel("gemini-pro")
-    except Exception:
-        model = None
-else:
-    model = None
+        # Dynamically fetch models that support generateContent
+        available_models = genai.list_models()
+        for m in available_models:
+            if "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                break
+        if not model:
+            st.error("⚠️ No compatible model available for content generation.")
+    except Exception as e:
+        st.error("⚠️ Error setting up model. Please check your API key.")
+        st.exception(e)
 
 # -------------------------------
 # UI helpers
@@ -112,8 +119,8 @@ def title_and_tagline():
 
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
+    text = re.sub(r'\*(.*?)\*', r'\1', md_text)
     return text
 
 # -------------------------------
@@ -157,19 +164,21 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
 
+    st.session_state.lesson_count += 1
+
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # Save to history only if successful
+            # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
-            st.session_state.lesson_count += 1
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
+            # Lesson usage (always up-to-date at the top)
             used = st.session_state.lesson_count
             remaining = 10 - used
             st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
@@ -199,11 +208,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
 
         except Exception as e:
-            # Friendly message to user
             st.error("⚠️ Sorry, the lesson plan could not be generated at this time.")
-            # Log the real error in Streamlit logs for you to see
-            st.exception(e)
-            return
 
 # -------------------------------
 # Main generator page
