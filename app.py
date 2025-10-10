@@ -80,14 +80,8 @@ model = None
 if api_key:
     genai.configure(api_key=api_key)
     try:
-        # Dynamically fetch models that support generateContent
-        available_models = genai.list_models()
-        for m in available_models:
-            if "generateContent" in m.supported_methods:
-                model = genai.GenerativeModel(m.name)
-                break
-        if not model:
-            st.error("⚠️ No compatible model available for content generation.")
+        # Use a known working model
+        model = genai.GenerativeModel("gemini-1.5-turbo")
     except Exception as e:
         st.error("⚠️ Error setting up model. Please check your API key.")
         st.exception(e)
@@ -119,8 +113,8 @@ def title_and_tagline():
 
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
-    text = re.sub(r'\*(.*?)\*', r'\1', md_text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
 # -------------------------------
@@ -208,7 +202,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
 
         except Exception as e:
-            st.error("⚠️ Sorry, the lesson plan could not be generated at this time.")
+            msg = str(e).lower()
+            if "api key" in msg:
+                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
+            elif "quota" in msg:
+                st.error("⚠️ API quota exceeded. Please try again later.")
+            else:
+                st.error(f"Error generating lesson plan: {e}")
 
 # -------------------------------
 # Main generator page
