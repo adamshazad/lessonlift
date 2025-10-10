@@ -39,18 +39,6 @@ body {background-color: white; color: black;}
     max-height: 300px;
     overflow-y: auto;
 }
-.download-box {
-    display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;
-}
-.download-box a button {
-    padding:10px 16px;
-    font-size:14px;
-    border-radius:8px;
-    border:none;
-    background-color:#4CAF50;
-    color:white;
-    cursor:pointer;
-}
 /* --- Sidebar Fix --- */
 [data-testid="stSidebar"][aria-expanded="false"] {
     display: none !important;
@@ -90,10 +78,18 @@ if not api_key:
 
 if api_key:
     genai.configure(api_key=api_key)
+    
+    # --- API key check snippet ---
     try:
-        model = genai.GenerativeModel("gemini-1.5-turbo")
-    except Exception:
-        model = None
+        test_model = genai.GenerativeModel("gemini-1.5-turbo")
+        # quick test call to ensure API key and model work
+        _ = test_model.generate_content("Hello!")
+        st.success("✅ Gemini API key is valid and working!")
+    except Exception as e:
+        st.error(f"⚠️ API key check failed: {e}")
+    # --------------------------------
+    
+    model = genai.GenerativeModel("gemini-1.5-turbo")
 else:
     model = None
 
@@ -183,29 +179,29 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Lesson usage
+            # Lesson usage (always up-to-date at the top)
             used = st.session_state.lesson_count
             remaining = 10 - used
             st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
-            # Show latest plan in professional scrollable box
+            # Show latest plan
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
-            # Download buttons in neat box
+            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
                 f"""
-                <div class='download-box'>
+                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                     <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button>⬇ TXT</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button>⬇ PDF</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
                     </a>
                     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                        <button>⬇ DOCX</button>
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
                     </a>
                 </div>
                 """,
@@ -213,7 +209,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
 
         except Exception as e:
-            st.error("⚠️ Sorry, the lesson plan could not be generated at this time.")
+            msg = str(e).lower()
+            if "api key" in msg:
+                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
+            elif "quota" in msg:
+                st.error("⚠️ API quota exceeded. Please try again later.")
+            else:
+                st.error(f"Error generating lesson plan: {e}")
 
 # -------------------------------
 # Main generator page
