@@ -79,15 +79,19 @@ if not api_key:
 model = None
 if api_key:
     genai.configure(api_key=api_key)
+    # Try first model, fallback to second if it fails
+    for candidate_model in ["gemini-2.5-flash", "gemini-2.5-turbo"]:
+        try:
+            model = genai.GenerativeModel(candidate_model)
+            _ = model.generate_content("Test")
+            break  # Stop at first working model
+        except Exception:
+            model = None
+    if not model:
+        st.error("⚠️ Could not set up any working model. Check your API key and available models.")
+else:
+    model = None
 
-    # ✅ Pick a model that supports generateContent
-    # Replace "gemini-2.5-flash" with the model you found from ListModels
-    try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        _ = model.generate_content("Test")  # quick test
-    except Exception as e:
-        st.error(f"⚠
-        
 # -------------------------------
 # UI helpers
 # -------------------------------
@@ -205,12 +209,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
         except Exception as e:
             msg = str(e).lower()
-            if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
-            elif "quota" in msg:
-                st.error("⚠️ API quota exceeded. Please try again later.")
-            else:
-                st.error(f"Error generating lesson plan: {e}")
+            st.error(f"⚠️ Sorry, the lesson plan could not be generated at this time.")
 
 # -------------------------------
 # Main generator page
