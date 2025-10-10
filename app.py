@@ -86,9 +86,9 @@ if api_key:
     try:
         # Get list of available models
         available_models = genai.list_models()
-        # Pick the first generative model that supports generate_content
+        # Pick the first model whose name contains 'gemini'
         for m in available_models:
-            if "generateContent" in m.supported_methods:
+            if "gemini" in m.name.lower():
                 model = genai.GenerativeModel(m.name)
                 break
         if not model:
