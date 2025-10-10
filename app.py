@@ -80,15 +80,21 @@ if not api_key:
     st.sidebar.title("🔑 API Key Setup")
     api_key = st.sidebar.text_input("Gemini API Key", type="password")
 
+model = None
 if api_key:
     genai.configure(api_key=api_key)
     try:
-        model = genai.GenerativeModel("gemini-1.5")
-        _ = model.generate_content("test")
-    except Exception:
-        model = genai.GenerativeModel("gemini-pro")
-else:
-    model = None
+        # Get list of available models
+        available_models = genai.list_models()
+        # Pick the first generative model that supports generate_content
+        for m in available_models:
+            if "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                break
+        if not model:
+            st.error("⚠️ No valid generative models available for your API key.")
+    except Exception as e:
+        st.error(f"⚠️ Error setting up model: {e}")
 
 # -------------------------------
 # UI helpers
@@ -125,7 +131,6 @@ def strip_markdown(md_text):
 # Exporters
 # -------------------------------
 def format_text_into_sections(text):
-    """Splits generated text into sections using headings for neat boxed display"""
     sections = []
     current_title = "Lesson Plan"
     current_content = []
@@ -157,7 +162,6 @@ def create_pdf(text):
         story.append(Spacer(1,3))
         story.append(Paragraph(sec['content'].replace("&","&amp;").replace("<","&lt;").replace(">","&gt;"), normal))
         story.append(Spacer(1,6))
-        # Add a thin line
         story.append(Table([['']], colWidths=[doc.width], style=TableStyle([('LINEABOVE', (0,0), (-1,0), 0.5, colors.grey)])))
     doc.build(story)
     buffer.seek(0)
@@ -173,7 +177,7 @@ def create_docx(text):
         run.font.size = Pt(12)
         run.font.color.rgb = RGBColor(0,0,0)
         doc.add_paragraph(sec['content'])
-        doc.add_paragraph("")  # spacer
+        doc.add_paragraph("")
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
@@ -199,25 +203,21 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
-            # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            # Lesson usage (always up-to-date at the top)
             used = st.session_state.lesson_count
             remaining = 10 - used
             st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
-            # Show latest plan in neat scrollable box
             sections = format_text_into_sections(clean_output)
             html_sections = ""
             for sec in sections:
                 html_sections += f"<div style='margin-bottom:10px;'><b>{sec['title']}</b><br>{sec['content'].replace(chr(10),'<br>')}</div>"
             st.markdown(f"<div class='stCard'>{html_sections}</div>", unsafe_allow_html=True)
 
-            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
