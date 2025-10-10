@@ -9,6 +9,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
+import hashlib
 
 # -------------------------------
 # Page config
@@ -39,6 +40,7 @@ body {background-color: white; color: black;}
     max-height: 300px;
     overflow-y: auto;
 }
+/* --- Sidebar Fix --- */
 [data-testid="stSidebar"][aria-expanded="false"] {
     display: none !important;
 }
@@ -60,9 +62,8 @@ if "lesson_count" not in st.session_state:
     st.session_state.lesson_count = 0
 if "last_reset_date" not in st.session_state:
     st.session_state.last_reset_date = datetime.date.today()
-if "trial_start_date" not in st.session_state:
-    st.session_state.trial_start_date = datetime.date.today()
-    st.session_state.trial = True
+if "lesson_cache" not in st.session_state:
+    st.session_state.lesson_cache = {}
 
 # Reset daily count at midnight
 today = datetime.date.today()
@@ -71,35 +72,35 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Determine daily limit
+# API key setup with rotation
 # -------------------------------
-if st.session_state.trial:
-    days_since_trial = (today - st.session_state.trial_start_date).days
-    if days_since_trial >= 7:
-        st.session_state.trial = False
-        daily_limit = 10
-    else:
-        daily_limit = 5
-else:
-    daily_limit = 10
-
-# -------------------------------
-# API key setup
-# -------------------------------
-api_key = st.secrets.get("gemini_api", None)
-if not api_key:
+api_keys = st.secrets.get("gemini_api_keys", [])  # List of API keys
+if not api_keys:
     st.sidebar.title("🔑 API Key Setup")
-    api_key = st.sidebar.text_input("Gemini API Key", type="password")
+    key_input = st.sidebar.text_input("Gemini API Key (single)", type="password")
+    if key_input:
+        api_keys = [key_input]
 
-if api_key:
-    genai.configure(api_key=api_key)
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        _ = model.generate_content("test")
-    except Exception:
-        model = genai.GenerativeModel("gemini-pro")
-else:
+current_key_index = 0
+model = None
+
+def setup_model():
+    global model, current_key_index
+    if not api_keys:
+        return None
+    attempts = 0
+    while attempts < len(api_keys):
+        try:
+            genai.configure(api_key=api_keys[current_key_index])
+            model = genai.GenerativeModel("gemini-1.5-turbo")  # updated default model
+            return model
+        except Exception:
+            current_key_index = (current_key_index + 1) % len(api_keys)
+            attempts += 1
     model = None
+    return None
+
+setup_model()
 
 # -------------------------------
 # UI helpers
@@ -128,8 +129,8 @@ def title_and_tagline():
 
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
-    text = re.sub(r'\*(.*?)\*', r'\1', md_text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
     return text
 
 # -------------------------------
@@ -162,61 +163,74 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator
+# Generator with caching and safe API
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    if st.session_state.lesson_count >= daily_limit:
-        st.error(f"🚫 Daily limit reached. You can generate up to {daily_limit} lessons per day.")
+    if st.session_state.lesson_count >= 10:
+        st.error("🚫 Daily limit reached. Please try again tomorrow.")
         return
 
     if not model:
-        st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
-        return
+        if not setup_model():
+            st.error("⚠️ No working Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api_keys'].")
+            return
 
+    # Create a hash key for caching
+    prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
+    if prompt_hash in st.session_state.lesson_cache:
+        output = st.session_state.lesson_cache[prompt_hash]
+    else:
+        with st.spinner("✨ Creating lesson plan..."):
+            try:
+                response = model.generate_content(prompt)
+                output = response.text.strip()
+                st.session_state.lesson_cache[prompt_hash] = output
+            except Exception:
+                # Rotate key and retry
+                setup_model()
+                try:
+                    response = model.generate_content(prompt)
+                    output = response.text.strip()
+                    st.session_state.lesson_cache[prompt_hash] = output
+                except Exception:
+                    output = "⚠️ Something went wrong. Please try again later."
+
+    clean_output = strip_markdown(output)
     st.session_state.lesson_count += 1
 
-    with st.spinner("✨ Creating lesson plan..."):
-        try:
-            response = model.generate_content(prompt)
-            output = response.text.strip()
-            clean_output = strip_markdown(output)
+    # Save to history
+    st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
-            # Save to history
-            st.session_state.lesson_history.append({"title": title, "content": clean_output})
+    if regen_message:
+        st.info(f"🔄 {regen_message}")
 
-            if regen_message:
-                st.info(f"🔄 {regen_message}")
+    used = st.session_state.lesson_count
+    remaining = 10 - used
+    st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
-            used = st.session_state.lesson_count
-            remaining = daily_limit - used
-            st.info(f"📊 {used}/{daily_limit} lessons used today — {remaining} remaining")
+    # Show latest plan
+    st.markdown(f"### 📖 {title}")
+    st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
-            # Show nicely formatted scrollable box
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
-
-            # Download buttons
-            pdf_buffer = create_pdf(clean_output)
-            docx_buffer = create_docx(clean_output)
-            st.markdown(
-                f"""
-                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
-                    </a>
-                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
-                    </a>
-                    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
-                    </a>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-        except Exception:
-            st.error("⚠️ Something went wrong while generating the lesson plan. Please try again.")
-            st.session_state.lesson_count -= 1
+    # Download buttons
+    pdf_buffer = create_pdf(clean_output)
+    docx_buffer = create_docx(clean_output)
+    st.markdown(
+        f"""
+        <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+            <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
+            </a>
+            <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+                <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
+            </a>
+            <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+                <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # -------------------------------
 # Main generator page
@@ -225,7 +239,7 @@ def lesson_generator_page():
     show_logo()
     title_and_tagline()
 
-    if not api_key:
+    if not api_keys:
         st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
         return
 
