@@ -39,7 +39,19 @@ body {background-color: white; color: black;}
     max-height: 300px;
     overflow-y: auto;
 }
-/* --- Sidebar Fix --- */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 8px;
+}
+th, td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+}
+th {
+    background-color: #f0f0f0;
+}
 [data-testid="stSidebar"][aria-expanded="false"] {
     display: none !important;
 }
@@ -62,6 +74,7 @@ if "lesson_count" not in st.session_state:
 if "last_reset_date" not in st.session_state:
     st.session_state.last_reset_date = datetime.date.today()
 
+# Reset daily count at midnight
 today = datetime.date.today()
 if st.session_state.last_reset_date != today:
     st.session_state.lesson_count = 0
@@ -77,21 +90,16 @@ if not api_key:
 
 if api_key:
     genai.configure(api_key=api_key)
-    # Safe fallback for model availability
-    model = None
-    for candidate in ["gemini-2.5-flash", "gemini-flash-latest", "gemini-1.5-flash"]:
-        try:
-            model_candidate = genai.GenerativeModel(candidate)
-            _ = model_candidate.generate_content("test")
-            model = model_candidate
-            break
-        except Exception:
-            continue
+    try:
+        model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        _ = model.generate_content("test")
+    except Exception:
+        model = genai.GenerativeModel("models/gemini-pro")
 else:
     model = None
 
 # -------------------------------
-# UI helpers
+# Helpers
 # -------------------------------
 def show_logo(path="logo.png", width=200):
     try:
@@ -116,10 +124,12 @@ def title_and_tagline():
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 def strip_markdown(md_text):
-    # Original function: very simple, no changes to formatting
-    text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'#+\s*', '', text)
+    text = re.sub(r'\|.*\|', '', text)  # remove table-like markdown
+    text = re.sub(r'---+', '', text)
     return text
 
 # -------------------------------
@@ -134,9 +144,9 @@ def create_pdf(text):
     for raw in text.splitlines():
         line = raw.rstrip()
         if not line.strip():
-            story.append(Spacer(1,6))
+            story.append(Spacer(1, 6))
         else:
-            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            safe = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
@@ -160,7 +170,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     if not model:
-        st.error("⚠️ No compatible Gemini model found. Add API key in sidebar.")
+        st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api'].")
         return
 
     st.session_state.lesson_count += 1
@@ -203,13 +213,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
 
         except Exception as e:
-            msg = str(e).lower()
-            if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
-            elif "quota" in msg:
-                st.error("⚠️ API quota exceeded. Please try again later.")
-            else:
-                st.error(f"Error generating lesson plan: {e}")
+            st.error(f"Error generating lesson plan: {e}")
 
 # -------------------------------
 # Main generator page
@@ -237,7 +241,14 @@ def lesson_generator_page():
 
     if submitted:
         prompt = f"""
-Create a detailed UK primary school lesson plan:
+Create a detailed UK primary school lesson plan in the **original LessonLift style**.
+
+🟩 Format neatly with:
+- Headings for each section (Learning Objectives, Activities, Assessment, etc.)
+- Bullet points or numbered steps (no tables or vertical bars)
+- Blank lines between sections for readability
+- Clear, short paragraphs
+- Visually appealing and easy to read like the old LessonLift output
 
 Year Group: {lesson_data['year_group']}
 Subject: {lesson_data['subject']}
@@ -250,56 +261,14 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
 
-    if st.session_state.last_prompt:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ],
-            key="regen_style"
-        )
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities",
-            key="custom_instruction"
-        )
-        if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
-            extra_instruction = ""
-            regen_message = ""
-            if not custom_instruction:
-                if regen_style == "🎨 More creative & engaging activities":
-                    extra_instruction = "Make activities more creative, interactive, and fun."
-                    regen_message = "Lesson updated with more creative and engaging activities."
-                elif regen_style == "📋 More structured with timings":
-                    extra_instruction = "Add clear structure with timings for each section."
-                    regen_message = "Lesson updated with clearer structure and timings."
-                elif regen_style == "🧩 Simplify for lower ability":
-                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                    regen_message = "Lesson simplified for lower ability."
-                elif regen_style == "🚀 Challenge for higher ability":
-                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                    regen_message = "Lesson updated with higher ability challenge tasks."
-                else:
-                    regen_message = "Here’s a new updated version of your lesson plan."
-            else:
-                extra_instruction = custom_instruction
-                regen_message = f"Lesson updated: {custom_instruction}"
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
-
 # -------------------------------
 # Sidebar history
 # -------------------------------
 def show_lesson_history():
     st.sidebar.title("📜 Lesson History")
     if st.session_state.lesson_history:
-        for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
-            with st.sidebar.expander(f"{entry['title']}"):
+        for entry in reversed(st.session_state.lesson_history):
+            with st.sidebar.expander(entry['title']):
                 st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
     else:
         st.sidebar.write("No lesson history yet.")
