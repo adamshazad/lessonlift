@@ -40,7 +40,6 @@ body {background-color: white; color: black;}
     max-height: 300px;
     overflow-y: auto;
 }
-/* --- Sidebar Fix --- */
 [data-testid="stSidebar"][aria-expanded="false"] {
     display: none !important;
 }
@@ -72,35 +71,38 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# API key setup with rotation
+# API key setup
 # -------------------------------
-api_keys = st.secrets.get("gemini_api_keys", [])  # List of API keys
+# Support multiple API keys
+api_keys = st.secrets.get("gemini_api_keys", None)  # expects list of keys
 if not api_keys:
     st.sidebar.title("🔑 API Key Setup")
-    key_input = st.sidebar.text_input("Gemini API Key (single)", type="password")
+    key_input = st.sidebar.text_input("Gemini API Key (first key)", type="password")
     if key_input:
         api_keys = [key_input]
 
 current_key_index = 0
 model = None
 
-def setup_model():
+def configure_model():
     global model, current_key_index
     if not api_keys:
         return None
-    attempts = 0
-    while attempts < len(api_keys):
+    max_tries = len(api_keys)
+    tries = 0
+    while tries < max_tries:
         try:
             genai.configure(api_key=api_keys[current_key_index])
-            model = genai.GenerativeModel("gemini-1.5-turbo")  # updated default model
+            model = genai.GenerativeModel("gemini-1.5")
+            # quick test
             return model
         except Exception:
             current_key_index = (current_key_index + 1) % len(api_keys)
-            attempts += 1
+            tries += 1
     model = None
     return None
 
-setup_model()
+configure_model()
 
 # -------------------------------
 # UI helpers
@@ -163,7 +165,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator with caching and safe API
+# Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if st.session_state.lesson_count >= 10:
@@ -171,32 +173,32 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     if not model:
-        if not setup_model():
-            st.error("⚠️ No working Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api_keys'].")
-            return
+        st.error("⚠️ No Gemini API key found. Add it in the sidebar or in st.secrets['gemini_api_keys'].")
+        return
 
-    # Create a hash key for caching
+    # Check cache first
     prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
     if prompt_hash in st.session_state.lesson_cache:
-        output = st.session_state.lesson_cache[prompt_hash]
+        clean_output = st.session_state.lesson_cache[prompt_hash]
     else:
+        st.session_state.lesson_count += 1
         with st.spinner("✨ Creating lesson plan..."):
-            try:
-                response = model.generate_content(prompt)
-                output = response.text.strip()
-                st.session_state.lesson_cache[prompt_hash] = output
-            except Exception:
-                # Rotate key and retry
-                setup_model()
+            tries = 0
+            max_tries = len(api_keys)
+            while tries < max_tries:
                 try:
                     response = model.generate_content(prompt)
-                    output = response.text.strip()
-                    st.session_state.lesson_cache[prompt_hash] = output
-                except Exception:
-                    output = "⚠️ Something went wrong. Please try again later."
-
-    clean_output = strip_markdown(output)
-    st.session_state.lesson_count += 1
+                    clean_output = strip_markdown(response.text.strip())
+                    st.session_state.lesson_cache[prompt_hash] = clean_output
+                    break
+                except Exception as e:
+                    # rotate key if API error
+                    tries += 1
+                    current_key_index = (current_key_index + 1) % len(api_keys)
+                    configure_model()
+                    if tries >= max_tries:
+                        clean_output = "⚠️ Sorry, the lesson plan could not be generated at this time."
+                        break
 
     # Save to history
     st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -204,6 +206,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if regen_message:
         st.info(f"🔄 {regen_message}")
 
+    # Lesson usage
     used = st.session_state.lesson_count
     remaining = 10 - used
     st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
