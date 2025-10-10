@@ -6,8 +6,10 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
 from docx import Document
+from docx.shared import Pt, RGBColor
 import datetime
 
 # -------------------------------
@@ -34,24 +36,14 @@ body {background-color: white; color: black;}
     border-radius: 12px !important;
     padding: 16px !important;
     margin-bottom: 12px !important;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.1) !important;
     line-height: 1.5em;
     max-height: 300px;
     overflow-y: auto;
+    border-left: 4px solid #d0d0d0;
 }
-table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-top: 8px;
-}
-th, td {
-    border: 1px solid #ccc;
-    padding: 8px;
-    text-align: left;
-}
-th {
-    background-color: #f0f0f0;
-}
+h2 {margin-bottom: 6px;}
+/* --- Sidebar Fix --- */
 [data-testid="stSidebar"][aria-expanded="false"] {
     display: none !important;
 }
@@ -91,15 +83,15 @@ if not api_key:
 if api_key:
     genai.configure(api_key=api_key)
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        model = genai.GenerativeModel("gemini-1.5")
         _ = model.generate_content("test")
     except Exception:
-        model = genai.GenerativeModel("models/gemini-pro")
+        model = genai.GenerativeModel("gemini-pro")
 else:
     model = None
 
 # -------------------------------
-# Helpers
+# UI helpers
 # -------------------------------
 def show_logo(path="logo.png", width=200):
     try:
@@ -124,38 +116,64 @@ def title_and_tagline():
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 def strip_markdown(md_text):
+    text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
-    text = re.sub(r'#+\s*', '', text)
-    text = re.sub(r'\|.*\|', '', text)  # remove table-like markdown
-    text = re.sub(r'---+', '', text)
     return text
 
 # -------------------------------
 # Exporters
 # -------------------------------
+def format_text_into_sections(text):
+    """Splits generated text into sections using headings for neat boxed display"""
+    sections = []
+    current_title = "Lesson Plan"
+    current_content = []
+    for line in text.splitlines():
+        line_strip = line.strip()
+        if line_strip.endswith(":") or line_strip.lower().startswith(("learning objective","starter","main activity","plenary","resources","assessment","sen/eal notes")):
+            if current_content:
+                sections.append({"title": current_title, "content": "\n".join(current_content)})
+            current_title = line_strip
+            current_content = []
+        else:
+            current_content.append(line)
+    if current_content:
+        sections.append({"title": current_title, "content": "\n".join(current_content)})
+    return sections
+
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
+    title_style = ParagraphStyle('TitleBox', parent=styles['Heading2'], fontSize=13, leading=15, spaceAfter=4, textColor=colors.black, leftIndent=2)
+    
     story = []
-    for raw in text.splitlines():
-        line = raw.rstrip()
-        if not line.strip():
-            story.append(Spacer(1, 6))
-        else:
-            safe = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            story.append(Paragraph(safe, normal))
+    sections = format_text_into_sections(text)
+    for sec in sections:
+        story.append(Spacer(1,6))
+        story.append(Paragraph(f"<b>{sec['title']}</b>", title_style))
+        story.append(Spacer(1,3))
+        story.append(Paragraph(sec['content'].replace("&","&amp;").replace("<","&lt;").replace(">","&gt;"), normal))
+        story.append(Spacer(1,6))
+        # Add a thin line
+        story.append(Table([['']], colWidths=[doc.width], style=TableStyle([('LINEABOVE', (0,0), (-1,0), 0.5, colors.grey)])))
     doc.build(story)
     buffer.seek(0)
     return buffer
 
 def create_docx(text):
     doc = Document()
-    for raw in text.splitlines():
-        doc.add_paragraph(raw.rstrip())
+    sections = format_text_into_sections(text)
+    for sec in sections:
+        p = doc.add_paragraph()
+        run = p.add_run(sec['title'])
+        run.bold = True
+        run.font.size = Pt(12)
+        run.font.color.rgb = RGBColor(0,0,0)
+        doc.add_paragraph(sec['content'])
+        doc.add_paragraph("")  # spacer
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
@@ -181,18 +199,25 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
+            # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
+            # Lesson usage (always up-to-date at the top)
             used = st.session_state.lesson_count
             remaining = 10 - used
             st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
-            st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+            # Show latest plan in neat scrollable box
+            sections = format_text_into_sections(clean_output)
+            html_sections = ""
+            for sec in sections:
+                html_sections += f"<div style='margin-bottom:10px;'><b>{sec['title']}</b><br>{sec['content'].replace(chr(10),'<br>')}</div>"
+            st.markdown(f"<div class='stCard'>{html_sections}</div>", unsafe_allow_html=True)
 
+            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -213,7 +238,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
 
         except Exception as e:
-            st.error(f"Error generating lesson plan: {e}")
+            msg = str(e).lower()
+            if "api key" in msg:
+                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
+            elif "quota" in msg:
+                st.error("⚠️ API quota exceeded. Please try again later.")
+            else:
+                st.error(f"Error generating lesson plan: {e}")
 
 # -------------------------------
 # Main generator page
@@ -241,14 +272,7 @@ def lesson_generator_page():
 
     if submitted:
         prompt = f"""
-Create a detailed UK primary school lesson plan in the **original LessonLift style**.
-
-🟩 Format neatly with:
-- Headings for each section (Learning Objectives, Activities, Assessment, etc.)
-- Bullet points or numbered steps (no tables or vertical bars)
-- Blank lines between sections for readability
-- Clear, short paragraphs
-- Visually appealing and easy to read like the old LessonLift output
+Create a detailed UK primary school lesson plan:
 
 Year Group: {lesson_data['year_group']}
 Subject: {lesson_data['subject']}
@@ -261,14 +285,56 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
 
+    if st.session_state.last_prompt:
+        st.markdown("### 🔄 Not happy with the plan?")
+        regen_style = st.selectbox(
+            "Choose a regeneration style:",
+            [
+                "♻️ Just regenerate (different variation)",
+                "🎨 More creative & engaging activities",
+                "📋 More structured with timings",
+                "🧩 Simplify for lower ability",
+                "🚀 Challenge for higher ability"
+            ],
+            key="regen_style"
+        )
+        custom_instruction = st.text_input(
+            "Or type your own custom instruction (optional)",
+            placeholder="e.g. Make it more interactive with outdoor activities",
+            key="custom_instruction"
+        )
+        if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
+            extra_instruction = ""
+            regen_message = ""
+            if not custom_instruction:
+                if regen_style == "🎨 More creative & engaging activities":
+                    extra_instruction = "Make activities more creative, interactive, and fun."
+                    regen_message = "Lesson updated with more creative and engaging activities."
+                elif regen_style == "📋 More structured with timings":
+                    extra_instruction = "Add clear structure with timings for each section."
+                    regen_message = "Lesson updated with clearer structure and timings."
+                elif regen_style == "🧩 Simplify for lower ability":
+                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
+                    regen_message = "Lesson simplified for lower ability."
+                elif regen_style == "🚀 Challenge for higher ability":
+                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
+                    regen_message = "Lesson updated with higher ability challenge tasks."
+                else:
+                    regen_message = "Here’s a new updated version of your lesson plan."
+            else:
+                extra_instruction = custom_instruction
+                regen_message = f"Lesson updated: {custom_instruction}"
+            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
+            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
+
 # -------------------------------
 # Sidebar history
 # -------------------------------
 def show_lesson_history():
     st.sidebar.title("📜 Lesson History")
     if st.session_state.lesson_history:
-        for entry in reversed(st.session_state.lesson_history):
-            with st.sidebar.expander(entry['title']):
+        for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
+            with st.sidebar.expander(f"{entry['title']}"):
                 st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
     else:
         st.sidebar.write("No lesson history yet.")
