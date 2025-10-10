@@ -6,10 +6,8 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
-from docx.shared import Pt, RGBColor
 import datetime
 
 # -------------------------------
@@ -36,14 +34,11 @@ body {background-color: white; color: black;}
     border-radius: 12px !important;
     padding: 16px !important;
     margin-bottom: 12px !important;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.1) !important;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
     max-height: 300px;
     overflow-y: auto;
-    border-left: 4px solid #d0d0d0;
 }
-h2 {margin-bottom: 6px;}
-/* --- Sidebar Fix --- */
 [data-testid="stSidebar"][aria-expanded="false"] {
     display: none !important;
 }
@@ -65,12 +60,28 @@ if "lesson_count" not in st.session_state:
     st.session_state.lesson_count = 0
 if "last_reset_date" not in st.session_state:
     st.session_state.last_reset_date = datetime.date.today()
+if "trial_start_date" not in st.session_state:
+    st.session_state.trial_start_date = datetime.date.today()
+    st.session_state.trial = True
 
 # Reset daily count at midnight
 today = datetime.date.today()
 if st.session_state.last_reset_date != today:
     st.session_state.lesson_count = 0
     st.session_state.last_reset_date = today
+
+# -------------------------------
+# Determine daily limit
+# -------------------------------
+if st.session_state.trial:
+    days_since_trial = (today - st.session_state.trial_start_date).days
+    if days_since_trial >= 7:
+        st.session_state.trial = False
+        daily_limit = 10
+    else:
+        daily_limit = 5
+else:
+    daily_limit = 10
 
 # -------------------------------
 # API key setup
@@ -80,21 +91,15 @@ if not api_key:
     st.sidebar.title("🔑 API Key Setup")
     api_key = st.sidebar.text_input("Gemini API Key", type="password")
 
-model = None
 if api_key:
     genai.configure(api_key=api_key)
     try:
-        # Get list of available models
-        available_models = genai.list_models()
-        # Pick the first model whose name contains 'gemini'
-        for m in available_models:
-            if "gemini" in m.name.lower():
-                model = genai.GenerativeModel(m.name)
-                break
-        if not model:
-            st.error("⚠️ No valid generative models available for your API key.")
-    except Exception as e:
-        st.error(f"⚠️ Error setting up model: {e}")
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        _ = model.generate_content("test")
+    except Exception:
+        model = genai.GenerativeModel("gemini-pro")
+else:
+    model = None
 
 # -------------------------------
 # UI helpers
@@ -124,60 +129,33 @@ def title_and_tagline():
 def strip_markdown(md_text):
     text = re.sub(r'#+\s*', '', md_text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', md_text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', md_text)
     return text
 
 # -------------------------------
 # Exporters
 # -------------------------------
-def format_text_into_sections(text):
-    sections = []
-    current_title = "Lesson Plan"
-    current_content = []
-    for line in text.splitlines():
-        line_strip = line.strip()
-        if line_strip.endswith(":") or line_strip.lower().startswith(("learning objective","starter","main activity","plenary","resources","assessment","sen/eal notes")):
-            if current_content:
-                sections.append({"title": current_title, "content": "\n".join(current_content)})
-            current_title = line_strip
-            current_content = []
-        else:
-            current_content.append(line)
-    if current_content:
-        sections.append({"title": current_title, "content": "\n".join(current_content)})
-    return sections
-
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
-    title_style = ParagraphStyle('TitleBox', parent=styles['Heading2'], fontSize=13, leading=15, spaceAfter=4, textColor=colors.black, leftIndent=2)
-    
     story = []
-    sections = format_text_into_sections(text)
-    for sec in sections:
-        story.append(Spacer(1,6))
-        story.append(Paragraph(f"<b>{sec['title']}</b>", title_style))
-        story.append(Spacer(1,3))
-        story.append(Paragraph(sec['content'].replace("&","&amp;").replace("<","&lt;").replace(">","&gt;"), normal))
-        story.append(Spacer(1,6))
-        story.append(Table([['']], colWidths=[doc.width], style=TableStyle([('LINEABOVE', (0,0), (-1,0), 0.5, colors.grey)])))
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            story.append(Spacer(1,6))
+        else:
+            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
     return buffer
 
 def create_docx(text):
     doc = Document()
-    sections = format_text_into_sections(text)
-    for sec in sections:
-        p = doc.add_paragraph()
-        run = p.add_run(sec['title'])
-        run.bold = True
-        run.font.size = Pt(12)
-        run.font.color.rgb = RGBColor(0,0,0)
-        doc.add_paragraph(sec['content'])
-        doc.add_paragraph("")
+    for raw in text.splitlines():
+        doc.add_paragraph(raw.rstrip())
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
@@ -187,8 +165,8 @@ def create_docx(text):
 # Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    if st.session_state.lesson_count >= 10:
-        st.error("🚫 Daily limit reached. Please try again tomorrow.")
+    if st.session_state.lesson_count >= daily_limit:
+        st.error(f"🚫 Daily limit reached. You can generate up to {daily_limit} lessons per day.")
         return
 
     if not model:
@@ -203,21 +181,20 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.text.strip()
             clean_output = strip_markdown(output)
 
+            # Save to history
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
             used = st.session_state.lesson_count
-            remaining = 10 - used
-            st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
+            remaining = daily_limit - used
+            st.info(f"📊 {used}/{daily_limit} lessons used today — {remaining} remaining")
 
-            sections = format_text_into_sections(clean_output)
-            html_sections = ""
-            for sec in sections:
-                html_sections += f"<div style='margin-bottom:10px;'><b>{sec['title']}</b><br>{sec['content'].replace(chr(10),'<br>')}</div>"
-            st.markdown(f"<div class='stCard'>{html_sections}</div>", unsafe_allow_html=True)
+            # Show nicely formatted scrollable box
+            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
+            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -237,14 +214,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 unsafe_allow_html=True
             )
 
-        except Exception as e:
-            msg = str(e).lower()
-            if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
-            elif "quota" in msg:
-                st.error("⚠️ API quota exceeded. Please try again later.")
-            else:
-                st.error(f"Error generating lesson plan: {e}")
+        except Exception:
+            st.error("⚠️ Something went wrong while generating the lesson plan. Please try again.")
+            st.session_state.lesson_count -= 1
 
 # -------------------------------
 # Main generator page
