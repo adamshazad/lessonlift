@@ -35,11 +35,11 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
-    max-height: 300px;
+    line-height: 1.6em;
+    white-space: pre-wrap;
+    max-height: 400px;
     overflow-y: auto;
 }
-/* --- Sidebar Fix --- */
 [data-testid="stSidebar"][aria-expanded="false"] {
     display: none !important;
 }
@@ -79,19 +79,35 @@ if not api_key:
 model = None
 if api_key:
     genai.configure(api_key=api_key)
-    
     try:
-        # ✅ Use a guaranteed working model
-        model = genai.GenerativeModel("models/gemini-2.5-pro")
-        st.sidebar.success("✅ Connected to Gemini 2.5 Pro successfully.")
+        models = genai.list_models()
+        st.sidebar.write("Available models for your API key:")
+        working_model_found = False
+        for m in models:
+            st.sidebar.write(f"- {m.name}")
+            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                working_model_found = True
+        if not working_model_found:
+            st.sidebar.error("⚠️ No models supporting generateContent found for this API key.")
     except Exception as e:
-        st.sidebar.error(f"⚠️ Could not initialize Gemini model: {e}")
-else:
-    st.sidebar.error("⚠️ Please enter your Gemini API key.")
+        st.sidebar.error(f"Could not list models: {e}")
 
 # -------------------------------
-# UI helpers
+# Helper functions
 # -------------------------------
+def clean_markdown(text):
+    """Remove markdown syntax and fix tables, bullets, and headers."""
+    text = re.sub(r'\|.*\|', '', text)                     # Remove markdown tables
+    text = re.sub(r'#+\s*', '', text)                      # Remove headers
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)           # Bold
+    text = re.sub(r'\*(.*?)\*', r'\1', text)               # Italic
+    text = re.sub(r'`(.*?)`', r'\1', text)                 # Inline code
+    text = re.sub(r'-{2,}', '', text)                      # Remove separators
+    text = re.sub(r'•', '-', text)                         # Normalize bullets
+    text = re.sub(r'\n{3,}', '\n\n', text)                 # Remove extra blank lines
+    return text.strip()
+
 def show_logo(path="logo.png", width=200):
     try:
         with open(path, "rb") as f:
@@ -114,12 +130,6 @@ def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-def strip_markdown(md_text):
-    text = re.sub(r'#+\s*', '', md_text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    return text
-
 # -------------------------------
 # Exporters
 # -------------------------------
@@ -129,8 +139,7 @@ def create_pdf(text):
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
-    for raw in text.splitlines():
-        line = raw.rstrip()
+    for line in text.splitlines():
         if not line.strip():
             story.append(Spacer(1,6))
         else:
@@ -142,8 +151,8 @@ def create_pdf(text):
 
 def create_docx(text):
     doc = Document()
-    for raw in text.splitlines():
-        doc.add_paragraph(raw.rstrip())
+    for line in text.splitlines():
+        doc.add_paragraph(line.rstrip())
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
@@ -167,7 +176,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         try:
             response = model.generate_content(prompt)
             output = response.text.strip()
-            clean_output = strip_markdown(output)
+            clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
@@ -179,7 +188,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -298,7 +307,7 @@ def show_lesson_history():
     if st.session_state.lesson_history:
         for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
             with st.sidebar.expander(f"{entry['title']}"):
-                st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='stCard'>{entry['content']}</div>", unsafe_allow_html=True)
     else:
         st.sidebar.write("No lesson history yet.")
 
