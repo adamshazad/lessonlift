@@ -1,4 +1,4 @@
-import streamlit as st 
+import streamlit as st
 import google.generativeai as genai
 import re
 import base64
@@ -9,6 +9,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
+from supabase import create_client, Client
 
 # -------------------------------
 # Page config
@@ -51,7 +52,60 @@ body {background-color: white; color: black;}
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Session defaults
+# Supabase setup
+# -------------------------------
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+# -------------------------------
+# Login / Signup
+# -------------------------------
+def signup(email, password):
+    try:
+        user = supabase.auth.sign_up({"email": email, "password": password})
+        if user.user:
+            st.success("✅ Signup successful! Please verify your email and login.")
+        else:
+            st.error("⚠️ Signup failed. " + str(user))
+    except Exception as e:
+        st.error(f"⚠️ Signup error: {str(e)}")
+
+def login(email, password):
+    try:
+        user = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        if user.user:
+            st.session_state.user = user.user
+            st.session_state.authenticated = True
+            st.success("✅ Logged in successfully!")
+        else:
+            st.error("⚠️ Login failed. Check credentials.")
+    except Exception as e:
+        st.error(f"⚠️ Login error: {str(e)}")
+
+# -------------------------------
+# Show login/signup page if not authenticated
+# -------------------------------
+if not st.session_state.authenticated:
+    st.title("🔐 LessonLift Login / Signup")
+    choice = st.radio("Choose action:", ["Login", "Signup"])
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    if choice == "Signup":
+        if st.button("Sign Up"):
+            signup(email, password)
+    else:
+        if st.button("Login"):
+            login(email, password)
+    st.stop()  # Stop execution until authenticated
+
+# -------------------------------
+# Session defaults (authenticated users)
 # -------------------------------
 if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
@@ -69,37 +123,29 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# API key setup
+# Gemini API key setup (server-side)
 # -------------------------------
 api_key = st.secrets.get("gemini_api", None)
-if not api_key:
-    st.sidebar.title("🔑 API Key Setup")
-    api_key = st.sidebar.text_input("Gemini API Key", type="password")
-
 model = None
 if api_key:
     genai.configure(api_key=api_key)
     try:
         models = genai.list_models()
-        st.sidebar.write("Available models for your API key:")
         working_model_found = False
         for m in models:
-            st.sidebar.write(f"- {m.name}")
             if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
                 model = genai.GenerativeModel(m.name)
                 working_model_found = True
         if not working_model_found:
-            st.sidebar.error("⚠️ No models supporting generateContent found for this API key.")
+            st.error("⚠️ No models supporting generateContent found for this API key.")
     except Exception as e:
-        st.sidebar.error(f"Could not list models: {e}")
-
+        st.error(f"Could not list models: {e}")
 # -------------------------------
 # Helper functions
 # -------------------------------
 def clean_markdown(text):
-    """Cleans and formats text neatly for preview and downloads."""
+    """Remove markdown syntax and fix tables, bullets, and headers."""
     text = re.sub(r'\|.*\|', '', text)                     # Remove markdown tables
-    text = re.sub(r':---|---:', '', text)                  # Remove table alignment
     text = re.sub(r'#+\s*', '', text)                      # Remove headers
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)           # Bold
     text = re.sub(r'\*(.*?)\*', r'\1', text)               # Italic
@@ -107,9 +153,7 @@ def clean_markdown(text):
     text = re.sub(r'-{2,}', '', text)                      # Remove separators
     text = re.sub(r'•', '-', text)                         # Normalize bullets
     text = re.sub(r'\n{3,}', '\n\n', text)                 # Remove extra blank lines
-    text = re.sub(r'(?m)^\s*[-*]\s*', '• ', text)          # Consistent bullet symbol
-    text = text.strip()
-    return text
+    return text.strip()
 
 def show_logo(path="logo.png", width=200):
     try:
@@ -191,7 +235,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10), '<br><br>')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -219,7 +263,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             elif "quota" in msg:
                 st.error("⚠️ API quota exceeded. Please try again later.")
             else:
-                st.error("⚠️ Sorry, the lesson plan could not be generated at this time.")
+                st.error(f"⚠️ Sorry, the lesson plan could not be generated at this time.")
 
 # -------------------------------
 # Main generator page
@@ -227,10 +271,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
-
-    if not api_key:
-        st.error("No Gemini API key found. Add it in the sidebar to generate plans.")
-        return
 
     lesson_data = {}
 
@@ -310,7 +350,7 @@ def show_lesson_history():
     if st.session_state.lesson_history:
         for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
             with st.sidebar.expander(f"{entry['title']}"):
-                st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10), '<br><br>')}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='stCard'>{entry['content']}</div>", unsafe_allow_html=True)
     else:
         st.sidebar.write("No lesson history yet.")
 
