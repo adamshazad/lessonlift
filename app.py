@@ -97,8 +97,9 @@ if api_key:
 # Helper functions
 # -------------------------------
 def clean_markdown(text):
-    """Remove markdown syntax and fix tables, bullets, and headers."""
+    """Cleans and formats text neatly for preview and downloads."""
     text = re.sub(r'\|.*\|', '', text)                     # Remove markdown tables
+    text = re.sub(r':---|---:', '', text)                  # Remove table alignment
     text = re.sub(r'#+\s*', '', text)                      # Remove headers
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)           # Bold
     text = re.sub(r'\*(.*?)\*', r'\1', text)               # Italic
@@ -106,7 +107,9 @@ def clean_markdown(text):
     text = re.sub(r'-{2,}', '', text)                      # Remove separators
     text = re.sub(r'•', '-', text)                         # Normalize bullets
     text = re.sub(r'\n{3,}', '\n\n', text)                 # Remove extra blank lines
-    return text.strip()
+    text = re.sub(r'(?m)^\s*[-*]\s*', '• ', text)          # Consistent bullet symbol
+    text = text.strip()
+    return text
 
 def show_logo(path="logo.png", width=200):
     try:
@@ -188,7 +191,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
 
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10), '<br><br>')}</div>", unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -216,7 +219,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             elif "quota" in msg:
                 st.error("⚠️ API quota exceeded. Please try again later.")
             else:
-                st.error(f"⚠️ Sorry, the lesson plan could not be generated at this time.")
+                st.error("⚠️ Sorry, the lesson plan could not be generated at this time.")
 
 # -------------------------------
 # Main generator page
@@ -307,7 +310,7 @@ def show_lesson_history():
     if st.session_state.lesson_history:
         for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
             with st.sidebar.expander(f"{entry['title']}"):
-                st.markdown(f"<div class='stCard'>{entry['content']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10), '<br><br>')}</div>", unsafe_allow_html=True)
     else:
         st.sidebar.write("No lesson history yet.")
 
