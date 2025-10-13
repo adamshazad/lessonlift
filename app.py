@@ -52,20 +52,11 @@ body {background-color: white; color: black;}
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Supabase setup (with fallback)
+# Supabase setup
 # -------------------------------
-try:
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-except KeyError:
-    SUPABASE_URL = st.text_input("Enter your SUPABASE_URL (for local testing)")
-    SUPABASE_KEY = st.text_input("Enter your SUPABASE_KEY (for local testing)", type="password")
-
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-else:
-    st.error("⚠️ Supabase credentials missing. Please provide them to continue.")
-    st.stop()
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -92,6 +83,7 @@ def login(email, password):
             st.session_state.user = user.user
             st.session_state.authenticated = True
             st.success("✅ Logged in successfully!")
+            st.rerun()  # ✅ Force the app to refresh and go to the generator page
         else:
             st.error("⚠️ Login failed. Check credentials.")
     except Exception as e:
@@ -154,14 +146,15 @@ if api_key:
 # Helper functions
 # -------------------------------
 def clean_markdown(text):
-    text = re.sub(r'\|.*\|', '', text)
-    text = re.sub(r'#+\s*', '', text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
-    text = re.sub(r'-{2,}', '', text)
-    text = re.sub(r'•', '-', text)
-    text = re.sub(r'\n{3,}', '\n\n', text)
+    """Remove markdown syntax and fix tables, bullets, and headers."""
+    text = re.sub(r'\|.*\|', '', text)                     # Remove markdown tables
+    text = re.sub(r'#+\s*', '', text)                      # Remove headers
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)           # Bold
+    text = re.sub(r'\*(.*?)\*', r'\1', text)               # Italic
+    text = re.sub(r'`(.*?)`', r'\1', text)                 # Inline code
+    text = re.sub(r'-{2,}', '', text)                      # Remove separators
+    text = re.sub(r'•', '-', text)                         # Normalize bullets
+    text = re.sub(r'\n{3,}', '\n\n', text)                 # Remove extra blank lines
     return text.strip()
 
 def show_logo(path="logo.png", width=200):
