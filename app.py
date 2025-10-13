@@ -62,6 +62,8 @@ if "user" not in st.session_state:
     st.session_state.user = None
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+if "show_login" not in st.session_state:
+    st.session_state.show_login = False
 
 # -------------------------------
 # Login / Signup
@@ -71,6 +73,8 @@ def signup(email, password):
         user = supabase.auth.sign_up({"email": email, "password": password})
         if user.user:
             st.success("✅ Signup successful! Please verify your email and login.")
+            st.session_state.show_login = True  # Automatically show login form
+            st.rerun()
         else:
             st.error("⚠️ Signup failed. " + str(user))
     except Exception as e:
@@ -83,7 +87,7 @@ def login(email, password):
             st.session_state.user = user.user
             st.session_state.authenticated = True
             st.success("✅ Logged in successfully!")
-            st.rerun()  # ✅ Force the app to refresh and go to the generator page
+            st.rerun()  # Ensure generator page shows after login
         else:
             st.error("⚠️ Login failed. Check credentials.")
     except Exception as e:
@@ -94,15 +98,23 @@ def login(email, password):
 # -------------------------------
 if not st.session_state.authenticated:
     st.title("🔐 LessonLift Login / Signup")
-    choice = st.radio("Choose action:", ["Login", "Signup"])
+    
+    # Decide which form to show
+    if st.session_state.show_login:
+        choice = "Login"
+    else:
+        choice = st.radio("Choose action:", ["Login", "Signup"])
+    
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
+    
     if choice == "Signup":
         if st.button("Sign Up"):
             signup(email, password)
     else:
         if st.button("Login"):
             login(email, password)
+    
     st.stop()  # Stop execution until authenticated
 
 # -------------------------------
@@ -146,15 +158,14 @@ if api_key:
 # Helper functions
 # -------------------------------
 def clean_markdown(text):
-    """Remove markdown syntax and fix tables, bullets, and headers."""
-    text = re.sub(r'\|.*\|', '', text)                     # Remove markdown tables
-    text = re.sub(r'#+\s*', '', text)                      # Remove headers
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)           # Bold
-    text = re.sub(r'\*(.*?)\*', r'\1', text)               # Italic
-    text = re.sub(r'`(.*?)`', r'\1', text)                 # Inline code
-    text = re.sub(r'-{2,}', '', text)                      # Remove separators
-    text = re.sub(r'•', '-', text)                         # Normalize bullets
-    text = re.sub(r'\n{3,}', '\n\n', text)                 # Remove extra blank lines
+    text = re.sub(r'\|.*\|', '', text)
+    text = re.sub(r'#+\s*', '', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'-{2,}', '', text)
+    text = re.sub(r'•', '-', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
 def show_logo(path="logo.png", width=200):
