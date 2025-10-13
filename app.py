@@ -54,42 +54,46 @@ body {background-color: white; color: black;}
 # -------------------------------
 # Supabase setup
 # -------------------------------
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+else:
+    supabase = None
 
 if "user" not in st.session_state:
     st.session_state.user = None
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-if "show_login" not in st.session_state:
-    st.session_state.show_login = False
 
 # -------------------------------
 # Login / Signup
 # -------------------------------
 def signup(email, password):
     try:
-        user = supabase.auth.sign_up({"email": email, "password": password})
-        if user.user:
-            st.success("✅ Signup successful! Please verify your email and login.")
-            st.session_state.show_login = True  # Automatically show login form
-            st.rerun()
+        if supabase:
+            user = supabase.auth.sign_up({"email": email, "password": password})
+            if user.user:
+                st.success("✅ Signup successful! Please verify your email and login.")
+            else:
+                st.error("⚠️ Signup failed. " + str(user))
         else:
-            st.error("⚠️ Signup failed. " + str(user))
+            st.error("⚠️ Supabase not configured. Cannot sign up.")
     except Exception as e:
         st.error(f"⚠️ Signup error: {str(e)}")
 
 def login(email, password):
     try:
-        user = supabase.auth.sign_in_with_password({"email": email, "password": password})
-        if user.user:
-            st.session_state.user = user.user
-            st.session_state.authenticated = True
-            st.success("✅ Logged in successfully!")
-            st.rerun()  # Ensure generator page shows after login
+        if supabase:
+            user = supabase.auth.sign_in_with_password({"email": email, "password": password})
+            if user.user:
+                st.session_state.user = user.user
+                st.session_state.authenticated = True
+                st.success("✅ Logged in successfully!")
+            else:
+                st.error("⚠️ Login failed. Check credentials.")
         else:
-            st.error("⚠️ Login failed. Check credentials.")
+            st.error("⚠️ Supabase not configured. Cannot login.")
     except Exception as e:
         st.error(f"⚠️ Login error: {str(e)}")
 
@@ -98,23 +102,15 @@ def login(email, password):
 # -------------------------------
 if not st.session_state.authenticated:
     st.title("🔐 LessonLift Login / Signup")
-    
-    # Decide which form to show
-    if st.session_state.show_login:
-        choice = "Login"
-    else:
-        choice = st.radio("Choose action:", ["Login", "Signup"])
-    
+    choice = st.radio("Choose action:", ["Login", "Signup"])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
-    
     if choice == "Signup":
         if st.button("Sign Up"):
             signup(email, password)
     else:
         if st.button("Login"):
             login(email, password)
-    
     st.stop()  # Stop execution until authenticated
 
 # -------------------------------
@@ -136,7 +132,7 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API key setup (server-side)
+# Gemini API key setup (server-side permanent fix)
 # -------------------------------
 api_key = st.secrets.get("gemini_api", None)
 model = None
@@ -150,9 +146,11 @@ if api_key:
                 model = genai.GenerativeModel(m.name)
                 working_model_found = True
         if not working_model_found:
-            st.error("⚠️ No models supporting generateContent found for this API key.")
+            st.error("⚠️ No models supporting generateContent found for this API key. Contact the admin.")
     except Exception as e:
         st.error(f"Could not list models: {e}")
+else:
+    st.error("⚠️ Gemini API key missing. Contact the admin.")  # Users never see or enter key
 
 # -------------------------------
 # Helper functions
@@ -227,7 +225,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     if not model:
-        st.error("⚠️ No Gemini API key found or no compatible model. Add it in the sidebar or check your API key.")
+        st.error("⚠️ No Gemini API key found or no compatible model. Contact admin.")
         return
 
     st.session_state.lesson_count += 1
@@ -272,7 +270,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         except Exception as e:
             msg = str(e).lower()
             if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Please check your Gemini key.")
+                st.error("⚠️ Invalid or missing API key. Contact admin.")
             elif "quota" in msg:
                 st.error("⚠️ API quota exceeded. Please try again later.")
             else:
