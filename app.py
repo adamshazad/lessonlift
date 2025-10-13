@@ -54,12 +54,9 @@ body {background-color: white; color: black;}
 # -------------------------------
 # Supabase setup
 # -------------------------------
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-else:
-    supabase = None
+SUPABASE_URL = st.secrets.get("SUPABASE_URL")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -70,30 +67,30 @@ if "authenticated" not in st.session_state:
 # Login / Signup
 # -------------------------------
 def signup(email, password):
+    if not supabase:
+        st.error("⚠️ Supabase not configured. Cannot sign up.")
+        return
     try:
-        if supabase:
-            user = supabase.auth.sign_up({"email": email, "password": password})
-            if user.user:
-                st.success("✅ Signup successful! Please verify your email and login.")
-            else:
-                st.error("⚠️ Signup failed. " + str(user))
+        user = supabase.auth.sign_up({"email": email, "password": password})
+        if user.user:
+            st.success("✅ Signup successful! Please verify your email and login.")
         else:
-            st.error("⚠️ Supabase not configured. Cannot sign up.")
+            st.error("⚠️ Signup failed. " + str(user))
     except Exception as e:
         st.error(f"⚠️ Signup error: {str(e)}")
 
 def login(email, password):
+    if not supabase:
+        st.error("⚠️ Supabase not configured. Cannot login.")
+        return
     try:
-        if supabase:
-            user = supabase.auth.sign_in_with_password({"email": email, "password": password})
-            if user.user:
-                st.session_state.user = user.user
-                st.session_state.authenticated = True
-                st.success("✅ Logged in successfully!")
-            else:
-                st.error("⚠️ Login failed. Check credentials.")
+        user = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        if user.user:
+            st.session_state.user = user.user
+            st.session_state.authenticated = True
+            st.success("✅ Logged in successfully!")
         else:
-            st.error("⚠️ Supabase not configured. Cannot login.")
+            st.error("⚠️ Login failed. Check credentials.")
     except Exception as e:
         st.error(f"⚠️ Login error: {str(e)}")
 
@@ -132,13 +129,13 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API key setup (server-side permanent fix)
+# Gemini API key setup (server-side)
 # -------------------------------
 api_key = st.secrets.get("gemini_api", None)
 model = None
 if api_key:
-    genai.configure(api_key=api_key)
     try:
+        genai.configure(api_key=api_key)
         models = genai.list_models()
         working_model_found = False
         for m in models:
@@ -146,11 +143,11 @@ if api_key:
                 model = genai.GenerativeModel(m.name)
                 working_model_found = True
         if not working_model_found:
-            st.error("⚠️ No models supporting generateContent found for this API key. Contact the admin.")
+            st.error("⚠️ No models supporting generateContent found for this API key.")
     except Exception as e:
         st.error(f"Could not list models: {e}")
 else:
-    st.error("⚠️ Gemini API key missing. Contact the admin.")  # Users never see or enter key
+    st.error("⚠️ Gemini API key missing from server. Contact admin.")
 
 # -------------------------------
 # Helper functions
