@@ -133,6 +133,8 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 api_key = st.secrets.get("gemini_api", None)
 model = None
+use_dummy_generator = False
+
 if api_key:
     try:
         genai.configure(api_key=api_key)
@@ -143,11 +145,14 @@ if api_key:
                 model = genai.GenerativeModel(m.name)
                 working_model_found = True
         if not working_model_found:
-            st.error("⚠️ No models supporting generateContent found for this API key.")
+            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
+            use_dummy_generator = True
     except Exception as e:
-        st.error(f"Could not list models: {e}")
+        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
+        use_dummy_generator = True
 else:
-    st.error("⚠️ Gemini API key missing from server. Contact admin.")
+    st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
+    use_dummy_generator = True
 
 # -------------------------------
 # Helper functions
@@ -214,7 +219,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (patched for user lesson limit)
+# Generator (patched for user lesson limit + dummy fallback)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     if supabase and st.session_state.user:
@@ -231,7 +236,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error("🚫 Daily/plan limit reached. Upgrade your plan or try again tomorrow.")
         return
 
-    if not model:
+    if not model and not use_dummy_generator:
         st.error("⚠️ No Gemini API key found or no compatible model. Contact admin.")
         return
 
@@ -239,9 +244,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            response = model.generate_content(prompt)
-            output = response.text.strip()
-            clean_output = clean_markdown(output)
+            if use_dummy_generator:
+                output = f"📝 Dummy Lesson Plan:\n\n{prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
+                clean_output = clean_markdown(output)
+            else:
+                response = model.generate_content(prompt)
+                output = response.text.strip()
+                clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
