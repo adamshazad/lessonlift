@@ -214,11 +214,21 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator
+# Generator (patched for user lesson limit)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    if st.session_state.lesson_count >= 10:
-        st.error("🚫 Daily limit reached. Please try again tomorrow.")
+    if supabase and st.session_state.user:
+        # Check user's remaining lessons from Supabase
+        try:
+            profile = supabase.table("profiles").select("lessons_remaining").eq("id", st.session_state.user.id).single().execute()
+            remaining = profile.data.get("lessons_remaining", 10)
+        except Exception:
+            remaining = 10
+    else:
+        remaining = 10
+
+    if remaining <= 0:
+        st.error("🚫 Daily/plan limit reached. Upgrade your plan or try again tomorrow.")
         return
 
     if not model:
@@ -238,9 +248,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            used = st.session_state.lesson_count
-            remaining = 10 - used
-            st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
+            st.info(f"📊 {st.session_state.lesson_count}/{remaining} lessons used today — {remaining - st.session_state.lesson_count} remaining")
 
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
