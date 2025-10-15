@@ -98,22 +98,28 @@ def login(email, password):
 # Show login/signup page if not authenticated
 # -------------------------------
 if not st.session_state.authenticated:
+    if "login_submitted" not in st.session_state:
+        st.session_state.login_submitted = False
+
     st.title("🔐 LessonLift Login / Signup")
     choice = st.radio("Choose action:", ["Login", "Signup"])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
 
     if choice == "Signup":
-        if st.button("Sign Up"):
+        if st.button("Sign Up") and not st.session_state.login_submitted:
             signup(email, password)
-            if st.session_state.authenticated:
-                st.experimental_rerun()
+            st.session_state.login_submitted = True
     else:
-        if st.button("Login"):
+        if st.button("Login") and not st.session_state.login_submitted:
             login(email, password)
-            if st.session_state.authenticated:
-                st.experimental_rerun()
-    
+            st.session_state.login_submitted = True
+
+    # After successful login/signup, stop and let Streamlit refresh automatically
+    if st.session_state.authenticated:
+        st.session_state.login_submitted = False  # reset for next session
+        st.stop()
+
     st.stop()  # Stop execution until authenticated
 
 # -------------------------------
@@ -264,6 +270,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
+                # Produce full dummy output
                 output = f"""
 📝 Dummy Lesson Plan
 
