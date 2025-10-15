@@ -10,6 +10,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 from supabase import create_client, Client
+from streamlit import experimental_rerun as rerun  # <-- Added for login fix
 
 # -------------------------------
 # Page config
@@ -74,6 +75,7 @@ def signup(email, password):
         user = supabase.auth.sign_up({"email": email, "password": password})
         if user.user:
             st.success("✅ Signup successful! Please verify your email and login.")
+            rerun()  # <-- Added to force page reload
         else:
             st.error("⚠️ Signup failed. " + str(user))
     except Exception as e:
@@ -89,6 +91,7 @@ def login(email, password):
             st.session_state.user = user.user
             st.session_state.authenticated = True
             st.success("✅ Logged in successfully!")
+            rerun()  # <-- Added to force page reload
         else:
             st.error("⚠️ Login failed. Check credentials.")
     except Exception as e:
