@@ -108,14 +108,12 @@ if not st.session_state.authenticated:
     else:
         if st.button("Login"):
             login(email, password)
-    
-    # -------------------------------
-    # Fix double-click issue
-    # -------------------------------
+
+    # ✅ FIX: rerun after successful login
     if st.session_state.authenticated and not st.session_state.get("rerun_triggered", False):
         st.session_state.rerun_triggered = True
-        st.experimental_rerun()
-    
+        st.rerun()
+
     st.stop()  # Stop execution until authenticated
 
 # -------------------------------
@@ -266,7 +264,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
-                # Produce full dummy output
                 output = f"""
 📝 Dummy Lesson Plan
 
@@ -330,14 +327,8 @@ Resources:
                 unsafe_allow_html=True
             )
 
-        except Exception as e:
-            msg = str(e).lower()
-            if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Contact admin.")
-            elif "quota" in msg:
-                st.error("⚠️ API quota exceeded. Please try again later.")
-            else:
-                st.error(f"⚠️ Sorry, the lesson plan could not be generated at this time.")
+        except Exception:
+            st.error("⚠️ Sorry, the lesson plan could not be generated at this time.")
 
 # -------------------------------
 # Main generator page
