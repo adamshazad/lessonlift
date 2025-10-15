@@ -98,28 +98,24 @@ def login(email, password):
 # Show login/signup page if not authenticated
 # -------------------------------
 if not st.session_state.authenticated:
-    if "login_submitted" not in st.session_state:
-        st.session_state.login_submitted = False
-
     st.title("🔐 LessonLift Login / Signup")
     choice = st.radio("Choose action:", ["Login", "Signup"])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
-
     if choice == "Signup":
-        if st.button("Sign Up") and not st.session_state.login_submitted:
+        if st.button("Sign Up"):
             signup(email, password)
-            st.session_state.login_submitted = True
     else:
-        if st.button("Login") and not st.session_state.login_submitted:
+        if st.button("Login"):
             login(email, password)
-            st.session_state.login_submitted = True
-
-    # After successful login/signup, stop and let Streamlit refresh automatically
-    if st.session_state.authenticated:
-        st.session_state.login_submitted = False  # reset for next session
-        st.stop()
-
+    
+    # -------------------------------
+    # Fix double-click issue
+    # -------------------------------
+    if st.session_state.authenticated and not st.session_state.get("rerun_triggered", False):
+        st.session_state.rerun_triggered = True
+        st.experimental_rerun()
+    
     st.stop()  # Stop execution until authenticated
 
 # -------------------------------
