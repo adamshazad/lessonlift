@@ -73,8 +73,6 @@ def signup(email, password):
     try:
         user = supabase.auth.sign_up({"email": email, "password": password})
         if user.user:
-            st.session_state.user = user.user
-            st.session_state.authenticated = True
             st.success("✅ Signup successful! Please verify your email and login.")
         else:
             st.error("⚠️ Signup failed. " + str(user))
@@ -104,17 +102,19 @@ if not st.session_state.authenticated:
     choice = st.radio("Choose action:", ["Login", "Signup"])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
-    login_pressed = st.button("Login")
-    signup_pressed = st.button("Sign Up")
 
-    if signup_pressed:
-        signup(email, password)
-    if login_pressed:
-        login(email, password)
+    if choice == "Signup":
+        if st.button("Sign Up"):
+            signup(email, password)
+            if st.session_state.authenticated:
+                st.experimental_rerun()
+    else:
+        if st.button("Login"):
+            login(email, password)
+            if st.session_state.authenticated:
+                st.experimental_rerun()
     
-    if not st.session_state.authenticated:
-        st.warning("Please log in or sign up to continue.")
-        st.stop()
+    st.stop()  # Stop execution until authenticated
 
 # -------------------------------
 # Session defaults (authenticated users)
@@ -140,7 +140,6 @@ if st.session_state.last_reset_date != today:
 api_key = st.secrets.get("gemini_api", None)
 model = None
 use_dummy_generator = False
-gemini_warning = None
 
 if api_key:
     try:
@@ -152,13 +151,13 @@ if api_key:
                 model = genai.GenerativeModel(m.name)
                 working_model_found = True
         if not working_model_found:
-            gemini_warning = "⚠️ No models supporting generateContent found for this API key. Using dummy generator instead."
+            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
             use_dummy_generator = True
     except Exception as e:
-        gemini_warning = f"Could not list models: {e}. Using dummy generator instead."
+        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
         use_dummy_generator = True
 else:
-    gemini_warning = "⚠️ Gemini API key missing from server. Using dummy generator instead."
+    st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
     use_dummy_generator = True
 
 # -------------------------------
@@ -226,9 +225,10 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (full original code)
+# Generator (patched for user lesson limit + dummy fallback)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
+    # Determine remaining lessons based on plan type (free vs paid)
     if supabase and st.session_state.user:
         try:
             profile = supabase.table("profiles").select("lessons_remaining, plan_type").eq("id", st.session_state.user.id).single().execute()
@@ -242,11 +242,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         remaining = 10
         plan_type = "freeTrial"
 
+    # Reset daily count if needed
     today = datetime.date.today()
     if st.session_state.last_reset_date != today:
         st.session_state.lesson_count = 0
         st.session_state.last_reset_date = today
 
+    # Adjust daily limits based on plan type
     daily_limit = 5 if plan_type == "freeTrial" else 10
 
     if st.session_state.lesson_count >= daily_limit:
@@ -338,9 +340,6 @@ Resources:
 # Main generator page
 # -------------------------------
 def lesson_generator_page():
-    if gemini_warning:
-        st.warning(gemini_warning)
-
     show_logo()
     title_and_tagline()
 
