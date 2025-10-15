@@ -17,7 +17,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS
+# CSS (tweaked scrollable box max-height)
 # -------------------------------
 st.markdown("""
 <style>
@@ -38,7 +38,7 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.6em;
     white-space: pre-wrap;
-    max-height: 400px;
+    max-height: 70vh;  /* Increased for better scroll */
     overflow-y: auto;
 }
 [data-testid="stSidebar"][aria-expanded="false"] {
@@ -222,18 +222,31 @@ def create_docx(text):
 # Generator (patched for user lesson limit + dummy fallback)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
+    # Determine remaining lessons based on plan type (free vs paid)
     if supabase and st.session_state.user:
-        # Check user's remaining lessons from Supabase
         try:
-            profile = supabase.table("profiles").select("lessons_remaining").eq("id", st.session_state.user.id).single().execute()
-            remaining = profile.data.get("lessons_remaining", 10)
+            profile = supabase.table("profiles").select("lessons_remaining, plan_type").eq("id", st.session_state.user.id).single().execute()
+            profile_data = profile.data or {}
+            remaining = profile_data.get("lessons_remaining", 10)
+            plan_type = profile_data.get("plan_type", "freeTrial")
         except Exception:
             remaining = 10
+            plan_type = "freeTrial"
     else:
         remaining = 10
+        plan_type = "freeTrial"
 
-    if remaining <= 0:
-        st.error("🚫 Daily/plan limit reached. Upgrade your plan or try again tomorrow.")
+    # Reset daily count if needed
+    today = datetime.date.today()
+    if st.session_state.last_reset_date != today:
+        st.session_state.lesson_count = 0
+        st.session_state.last_reset_date = today
+
+    # Adjust daily limits based on plan type
+    daily_limit = 5 if plan_type == "freeTrial" else 10
+
+    if st.session_state.lesson_count >= daily_limit:
+        st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
         return
 
     if not model and not use_dummy_generator:
@@ -245,7 +258,34 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
-                output = f"📝 Dummy Lesson Plan:\n\n{prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
+                # Produce full dummy output
+                output = f"""
+📝 Dummy Lesson Plan
+
+{prompt}
+
+Learning Objectives:
+- Objective 1
+- Objective 2
+
+Starter:
+- Introduce topic and engage students
+
+Main Activities:
+- Activity 1
+- Activity 2
+- Activity 3
+
+Plenary:
+- Recap key points
+- Q&A session
+
+Resources:
+- Worksheets
+- Visual aids
+
+[This is a placeholder lesson plan for testing purposes.]
+"""
                 clean_output = clean_markdown(output)
             else:
                 response = model.generate_content(prompt)
@@ -257,7 +297,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            st.info(f"📊 {st.session_state.lesson_count}/{remaining} lessons used today — {remaining - st.session_state.lesson_count} remaining")
+            remaining_today = daily_limit - st.session_state.lesson_count
+            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
 
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
