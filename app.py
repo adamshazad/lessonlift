@@ -10,6 +10,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 from supabase import create_client, Client
+from streamlit.runtime.scriptrunner import RerunException, add_script_run_ctx  # <-- Added for login/signup rerun
 
 # -------------------------------
 # Page config
@@ -74,7 +75,7 @@ def signup(email, password):
         user = supabase.auth.sign_up({"email": email, "password": password})
         if user.user:
             st.success("✅ Signup successful! Please verify your email and login.")
-            st.experimental_rerun()  # <-- fixed double-click issue
+            raise RerunException(st.script_request_queue)  # <-- Fix: rerun after signup
         else:
             st.error("⚠️ Signup failed. " + str(user))
     except Exception as e:
@@ -90,7 +91,7 @@ def login(email, password):
             st.session_state.user = user.user
             st.session_state.authenticated = True
             st.success("✅ Logged in successfully!")
-            st.experimental_rerun()  # <-- fixed double-click issue
+            raise RerunException(st.script_request_queue)  # <-- Fix: rerun after login
         else:
             st.error("⚠️ Login failed. Check credentials.")
     except Exception as e:
