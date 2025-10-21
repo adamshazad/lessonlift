@@ -74,8 +74,6 @@ def signup(email, password):
         user = supabase.auth.sign_up({"email": email, "password": password})
         if user.user:
             st.success("✅ Signup successful! Please verify your email and login.")
-            st.session_state.authenticated = False
-            st.experimental_rerun()  # <- triggers immediate reload
         else:
             st.error("⚠️ Signup failed. " + str(user))
     except Exception as e:
@@ -91,7 +89,7 @@ def login(email, password):
             st.session_state.user = user.user
             st.session_state.authenticated = True
             st.success("✅ Logged in successfully!")
-            st.experimental_rerun()  # <- triggers immediate reload
+            st.stop()  # <- stops execution to immediately continue with authenticated state
         else:
             st.error("⚠️ Login failed. Check credentials.")
     except Exception as e:
@@ -108,10 +106,11 @@ if not st.session_state.authenticated:
     if choice == "Signup":
         if st.button("Sign Up"):
             signup(email, password)
+            st.stop()  # <- stop so page reloads correctly
     else:
         if st.button("Login"):
             login(email, password)
-    st.stop()  # Stop execution until authenticated
+            st.stop()  # <- stop so page reloads correctly
 
 # -------------------------------
 # Session defaults (authenticated users)
