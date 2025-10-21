@@ -108,12 +108,6 @@ if not st.session_state.authenticated:
     else:
         if st.button("Login"):
             login(email, password)
-
-    # ✅ FIX: rerun after successful login
-    if st.session_state.authenticated and not st.session_state.get("rerun_triggered", False):
-        st.session_state.rerun_triggered = True
-        st.rerun()
-
     st.stop()  # Stop execution until authenticated
 
 # -------------------------------
@@ -157,7 +151,9 @@ if api_key:
         st.warning(f"Could not list models: {e}. Using dummy generator instead.")
         use_dummy_generator = True
 else:
-    st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
+    if "gemini_warning_shown" not in st.session_state:
+        st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
+        st.session_state.gemini_warning_shown = True
     use_dummy_generator = True
 
 # -------------------------------
@@ -264,6 +260,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
+                # Produce full dummy output
                 output = f"""
 📝 Dummy Lesson Plan
 
@@ -327,8 +324,14 @@ Resources:
                 unsafe_allow_html=True
             )
 
-        except Exception:
-            st.error("⚠️ Sorry, the lesson plan could not be generated at this time.")
+        except Exception as e:
+            msg = str(e).lower()
+            if "api key" in msg:
+                st.error("⚠️ Invalid or missing API key. Contact admin.")
+            elif "quota" in msg:
+                st.error("⚠️ API quota exceeded. Please try again later.")
+            else:
+                st.error(f"⚠️ Sorry, the lesson plan could not be generated at this time.")
 
 # -------------------------------
 # Main generator page
