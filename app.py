@@ -98,11 +98,14 @@ def login(email, password):
 # Show login/signup page if not authenticated
 # -------------------------------
 if not st.session_state.authenticated:
+    if "login_trigger" not in st.session_state:
+        st.session_state.login_trigger = 0  # Used to force rerun
+
     st.title("🔐 LessonLift Login / Signup")
     choice = st.radio("Choose action:", ["Login", "Signup"])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
-    
+
     login_success = False
     signup_success = False
 
@@ -116,9 +119,9 @@ if not st.session_state.authenticated:
             if st.session_state.authenticated:
                 login_success = True
 
-    # Force rerun if login/signup succeeded
+    # Force rerun by updating session state (replaces experimental_rerun)
     if login_success or signup_success:
-        st.experimental_rerun()
+        st.session_state.login_trigger += 1
 
     st.stop()  # Stop execution until authenticated
 
