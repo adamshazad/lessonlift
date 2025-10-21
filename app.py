@@ -74,6 +74,8 @@ def signup(email, password):
         user = supabase.auth.sign_up({"email": email, "password": password})
         if user.user:
             st.success("✅ Signup successful! Please verify your email and login.")
+            st.session_state.authenticated = True
+            st.session_state.user = user.user
         else:
             st.error("⚠️ Signup failed. " + str(user))
     except Exception as e:
@@ -97,33 +99,17 @@ def login(email, password):
 # -------------------------------
 # Show login/signup page if not authenticated
 # -------------------------------
-if not st.session_state.authenticated:
-    if "login_trigger" not in st.session_state:
-        st.session_state.login_trigger = 0  # Used to force rerun
-
+def show_login_page():
     st.title("🔐 LessonLift Login / Signup")
     choice = st.radio("Choose action:", ["Login", "Signup"])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
-
-    login_success = False
-    signup_success = False
-
     if choice == "Signup":
         if st.button("Sign Up"):
             signup(email, password)
-            signup_success = True
     else:
         if st.button("Login"):
             login(email, password)
-            if st.session_state.authenticated:
-                login_success = True
-
-    # Force rerun by updating session state (replaces experimental_rerun)
-    if login_success or signup_success:
-        st.session_state.login_trigger += 1
-
-    st.stop()  # Stop execution until authenticated
 
 # -------------------------------
 # Session defaults (authenticated users)
@@ -237,7 +223,6 @@ def create_docx(text):
 # Generator (patched for user lesson limit + dummy fallback)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    # Determine remaining lessons based on plan type (free vs paid)
     if supabase and st.session_state.user:
         try:
             profile = supabase.table("profiles").select("lessons_remaining, plan_type").eq("id", st.session_state.user.id).single().execute()
@@ -251,13 +236,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         remaining = 10
         plan_type = "freeTrial"
 
-    # Reset daily count if needed
     today = datetime.date.today()
     if st.session_state.last_reset_date != today:
         st.session_state.lesson_count = 0
         st.session_state.last_reset_date = today
 
-    # Adjust daily limits based on plan type
     daily_limit = 5 if plan_type == "freeTrial" else 10
 
     if st.session_state.lesson_count >= daily_limit:
@@ -273,7 +256,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
-                # Produce full dummy output
                 output = f"""
 📝 Dummy Lesson Plan
 
@@ -439,5 +421,8 @@ def show_lesson_history():
 # Run
 # -------------------------------
 if __name__ == "__main__":
-    show_lesson_history()
-    lesson_generator_page()
+    if not st.session_state.authenticated:
+        show_login_page()
+    else:
+        show_lesson_history()
+        lesson_generator_page()
