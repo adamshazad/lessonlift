@@ -102,14 +102,24 @@ if not st.session_state.authenticated:
     choice = st.radio("Choose action:", ["Login", "Signup"])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
+
+    # Minimal fix: temporary flag to rerun once after login/signup
+    if "just_logged_in" not in st.session_state:
+        st.session_state.just_logged_in = False
+
     if choice == "Signup":
         if st.button("Sign Up"):
             signup(email, password)
-            # Immediately show login after signup without rerun
-            st.session_state.authenticated = False
+            st.session_state.just_logged_in = True
     else:
         if st.button("Login"):
             login(email, password)
+            st.session_state.just_logged_in = True
+
+    if st.session_state.just_logged_in:
+        st.session_state.just_logged_in = False
+        st.experimental_rerun()  # Forces the page to reload immediately
+
     st.stop()  # Stop execution until authenticated
 
 # -------------------------------
@@ -153,9 +163,7 @@ if api_key:
         st.warning(f"Could not list models: {e}. Using dummy generator instead.")
         use_dummy_generator = True
 else:
-    if "gemini_warning_shown" not in st.session_state:
-        st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
-        st.session_state.gemini_warning_shown = True
+    st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
     use_dummy_generator = True
 
 # -------------------------------
