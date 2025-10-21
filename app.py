@@ -105,6 +105,8 @@ if not st.session_state.authenticated:
     if choice == "Signup":
         if st.button("Sign Up"):
             signup(email, password)
+            # Immediately show login after signup without rerun
+            st.session_state.authenticated = False
     else:
         if st.button("Login"):
             login(email, password)
