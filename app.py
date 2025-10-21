@@ -75,6 +75,7 @@ def signup(email, password):
         if user.user:
             st.success("✅ Signup successful! Please verify your email and login.")
             st.session_state.authenticated = False
+            st.experimental_rerun()  # <- triggers immediate reload
         else:
             st.error("⚠️ Signup failed. " + str(user))
     except Exception as e:
@@ -90,6 +91,7 @@ def login(email, password):
             st.session_state.user = user.user
             st.session_state.authenticated = True
             st.success("✅ Logged in successfully!")
+            st.experimental_rerun()  # <- triggers immediate reload
         else:
             st.error("⚠️ Login failed. Check credentials.")
     except Exception as e:
@@ -109,7 +111,7 @@ if not st.session_state.authenticated:
     else:
         if st.button("Login"):
             login(email, password)
-    # Removed st.stop() to allow immediate page update after login
+    st.stop()  # Stop execution until authenticated
 
 # -------------------------------
 # Session defaults (authenticated users)
@@ -425,6 +427,5 @@ def show_lesson_history():
 # Run
 # -------------------------------
 if __name__ == "__main__":
-    if st.session_state.authenticated:
-        show_lesson_history()
-        lesson_generator_page()
+    show_lesson_history()
+    lesson_generator_page()
