@@ -62,8 +62,6 @@ if "user" not in st.session_state:
     st.session_state.user = None
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-if "login_clicked" not in st.session_state:
-    st.session_state.login_clicked = False  # Flag for single-click login
 
 # -------------------------------
 # Login / Signup
@@ -76,7 +74,7 @@ def signup(email, password):
         user = supabase.auth.sign_up({"email": email, "password": password})
         if user.user:
             st.success("✅ Signup successful! Please verify your email and login.")
-            st.session_state.login_clicked = True
+            st.session_state.authenticated = False
         else:
             st.error("⚠️ Signup failed. " + str(user))
     except Exception as e:
@@ -91,7 +89,6 @@ def login(email, password):
         if user.user:
             st.session_state.user = user.user
             st.session_state.authenticated = True
-            st.session_state.login_clicked = True
             st.success("✅ Logged in successfully!")
         else:
             st.error("⚠️ Login failed. Check credentials.")
@@ -101,7 +98,7 @@ def login(email, password):
 # -------------------------------
 # Show login/signup page if not authenticated
 # -------------------------------
-if not st.session_state.authenticated and not st.session_state.login_clicked:
+if not st.session_state.authenticated:
     st.title("🔐 LessonLift Login / Signup")
     choice = st.radio("Choose action:", ["Login", "Signup"])
     email = st.text_input("Email")
@@ -112,7 +109,7 @@ if not st.session_state.authenticated and not st.session_state.login_clicked:
     else:
         if st.button("Login"):
             login(email, password)
-    st.stop()  # Stop execution until authenticated
+    # Removed st.stop() to allow immediate page update after login
 
 # -------------------------------
 # Session defaults (authenticated users)
@@ -428,5 +425,6 @@ def show_lesson_history():
 # Run
 # -------------------------------
 if __name__ == "__main__":
-    show_lesson_history()
-    lesson_generator_page()
+    if st.session_state.authenticated:
+        show_lesson_history()
+        lesson_generator_page()
