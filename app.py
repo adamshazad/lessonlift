@@ -62,6 +62,8 @@ if "user" not in st.session_state:
     st.session_state.user = None
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+if "login_clicked" not in st.session_state:
+    st.session_state.login_clicked = False  # Flag for single-click login
 
 # -------------------------------
 # Login / Signup
@@ -74,6 +76,7 @@ def signup(email, password):
         user = supabase.auth.sign_up({"email": email, "password": password})
         if user.user:
             st.success("✅ Signup successful! Please verify your email and login.")
+            st.session_state.login_clicked = True
         else:
             st.error("⚠️ Signup failed. " + str(user))
     except Exception as e:
@@ -88,6 +91,7 @@ def login(email, password):
         if user.user:
             st.session_state.user = user.user
             st.session_state.authenticated = True
+            st.session_state.login_clicked = True
             st.success("✅ Logged in successfully!")
         else:
             st.error("⚠️ Login failed. Check credentials.")
@@ -97,29 +101,17 @@ def login(email, password):
 # -------------------------------
 # Show login/signup page if not authenticated
 # -------------------------------
-if not st.session_state.authenticated:
+if not st.session_state.authenticated and not st.session_state.login_clicked:
     st.title("🔐 LessonLift Login / Signup")
     choice = st.radio("Choose action:", ["Login", "Signup"])
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
-
-    # Minimal fix: temporary flag to rerun once after login/signup
-    if "just_logged_in" not in st.session_state:
-        st.session_state.just_logged_in = False
-
     if choice == "Signup":
         if st.button("Sign Up"):
             signup(email, password)
-            st.session_state.just_logged_in = True
     else:
         if st.button("Login"):
             login(email, password)
-            st.session_state.just_logged_in = True
-
-    if st.session_state.just_logged_in:
-        st.session_state.just_logged_in = False
-        st.experimental_rerun()  # Forces the page to reload immediately
-
     st.stop()  # Stop execution until authenticated
 
 # -------------------------------
