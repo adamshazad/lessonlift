@@ -138,17 +138,11 @@ use_dummy_generator = False
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        models = genai.list_models()
-        working_model_found = False
-        for m in models:
-            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
-                model = genai.GenerativeModel(m.name)
-                working_model_found = True
-        if not working_model_found:
-            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
-            use_dummy_generator = True
+        # Directly use default model to avoid dummy fallback
+        model = genai.GenerativeModel("models/text-bison-001")
+        use_dummy_generator = False
     except Exception as e:
-        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
+        st.warning(f"Could not configure Gemini: {e}. Using dummy generator instead.")
         use_dummy_generator = True
 else:
     st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
@@ -222,7 +216,6 @@ def create_docx(text):
 # Generator (patched for user lesson limit + dummy fallback)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    # Determine remaining lessons based on plan type (free vs paid)
     if supabase and st.session_state.user:
         try:
             profile = supabase.table("profiles").select("lessons_remaining, plan_type").eq("id", st.session_state.user.id).single().execute()
@@ -236,13 +229,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         remaining = 10
         plan_type = "freeTrial"
 
-    # Reset daily count if needed
     today = datetime.date.today()
     if st.session_state.last_reset_date != today:
         st.session_state.lesson_count = 0
         st.session_state.last_reset_date = today
 
-    # Adjust daily limits based on plan type
     daily_limit = 5 if plan_type == "freeTrial" else 10
 
     if st.session_state.lesson_count >= daily_limit:
@@ -258,7 +249,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
-                # Produce full dummy output
                 output = f"""
 📝 Dummy Lesson Plan
 
