@@ -131,17 +131,24 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 # Gemini API key setup (server-side)
 # -------------------------------
-api_key = st.secrets.get("gemini_api", None)
+api_key = st.secrets.get("gemini_api")  # Make sure your real key is here
 model = None
 use_dummy_generator = False
 
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        # Force use a known compatible model
-        model = genai.GenerativeModel("text-bison-001")
+        models = genai.list_models()
+        working_model_found = False
+        for m in models:
+            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                working_model_found = True
+        if not working_model_found:
+            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
+            use_dummy_generator = True
     except Exception as e:
-        st.warning(f"Could not initialize Gemini model: {e}. Using dummy generator instead.")
+        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
         use_dummy_generator = True
 else:
     st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
@@ -212,35 +219,12 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator
+# Generator (uses real Gemini API key)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    if supabase and st.session_state.user:
-        try:
-            profile = supabase.table("profiles").select("lessons_remaining, plan_type").eq("id", st.session_state.user.id).single().execute()
-            profile_data = profile.data or {}
-            remaining = profile_data.get("lessons_remaining", 10)
-            plan_type = profile_data.get("plan_type", "freeTrial")
-        except Exception:
-            remaining = 10
-            plan_type = "freeTrial"
-    else:
-        remaining = 10
-        plan_type = "freeTrial"
-
-    today = datetime.date.today()
-    if st.session_state.last_reset_date != today:
-        st.session_state.lesson_count = 0
-        st.session_state.last_reset_date = today
-
-    daily_limit = 5 if plan_type == "freeTrial" else 10
-
+    daily_limit = 5
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
-        return
-
-    if not model and not use_dummy_generator:
-        st.error("⚠️ No Gemini API key found or no compatible model. Contact admin.")
         return
 
     st.session_state.lesson_count += 1
@@ -248,6 +232,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
+                # Produce dummy output only if API fails
                 output = f"""
 📝 Dummy Lesson Plan
 
@@ -275,12 +260,11 @@ Resources:
 
 [This is a placeholder lesson plan for testing purposes.]
 """
-                clean_output = clean_markdown(output)
             else:
                 response = model.generate_content(prompt)
                 output = response.text.strip()
-                clean_output = clean_markdown(output)
 
+            clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -312,13 +296,7 @@ Resources:
             )
 
         except Exception as e:
-            msg = str(e).lower()
-            if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Contact admin.")
-            elif "quota" in msg:
-                st.error("⚠️ API quota exceeded. Please try again later.")
-            else:
-                st.error(f"⚠️ Sorry, the lesson plan could not be generated at this time.")
+            st.error(f"⚠️ Lesson plan could not be generated: {e}")
 
 # -------------------------------
 # Main generator page
