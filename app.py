@@ -38,7 +38,7 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.6em;
     white-space: pre-wrap;
-    max-height: 70vh;  /* Increased for better scroll */
+    max-height: 70vh;
     overflow-y: auto;
 }
 [data-testid="stSidebar"][aria-expanded="false"] {
@@ -219,7 +219,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (patched Gemini API)
+# Generator (patched for realistic dummy + API key)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     # Determine remaining lessons based on plan type (free vs paid)
@@ -249,44 +249,61 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
         return
 
+    if not model and not use_dummy_generator:
+        st.error("⚠️ No Gemini API key found or no compatible model. Contact admin.")
+        return
+
     st.session_state.lesson_count += 1
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            if model:
-                # Use real Gemini API
-                response = model.generate_content(prompt)
-                output = response.text.strip()
-                clean_output = clean_markdown(output)
-            else:
-                # Fallback to dummy generator
+            if use_dummy_generator:
+                # Produce realistic full dummy lesson plan
                 output = f"""
 📝 Dummy Lesson Plan
 
 {prompt}
 
 Learning Objectives:
-- Objective 1
-- Objective 2
+- Understand the key concepts of {prompt.split('Topic:')[-1].split('\\n')[0].strip()}
+- Apply knowledge in practical activities
+- Assess understanding through Q&A
 
 Starter:
-- Introduce topic and engage students
+- Quick discussion or question related to the topic
+- Engage students with visual aids or props
 
 Main Activities:
-- Activity 1
-- Activity 2
-- Activity 3
+- Activity 1: Teacher-led demonstration
+- Activity 2: Hands-on group task
+- Activity 3: Individual practice or worksheet
 
 Plenary:
 - Recap key points
-- Q&A session
+- Mini quiz or discussion
+- Address misconceptions
+
+Assessment:
+- Observations
+- Questioning
+- Review of worksheets
 
 Resources:
 - Worksheets
 - Visual aids
+- Any specific tools needed for activities
 
-[This is a placeholder lesson plan for testing purposes.]
+Differentiation/SEN/EAL:
+- Scaffold tasks for lower ability
+- Provide extension challenges for higher ability
+- Visual aids or sentence starters as needed
+
+[This is a placeholder lesson plan for testing purposes, full structure included.]
 """
+                clean_output = clean_markdown(output)
+            else:
+                response = model.generate_content(prompt)
+                output = response.text.strip()
                 clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
