@@ -38,7 +38,7 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.6em;
     white-space: pre-wrap;
-    max-height: 70vh;  /* Increased for better scroll */
+    max-height: 70vh;  
     overflow-y: auto;
 }
 [data-testid="stSidebar"][aria-expanded="false"] {
@@ -129,7 +129,7 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API key setup (server-side, fixed)
+# Gemini API key setup (server-side)
 # -------------------------------
 api_key = st.secrets.get("gemini_api", None)
 model = None
@@ -138,21 +138,10 @@ use_dummy_generator = False
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        # List all models
-        models = genai.list_models()
-        st.write(f"🟢 Found {len(models)} models with your Gemini API key.")
-        working_model_found = False
-        for m in models:
-            # Check if model supports content generation
-            if not working_model_found and hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
-                model = genai.GenerativeModel(m.name)
-                working_model_found = True
-                st.write(f"✅ Using Gemini model: {m.name}")
-        if not working_model_found:
-            st.warning("⚠️ No compatible Gemini model found. Using dummy generator instead.")
-            use_dummy_generator = True
+        # Directly use the default model
+        model = genai.GenerativeModel("models/text-bison-001")  # Replace with the latest available Gemini model if needed
     except Exception as e:
-        st.warning(f"⚠️ Error with Gemini API key: {e}. Using dummy generator instead.")
+        st.warning(f"Could not initialize Gemini model: {e}. Using dummy generator instead.")
         use_dummy_generator = True
 else:
     st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
@@ -226,35 +215,9 @@ def create_docx(text):
 # Generator (patched for user lesson limit + dummy fallback)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    # Determine remaining lessons based on plan type (free vs paid)
-    if supabase and st.session_state.user:
-        try:
-            profile = supabase.table("profiles").select("lessons_remaining, plan_type").eq("id", st.session_state.user.id).single().execute()
-            profile_data = profile.data or {}
-            remaining = profile_data.get("lessons_remaining", 10)
-            plan_type = profile_data.get("plan_type", "freeTrial")
-        except Exception:
-            remaining = 10
-            plan_type = "freeTrial"
-    else:
-        remaining = 10
-        plan_type = "freeTrial"
-
-    # Reset daily count if needed
-    today = datetime.date.today()
-    if st.session_state.last_reset_date != today:
-        st.session_state.lesson_count = 0
-        st.session_state.last_reset_date = today
-
-    # Adjust daily limits based on plan type
-    daily_limit = 5 if plan_type == "freeTrial" else 10
-
+    daily_limit = 5  # keep for free trial
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
-        return
-
-    if not model and not use_dummy_generator:
-        st.error("⚠️ No Gemini API key found or no compatible model. Contact admin.")
         return
 
     st.session_state.lesson_count += 1
@@ -262,7 +225,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
-                # Produce full dummy output
                 output = f"""
 📝 Dummy Lesson Plan
 
@@ -287,13 +249,14 @@ Plenary:
 Resources:
 - Worksheets
 - Visual aids
+
+[This is a placeholder lesson plan for testing purposes.]
 """
-                clean_output = clean_markdown(output)
             else:
                 response = model.generate_content(prompt)
                 output = response.text.strip()
-                clean_output = clean_markdown(output)
 
+            clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -325,13 +288,7 @@ Resources:
             )
 
         except Exception as e:
-            msg = str(e).lower()
-            if "api key" in msg:
-                st.error("⚠️ Invalid or missing API key. Contact admin.")
-            elif "quota" in msg:
-                st.error("⚠️ API quota exceeded. Please try again later.")
-            else:
-                st.error(f"⚠️ Sorry, the lesson plan could not be generated at this time.")
+            st.error(f"⚠️ Sorry, the lesson plan could not be generated at this time: {e}")
 
 # -------------------------------
 # Main generator page
@@ -367,48 +324,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
-
-    if st.session_state.last_prompt:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ],
-            key="regen_style"
-        )
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities",
-            key="custom_instruction"
-        )
-        if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
-            extra_instruction = ""
-            regen_message = ""
-            if not custom_instruction:
-                if regen_style == "🎨 More creative & engaging activities":
-                    extra_instruction = "Make activities more creative, interactive, and fun."
-                    regen_message = "Lesson updated with more creative and engaging activities."
-                elif regen_style == "📋 More structured with timings":
-                    extra_instruction = "Add clear structure with timings for each section."
-                    regen_message = "Lesson updated with clearer structure and timings."
-                elif regen_style == "🧩 Simplify for lower ability":
-                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                    regen_message = "Lesson simplified for lower ability."
-                elif regen_style == "🚀 Challenge for higher ability":
-                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                    regen_message = "Lesson updated with higher ability challenge tasks."
-                else:
-                    regen_message = "Here’s a new updated version of your lesson plan."
-            else:
-                extra_instruction = custom_instruction
-                regen_message = f"Lesson updated: {custom_instruction}"
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
 # -------------------------------
 # Sidebar history
