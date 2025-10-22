@@ -131,7 +131,7 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 # Gemini API key setup (server-side)
 # -------------------------------
-api_key = st.secrets.get("gemini_api", "AIzaSyDHgUA9zKsPImPxM6zFJOpHP1LcN2vFzJk")  # Your real key here
+api_key = st.secrets.get("gemini_api", None)
 model = None
 use_dummy_generator = False
 
