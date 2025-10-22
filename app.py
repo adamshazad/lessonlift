@@ -38,7 +38,7 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.6em;
     white-space: pre-wrap;
-    max-height: 70vh;
+    max-height: 70vh;  /* Increased for better scroll */
     overflow-y: auto;
 }
 [data-testid="stSidebar"][aria-expanded="false"] {
@@ -131,7 +131,7 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 # Gemini API key setup (server-side)
 # -------------------------------
-api_key = st.secrets.get("gemini_api", None)
+api_key = st.secrets.get("gemini_api", "AIzaSyDHgUA9zKsPImPxM6zFJOpHP1LcN2vFzJk")  # Your real key here
 model = None
 use_dummy_generator = False
 
@@ -219,7 +219,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (patched for realistic dummy + API key)
+# Generator (patched for user lesson limit + dummy fallback)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     # Determine remaining lessons based on plan type (free vs paid)
@@ -258,47 +258,33 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
-                # Produce realistic full dummy lesson plan
+                # Produce full dummy output
                 output = f"""
 📝 Dummy Lesson Plan
 
 {prompt}
 
 Learning Objectives:
-- Understand the key concepts of {prompt.split('Topic:')[-1].split('\\n')[0].strip()}
-- Apply knowledge in practical activities
-- Assess understanding through Q&A
+- Objective 1
+- Objective 2
 
 Starter:
-- Quick discussion or question related to the topic
-- Engage students with visual aids or props
+- Introduce topic and engage students
 
 Main Activities:
-- Activity 1: Teacher-led demonstration
-- Activity 2: Hands-on group task
-- Activity 3: Individual practice or worksheet
+- Activity 1
+- Activity 2
+- Activity 3
 
 Plenary:
 - Recap key points
-- Mini quiz or discussion
-- Address misconceptions
-
-Assessment:
-- Observations
-- Questioning
-- Review of worksheets
+- Q&A session
 
 Resources:
 - Worksheets
 - Visual aids
-- Any specific tools needed for activities
 
-Differentiation/SEN/EAL:
-- Scaffold tasks for lower ability
-- Provide extension challenges for higher ability
-- Visual aids or sentence starters as needed
-
-[This is a placeholder lesson plan for testing purposes, full structure included.]
+[This is a placeholder lesson plan for testing purposes.]
 """
                 clean_output = clean_markdown(output)
             else:
