@@ -129,7 +129,7 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API key setup (server-side)
+# Gemini API key setup (server-side, fixed)
 # -------------------------------
 api_key = st.secrets.get("gemini_api", None)
 model = None
@@ -138,16 +138,21 @@ use_dummy_generator = False
 if api_key:
     try:
         genai.configure(api_key=api_key)
+        # List all models
         models = genai.list_models()
-        if models:
-            # pick the first available model for content generation
-            model = genai.GenerativeModel(models[0].name)
-            use_dummy_generator = False
-        else:
-            st.warning("⚠️ No Gemini models found. Using dummy generator instead.")
+        st.write(f"🟢 Found {len(models)} models with your Gemini API key.")
+        working_model_found = False
+        for m in models:
+            # Check if model supports content generation
+            if not working_model_found and hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                working_model_found = True
+                st.write(f"✅ Using Gemini model: {m.name}")
+        if not working_model_found:
+            st.warning("⚠️ No compatible Gemini model found. Using dummy generator instead.")
             use_dummy_generator = True
     except Exception as e:
-        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
+        st.warning(f"⚠️ Error with Gemini API key: {e}. Using dummy generator instead.")
         use_dummy_generator = True
 else:
     st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
@@ -257,6 +262,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
+                # Produce full dummy output
                 output = f"""
 📝 Dummy Lesson Plan
 
@@ -281,8 +287,6 @@ Plenary:
 Resources:
 - Worksheets
 - Visual aids
-
-[This is a placeholder lesson plan for testing purposes.]
 """
                 clean_output = clean_markdown(output)
             else:
