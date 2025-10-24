@@ -131,18 +131,26 @@ if st.session_state.last_reset_date != today:
 # Gemini API key setup (server-side)
 # -------------------------------
 api_key = st.secrets.get("GEMINI_API_KEY")
-model_name = "models/gemini-2.5-pro"  # ✅ explicitly select a working model
 model = None
 use_dummy_generator = False
 
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
+        models = genai.list_models()
+        working_model_found = False
+        for m in models:
+            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                working_model_found = True
+        if not working_model_found:
+            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
+            use_dummy_generator = True
     except Exception as e:
-        st.error(f"⚠️ Gemini model could not be initialized: {e}")
+        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
         use_dummy_generator = True
 else:
+    st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
     use_dummy_generator = True
 
 # -------------------------------
@@ -213,12 +221,36 @@ def create_docx(text):
 # Generator (uses real Gemini API key)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    daily_limit = 5
+    daily_limit = 10  # updated to 10 lessons/day
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
         return
 
     st.session_state.lesson_count += 1
+
+    structured_prompt = f"""
+Create a complete UK primary school lesson plan in a structured, teacher-ready template.
+Use this strict format:
+
+1. Lesson Title
+2. Subject
+3. Year Group
+4. Duration
+5. Learning Objectives
+6. Success Criteria (differentiated for All/Most/Some)
+7. Key Vocabulary
+8. Resources & Preparation
+9. Starter (with timings and teacher instructions)
+10. Main Input / Teaching Activities (with timings)
+11. Main Activity (with differentiated instructions and timings)
+12. Plenary / Review (with timings)
+13. Optional Homework or Extension
+14. Notes / SEN considerations
+
+Ensure each section is clearly labeled, include timings, differentiation, and step-by-step instructions.
+
+{prompt}
+"""
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -226,32 +258,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 output = f"""
 📝 Dummy Lesson Plan
 
-{prompt}
-
-Learning Objectives:
-- Objective 1
-- Objective 2
-
-Starter:
-- Introduce topic and engage students
-
-Main Activities:
-- Activity 1
-- Activity 2
-- Activity 3
-
-Plenary:
-- Recap key points
-- Q&A session
-
-Resources:
-- Worksheets
-- Visual aids
+{structured_prompt}
 
 [This is a placeholder lesson plan for testing purposes.]
 """
             else:
-                response = model.generate_content(prompt)
+                response = model.generate_content(
+                    structured_prompt,
+                    max_output_tokens=1500  # allows longer, complete lesson plans
+                )
                 output = response.text.strip()
 
             clean_output = clean_markdown(output)
@@ -310,8 +325,6 @@ def lesson_generator_page():
 
     if submitted:
         prompt = f"""
-Create a detailed UK primary school lesson plan:
-
 Year Group: {lesson_data['year_group']}
 Subject: {lesson_data['subject']}
 Topic: {lesson_data['topic']}
