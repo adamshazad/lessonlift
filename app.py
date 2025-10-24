@@ -131,26 +131,18 @@ if st.session_state.last_reset_date != today:
 # Gemini API key setup (server-side)
 # -------------------------------
 api_key = st.secrets.get("GEMINI_API_KEY")
+model_name = "models/gemini-2.5-pro"  # ✅ explicitly select a working model
 model = None
 use_dummy_generator = False
 
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        models = genai.list_models()
-        working_model_found = False
-        for m in models:
-            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
-                model = genai.GenerativeModel(m.name)
-                working_model_found = True
-        if not working_model_found:
-            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
-            use_dummy_generator = True
+        model = genai.GenerativeModel(model_name)
     except Exception as e:
-        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
+        st.error(f"⚠️ Gemini model could not be initialized: {e}")
         use_dummy_generator = True
 else:
-    st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
     use_dummy_generator = True
 
 # -------------------------------
@@ -221,7 +213,7 @@ def create_docx(text):
 # Generator (uses real Gemini API key)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    daily_limit = 10  # ✅ Updated daily limit
+    daily_limit = 5
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
         return
