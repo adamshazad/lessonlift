@@ -128,35 +128,21 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API key setup (server-side) — WITH DEBUG PATCH
+# Gemini API key setup (server-side) — FORCE WORKING MODEL
 # -------------------------------
-api_key = st.secrets.get("GEMINI_API_KEY")  # ✅ Fixed key name
+api_key = st.secrets.get("GEMINI_API_KEY")
 model = None
 use_dummy_generator = False
 
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        models = genai.list_models()
-
-        # 🔍 Debug patch: show which models and methods are available
-        model_names = [
-            f"{m.name}: {getattr(m, 'supported_methods', getattr(m, 'supported_generation_methods', None))}"
-            for m in models
-        ]
-        st.write("🔍 Available models and their supported methods:", model_names)
-
-        working_model_found = False
-        for m in models:
-            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
-                model = genai.GenerativeModel(m.name)
-                working_model_found = True
-
-        if not working_model_found:
-            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
-            use_dummy_generator = True
+        # Force the working model:
+        model_name = "models/gemini-2.5-pro"
+        model = genai.GenerativeModel(model_name)
+        st.success(f"✅ Using Gemini model: {model_name}")
     except Exception as e:
-        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
+        st.warning(f"Could not configure Gemini model: {e}. Using dummy generator instead.")
         use_dummy_generator = True
 else:
     st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
