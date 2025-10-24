@@ -10,7 +10,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 from supabase import create_client, Client
-import time
 
 # -------------------------------
 # Page config
@@ -129,36 +128,29 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API key setup (server-side) with rotation
+# Gemini API key setup (server-side)
 # -------------------------------
-# Put all your keys here
-api_keys = [
-    st.secrets.get("GEMINI_API_KEY"),  # main key
-    # Add more keys in secrets.toml if you have them
-    # st.secrets.get("GEMINI_API_KEY_2"),
-    # st.secrets.get("GEMINI_API_KEY_3"),
-]
-
+api_key = st.secrets.get("GEMINI_API_KEY")
 model = None
 use_dummy_generator = False
 
-def get_working_model():
-    global model, use_dummy_generator
-    for key in api_keys:
-        try:
-            genai.configure(api_key=key)
-            models = genai.list_models()
-            for m in models:
-                if hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
-                    model = genai.GenerativeModel(m.name)
-                    return True
-        except Exception:
-            continue
-    use_dummy_generator = True
-    return False
-
-if not get_working_model():
-    st.warning("⚠️ No models supporting generateContent found for your keys. Using dummy generator instead.")
+if api_key:
+    try:
+        genai.configure(api_key=api_key)
+        models = genai.list_models()
+        working_model_found = False
+        for m in models:
+            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                working_model_found = True
+        if not working_model_found:
+            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
+            use_dummy_generator = True
+    except Exception as e:
+        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
+        use_dummy_generator = True
+else:
+    st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
     use_dummy_generator = True
 
 # -------------------------------
@@ -226,19 +218,20 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator with multi-key rotation
+# Generator (uses real Gemini API key)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    daily_limit = 5
+    daily_limit = 10  # ✅ Updated daily limit
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
         return
 
     st.session_state.lesson_count += 1
+
     with st.spinner("✨ Creating lesson plan..."):
-        output = ""
-        if use_dummy_generator:
-            output = f"""
+        try:
+            if use_dummy_generator:
+                output = f"""
 📝 Dummy Lesson Plan
 
 {prompt}
@@ -265,52 +258,43 @@ Resources:
 
 [This is a placeholder lesson plan for testing purposes.]
 """
-        else:
-            success = False
-            for key in api_keys:
-                try:
-                    genai.configure(api_key=key)
-                    response = model.generate_content(prompt)
-                    output = response.text.strip()
-                    success = True
-                    break
-                except Exception as e:
-                    st.warning(f"API key limit reached or error: {e}. Trying next key...")
-                    time.sleep(1)
-            if not success:
-                st.error("⚠️ All Gemini API keys have reached their limit. Please try again later.")
-                return
+            else:
+                response = model.generate_content(prompt)
+                output = response.text.strip()
 
-        clean_output = clean_markdown(output)
-        st.session_state.lesson_history.append({"title": title, "content": clean_output})
+            clean_output = clean_markdown(output)
+            st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
-        if regen_message:
-            st.info(f"🔄 {regen_message}")
+            if regen_message:
+                st.info(f"🔄 {regen_message}")
 
-        remaining_today = daily_limit - st.session_state.lesson_count
-        st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
+            remaining_today = daily_limit - st.session_state.lesson_count
+            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
 
-        st.markdown(f"### 📖 {title}")
-        st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            st.markdown(f"### 📖 {title}")
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-        pdf_buffer = create_pdf(clean_output)
-        docx_buffer = create_docx(clean_output)
-        st.markdown(
-            f"""
-            <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
-                </a>
-                <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
-                </a>
-                <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                    <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
-                </a>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+            pdf_buffer = create_pdf(clean_output)
+            docx_buffer = create_docx(clean_output)
+            st.markdown(
+                f"""
+                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
+                    </a>
+                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
+                    </a>
+                    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
+                    </a>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        except Exception as e:
+            st.error(f"⚠️ Lesson plan could not be generated: {e}")
 
 # -------------------------------
 # Main generator page
