@@ -38,7 +38,7 @@ body {background-color: white; color: black;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.6em;
     white-space: pre-wrap;
-    max-height: 70vh;  /* Increased for better scroll */
+    max-height: 70vh;
     overflow-y: auto;
 }
 [data-testid="stSidebar"][aria-expanded="false"] {
@@ -108,7 +108,7 @@ if not st.session_state.authenticated:
     else:
         if st.button("Login"):
             login(email, password)
-    st.stop()  # Stop execution until authenticated
+    st.stop()
 
 # -------------------------------
 # Session defaults (authenticated users)
@@ -122,7 +122,6 @@ if "lesson_count" not in st.session_state:
 if "last_reset_date" not in st.session_state:
     st.session_state.last_reset_date = datetime.date.today()
 
-# Reset daily count at midnight
 today = datetime.date.today()
 if st.session_state.last_reset_date != today:
     st.session_state.lesson_count = 0
@@ -131,7 +130,7 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 # Gemini API key setup (server-side)
 # -------------------------------
-api_key = st.secrets.get("gemini_api")  # Make sure your real key is here
+api_key = st.secrets.get("GEMINI_API_KEY")  # ✅ Fixed key name
 model = None
 use_dummy_generator = False
 
@@ -232,7 +231,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator:
-                # Produce dummy output only if API fails
                 output = f"""
 📝 Dummy Lesson Plan
 
