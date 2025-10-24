@@ -128,7 +128,7 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API key setup (server-side)
+# Gemini API key setup (server-side) — WITH DEBUG PATCH
 # -------------------------------
 api_key = st.secrets.get("GEMINI_API_KEY")  # ✅ Fixed key name
 model = None
@@ -138,11 +138,20 @@ if api_key:
     try:
         genai.configure(api_key=api_key)
         models = genai.list_models()
+
+        # 🔍 Debug patch: show which models and methods are available
+        model_names = [
+            f"{m.name}: {getattr(m, 'supported_methods', getattr(m, 'supported_generation_methods', None))}"
+            for m in models
+        ]
+        st.write("🔍 Available models and their supported methods:", model_names)
+
         working_model_found = False
         for m in models:
             if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
                 model = genai.GenerativeModel(m.name)
                 working_model_found = True
+
         if not working_model_found:
             st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
             use_dummy_generator = True
