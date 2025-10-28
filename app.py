@@ -137,7 +137,17 @@ use_dummy_generator = False
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        models = genai.list_models()
+        
+        # ---------- TEST SNIPPET START ----------
+        try:
+            models = genai.list_models()
+            st.write("✅ Available Gemini models for your API key:")
+            for m in models:
+                st.write(f"Model: {m.name}, Supported methods: {getattr(m, 'supported_methods', [])}")
+        except Exception as e:
+            st.warning(f"⚠️ Error listing models: {e}")
+        # ---------- TEST SNIPPET END ----------
+        
         working_model_found = False
         for m in models:
             if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
@@ -152,7 +162,6 @@ if api_key:
 else:
     st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
     use_dummy_generator = True
-
 # -------------------------------
 # Helper functions
 # -------------------------------
