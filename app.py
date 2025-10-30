@@ -3,7 +3,6 @@
 # -------------------------------
 import os
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
-
 import streamlit as st
 import google.generativeai as genai
 import re
