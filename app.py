@@ -10,6 +10,8 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 from supabase import create_client, Client
+import os
+from google.oauth2 import service_account
 
 # -------------------------------
 # Page config
@@ -128,40 +130,47 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API key setup (server-side)
+# Gemini (Vertex AI) setup — using service account JSON
 # -------------------------------
-api_key = st.secrets.get("GEMINI_API_KEY")
 model = None
 use_dummy_generator = False
 
-if api_key:
-    try:
-        genai.configure(api_key=api_key)
-        
-        # ---------- TEST SNIPPET START ----------
-        try:
-            models = genai.list_models()
-            st.write("✅ Available Gemini models for your API key:")
-            for m in models:
-                st.write(f"Model: {m.name}, Supported methods: {getattr(m, 'supported_methods', [])}")
-        except Exception as e:
-            st.warning(f"⚠️ Error listing models: {e}")
-        # ---------- TEST SNIPPET END ----------
-        
+try:
+    # Load service account JSON (from GitHub secret or local file)
+    if "GOOGLE_APPLICATION_CREDENTIALS_JSON" in st.secrets:
+        creds_json = st.secrets["GOOGLE_APPLICATION_CREDENTIALS_JSON"]
+        with open("vertex_key.json", "w") as f:
+            f.write(creds_json)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "vertex_key.json"
+    elif os.path.exists("gen-lang-client-0875480873-4b5bcde4f769.json"):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "gen-lang-client-0875480873-4b5bcde4f769.json"
+    else:
+        st.warning("⚠️ No service account key found. Using dummy generator.")
+        use_dummy_generator = True
+
+    if not use_dummy_generator:
+        creds = service_account.Credentials.from_service_account_file(os.environ["GOOGLE_APPLICATION_CREDENTIALS"])
+        genai.configure(credentials=creds)
+
+        models = genai.list_models()
+        st.write("✅ Available Gemini models for your Vertex AI service account:")
+        for m in models:
+            st.write(f"Model: {m.name}, Supported methods: {getattr(m, 'supported_methods', [])}")
+
         working_model_found = False
         for m in models:
-            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
+            if not working_model_found and hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
                 model = genai.GenerativeModel(m.name)
                 working_model_found = True
+
         if not working_model_found:
-            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
+            st.warning("⚠️ No models supporting generateContent found. Using dummy generator instead.")
             use_dummy_generator = True
-    except Exception as e:
-        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
-        use_dummy_generator = True
-else:
-    st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
+
+except Exception as e:
+    st.warning(f"⚠️ Could not set up Vertex AI: {e}")
     use_dummy_generator = True
+
 # -------------------------------
 # Helper functions
 # -------------------------------
@@ -274,7 +283,7 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
             else:
                 response = model.generate_content(
                     structured_prompt,
-                    max_output_tokens=1500  # allows longer, complete lesson plans
+                    max_output_tokens=1500
                 )
                 output = response.text.strip()
 
