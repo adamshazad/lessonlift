@@ -3,6 +3,7 @@
 # -------------------------------
 import os
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
+
 import streamlit as st
 import google.generativeai as genai
 import re
@@ -133,39 +134,28 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API key setup (server-side)
+# Gemini API setup (service account credentials now used)
 # -------------------------------
-api_key = st.secrets.get("GEMINI_API_KEY")
 model = None
 use_dummy_generator = False
 
-if api_key:
-    try:
-        genai.configure(api_key=api_key)
-        
-        # ---------- TEST SNIPPET START ----------
-        try:
-            models = genai.list_models()
-            st.write("✅ Available Gemini models for your API key:")
-            for m in models:
-                st.write(f"Model: {m.name}, Supported methods: {getattr(m, 'supported_methods', [])}")
-        except Exception as e:
-            st.warning(f"⚠️ Error listing models: {e}")
-        # ---------- TEST SNIPPET END ----------
-        
-        working_model_found = False
-        for m in models:
-            if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
-                model = genai.GenerativeModel(m.name)
-                working_model_found = True
-        if not working_model_found:
-            st.warning("⚠️ No models supporting generateContent found for this API key. Using dummy generator instead.")
-            use_dummy_generator = True
-    except Exception as e:
-        st.warning(f"Could not list models: {e}. Using dummy generator instead.")
+try:
+    # List models using service account authentication
+    models = genai.list_models()
+    st.write("✅ Available Gemini models (service account authentication):")
+    for m in models:
+        st.write(f"Model: {m.name}, Supported methods: {getattr(m, 'supported_methods', [])}")
+
+    working_model_found = False
+    for m in models:
+        if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
+            model = genai.GenerativeModel(m.name)
+            working_model_found = True
+    if not working_model_found:
+        st.warning("⚠️ No models supporting generateContent found. Using dummy generator instead.")
         use_dummy_generator = True
-else:
-    st.warning("⚠️ Gemini API key missing from server. Using dummy generator instead.")
+except Exception as e:
+    st.warning(f"⚠️ Could not list models: {e}. Using dummy generator instead.")
     use_dummy_generator = True
 
 # -------------------------------
