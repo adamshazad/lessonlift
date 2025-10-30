@@ -16,6 +16,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 from supabase import create_client, Client
+import json
 
 # -------------------------------
 # Page config
@@ -136,27 +137,16 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 # Gemini API setup (service account credentials now used)
 # -------------------------------
-model = None
+# Load service account JSON
+with open("/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json") as f:
+    service_account_info = json.load(f)
+
+# Configure genai
+genai.configure(credentials=service_account_info)
+
+# Set the working model
+model = genai.GenerativeModel("models/gemini-2.5-pro")
 use_dummy_generator = False
-
-try:
-    # List models using service account authentication
-    models = genai.list_models()
-    st.write("✅ Available Gemini models (service account authentication):")
-    for m in models:
-        st.write(f"Model: {m.name}, Supported methods: {getattr(m, 'supported_methods', [])}")
-
-    working_model_found = False
-    for m in models:
-        if not working_model_found and hasattr(m, 'supported_methods') and "generateContent" in m.supported_methods:
-            model = genai.GenerativeModel(m.name)
-            working_model_found = True
-    if not working_model_found:
-        st.warning("⚠️ No models supporting generateContent found. Using dummy generator instead.")
-        use_dummy_generator = True
-except Exception as e:
-    st.warning(f"⚠️ Could not list models: {e}. Using dummy generator instead.")
-    use_dummy_generator = True
 
 # -------------------------------
 # Helper functions
@@ -164,9 +154,9 @@ except Exception as e:
 def clean_markdown(text):
     text = re.sub(r'\|.*\|', '', text)
     text = re.sub(r'#+\s*', '', text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
+    text = re.sub(r'\*(.*?)\*', r'\1')
+    text = re.sub(r'`(.*?)`', r'\1')
     text = re.sub(r'-{2,}', '', text)
     text = re.sub(r'•', '-', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
@@ -270,7 +260,7 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
             else:
                 response = model.generate_content(
                     structured_prompt,
-                    max_output_tokens=1500  # allows longer, complete lesson plans
+                    max_output_tokens=1500
                 )
                 output = response.text.strip()
 
