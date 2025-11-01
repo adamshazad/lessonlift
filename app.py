@@ -17,7 +17,7 @@ from docx import Document
 import datetime
 from supabase import create_client, Client
 import json
-from google.oauth2 import service_account  # <--- added import for proper credentials
+from google.oauth2 import service_account  # ensures proper credentials handling
 
 # -------------------------------
 # Page config
@@ -136,16 +136,29 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API setup (service account credentials now used)
+# Gemini API setup
 # -------------------------------
-# Load service account JSON properly using google.oauth2
-key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
-creds = service_account.Credentials.from_service_account_file(key_path)
-genai.configure(credentials=creds)
+try:
+    key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
+    creds = service_account.Credentials.from_service_account_file(key_path)
+    genai.configure(credentials=creds)
 
-# Set the working model
-model = genai.GenerativeModel("models/gemini-2.5-pro")
-use_dummy_generator = False
+    # Attempt to pick a model that supports generateContent
+    available_models = list(genai.list_models())
+    model = None
+    use_dummy_generator = False
+    for m in available_models:
+        if hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
+            model = genai.GenerativeModel(m.name)
+            break
+    if model is None:
+        st.warning("⚠️ No models supporting generateContent found. Using dummy generator instead.")
+        use_dummy_generator = True
+
+except Exception as e:
+    st.warning(f"⚠️ Gemini API configuration failed: {e}. Using dummy generator instead.")
+    model = None
+    use_dummy_generator = True
 
 # -------------------------------
 # Helper functions
@@ -212,16 +225,15 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (uses real Gemini API key)
+# Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    daily_limit = 10  # updated to 10 lessons/day
+    daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
         return
 
     st.session_state.lesson_count += 1
-
     structured_prompt = f"""
 Create a complete UK primary school lesson plan in a structured, teacher-ready template.
 Use this strict format:
@@ -248,14 +260,8 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            if use_dummy_generator:
-                output = f"""
-📝 Dummy Lesson Plan
-
-{structured_prompt}
-
-[This is a placeholder lesson plan for testing purposes.]
-"""
+            if use_dummy_generator or model is None:
+                output = f"📝 Dummy Lesson Plan\n\n{structured_prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
             else:
                 response = model.generate_content(
                     structured_prompt,
