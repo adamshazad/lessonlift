@@ -17,6 +17,7 @@ from docx import Document
 import datetime
 from supabase import create_client, Client
 import json
+from google.oauth2 import service_account  # <--- added import for proper credentials
 
 # -------------------------------
 # Page config
@@ -137,12 +138,10 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 # Gemini API setup (service account credentials now used)
 # -------------------------------
-# Load service account JSON
-with open("/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json") as f:
-    service_account_info = json.load(f)
-
-# Configure genai
-genai.configure(credentials=service_account_info)
+# Load service account JSON properly using google.oauth2
+key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
+creds = service_account.Credentials.from_service_account_file(key_path)
+genai.configure(credentials=creds)
 
 # Set the working model
 model = genai.GenerativeModel("models/gemini-2.5-pro")
