@@ -2,8 +2,6 @@
 # Set Google service account credentials
 # -------------------------------
 import os
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
-
 import streamlit as st
 import google.generativeai as genai
 import re
@@ -17,7 +15,7 @@ from docx import Document
 import datetime
 from supabase import create_client, Client
 import json
-from google.oauth2 import service_account  # ensures proper credentials handling
+from google.oauth2 import service_account
 
 # -------------------------------
 # Page config
@@ -136,29 +134,29 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API setup
+# Gemini API setup (flexible)
 # -------------------------------
-try:
-    key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
-    creds = service_account.Credentials.from_service_account_file(key_path)
-    genai.configure(credentials=creds)
+model = None
+use_dummy_generator = True
 
-    # Attempt to pick a model that supports generateContent
-    available_models = list(genai.list_models())
-    model = None
-    use_dummy_generator = False
-    for m in available_models:
-        if hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
-            model = genai.GenerativeModel(m.name)
-            break
-    if model is None:
-        st.warning("⚠️ No models supporting generateContent found. Using dummy generator instead.")
-        use_dummy_generator = True
+key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
+if os.path.exists(key_path):
+    try:
+        creds = service_account.Credentials.from_service_account_file(key_path)
+        genai.configure(credentials=creds)
 
-except Exception as e:
-    st.warning(f"⚠️ Gemini API configuration failed: {e}. Using dummy generator instead.")
-    model = None
-    use_dummy_generator = True
+        available_models = list(genai.list_models())
+        for m in available_models:
+            if hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                use_dummy_generator = False
+                break
+        if use_dummy_generator:
+            st.warning("⚠️ No models supporting generateContent found. Using dummy generator instead.")
+    except Exception as e:
+        st.warning(f"⚠️ Gemini API configuration failed: {e}. Using dummy generator instead.")
+else:
+    st.warning(f"⚠️ Gemini service account JSON not found at {key_path}. Using dummy generator instead.")
 
 # -------------------------------
 # Helper functions
@@ -257,16 +255,12 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
 
 {prompt}
 """
-
     with st.spinner("✨ Creating lesson plan..."):
         try:
             if use_dummy_generator or model is None:
                 output = f"📝 Dummy Lesson Plan\n\n{structured_prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
             else:
-                response = model.generate_content(
-                    structured_prompt,
-                    max_output_tokens=1500
-                )
+                response = model.generate_content(structured_prompt, max_output_tokens=1500)
                 output = response.text.strip()
 
             clean_output = clean_markdown(output)
