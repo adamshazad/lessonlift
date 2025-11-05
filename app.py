@@ -172,6 +172,21 @@ except Exception as e:
     use_dummy_generator = True
 
 # -------------------------------
+# Debug: List all models your service account can see
+# -------------------------------
+st.subheader("🔍 Gemini Available Models (for debugging)")
+try:
+    available_models = list(genai.list_models())
+    if not available_models:
+        st.warning("No models were returned by the Gemini API.")
+    else:
+        for m in available_models:
+            methods = getattr(m, "supported_methods", [])
+            st.markdown(f"- **{m.name}** — Supported methods: {methods}")
+except Exception as e:
+    st.error(f"⚠️ Could not list Gemini models: {e}")
+
+# -------------------------------
 # Helper functions
 # -------------------------------
 def clean_markdown(text):
@@ -316,4 +331,3 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
-    ...
