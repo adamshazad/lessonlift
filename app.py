@@ -140,14 +140,14 @@ model = None
 use_dummy_generator = True
 
 try:
-    # 1️⃣ Check for Streamlit secrets first (use this for Streamlit Cloud)
+    # 1️⃣ Use Streamlit secrets first (for deployment)
     if "GEMINI_SERVICE_ACCOUNT" in st.secrets:
         creds_json = json.loads(st.secrets["GEMINI_SERVICE_ACCOUNT"])
         creds = service_account.Credentials.from_service_account_info(creds_json)
         genai.configure(credentials=creds)
         st.info("✅ Loaded Gemini credentials from Streamlit secrets.")
+    # 2️⃣ Otherwise, use local JSON file (for Mac testing)
     else:
-        # 2️⃣ Fallback: use local file path (for your Mac)
         key_path = os.path.expanduser("~/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json")
         if os.path.exists(key_path):
             creds = service_account.Credentials.from_service_account_file(key_path)
@@ -156,7 +156,7 @@ try:
         else:
             raise FileNotFoundError(f"No service account file found at {key_path}")
 
-    # Find a model that supports generateContent
+    # Pick a Gemini model that supports generateContent
     available_models = list(genai.list_models())
     for m in available_models:
         if hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
@@ -316,90 +316,4 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
-
-    lesson_data = {}
-
-    with st.form("lesson_form"):
-        st.subheader("Lesson Details")
-        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
-        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"], key="ability_level")
-        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"], key="lesson_duration")
-        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science", key="subject")
-        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth", key="topic")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
-        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
-        submitted = st.form_submit_button("🚀 Generate Lesson Plan")
-
-    if submitted:
-        prompt = f"""
-Year Group: {lesson_data['year_group']}
-Subject: {lesson_data['subject']}
-Topic: {lesson_data['topic']}
-Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
-Ability Level: {lesson_data['ability_level']}
-Lesson Duration: {lesson_data['lesson_duration']}
-SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
-"""
-        st.session_state.last_prompt = prompt
-        generate_and_display_plan(prompt, title="Original")
-
-    if st.session_state.last_prompt:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ],
-            key="regen_style"
-        )
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities",
-            key="custom_instruction"
-        )
-        if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
-            extra_instruction = ""
-            regen_message = ""
-            if not custom_instruction:
-                if regen_style == "🎨 More creative & engaging activities":
-                    extra_instruction = "Make activities more creative, interactive, and fun."
-                    regen_message = "Lesson updated with more creative and engaging activities."
-                elif regen_style == "📋 More structured with timings":
-                    extra_instruction = "Add clear structure with timings for each section."
-                    regen_message = "Lesson updated with clearer structure and timings."
-                elif regen_style == "🧩 Simplify for lower ability":
-                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
-                    regen_message = "Lesson simplified for lower ability."
-                elif regen_style == "🚀 Challenge for higher ability":
-                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
-                    regen_message = "Lesson updated with higher ability challenge tasks."
-                else:
-                    regen_message = "Here’s a new updated version of your lesson plan."
-            else:
-                extra_instruction = custom_instruction
-                regen_message = f"Lesson updated: {custom_instruction}"
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
-
-# -------------------------------
-# Sidebar history
-# -------------------------------
-def show_lesson_history():
-    st.sidebar.title("📜 Lesson History")
-    if st.session_state.lesson_history:
-        for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
-            with st.sidebar.expander(f"{entry['title']}"):
-                st.markdown(f"<div class='stCard'>{entry['content']}</div>", unsafe_allow_html=True)
-    else:
-        st.sidebar.write("No lesson history yet.")
-
-# -------------------------------
-# Run
-# -------------------------------
-if __name__ == "__main__":
-    show_lesson_history()
-    lesson_generator_page()
+    ...
