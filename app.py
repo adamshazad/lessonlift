@@ -134,29 +134,42 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API setup (flexible)
+# Gemini API setup (auto detects environment)
 # -------------------------------
 model = None
 use_dummy_generator = True
 
-key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
-if os.path.exists(key_path):
-    try:
-        creds = service_account.Credentials.from_service_account_file(key_path)
+try:
+    # 1️⃣ Check for Streamlit secrets first (use this for Streamlit Cloud)
+    if "GEMINI_SERVICE_ACCOUNT" in st.secrets:
+        creds_json = json.loads(st.secrets["GEMINI_SERVICE_ACCOUNT"])
+        creds = service_account.Credentials.from_service_account_info(creds_json)
         genai.configure(credentials=creds)
+        st.info("✅ Loaded Gemini credentials from Streamlit secrets.")
+    else:
+        # 2️⃣ Fallback: use local file path (for your Mac)
+        key_path = os.path.expanduser("~/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json")
+        if os.path.exists(key_path):
+            creds = service_account.Credentials.from_service_account_file(key_path)
+            genai.configure(credentials=creds)
+            st.info("✅ Loaded Gemini credentials from local JSON file.")
+        else:
+            raise FileNotFoundError(f"No service account file found at {key_path}")
 
-        available_models = list(genai.list_models())
-        for m in available_models:
-            if hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
-                model = genai.GenerativeModel(m.name)
-                use_dummy_generator = False
-                break
-        if use_dummy_generator:
-            st.warning("⚠️ No models supporting generateContent found. Using dummy generator instead.")
-    except Exception as e:
-        st.warning(f"⚠️ Gemini API configuration failed: {e}. Using dummy generator instead.")
-else:
-    st.warning(f"⚠️ Gemini service account JSON not found at {key_path}. Using dummy generator instead.")
+    # Find a model that supports generateContent
+    available_models = list(genai.list_models())
+    for m in available_models:
+        if hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
+            model = genai.GenerativeModel(m.name)
+            use_dummy_generator = False
+            break
+    if model is None:
+        st.warning("⚠️ No models supporting generateContent found. Using dummy generator instead.")
+
+except Exception as e:
+    st.warning(f"⚠️ Gemini API configuration failed: {e}. Using dummy generator instead.")
+    model = None
+    use_dummy_generator = True
 
 # -------------------------------
 # Helper functions
