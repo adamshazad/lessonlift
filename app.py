@@ -292,3 +292,22 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
+
+# -------------------------------
+# Main app
+# -------------------------------
+def main():
+    lesson_generator_page()
+    
+    st.subheader("📝 Generate a New Lesson Plan")
+    prompt = st.text_area("Enter your lesson requirements or topic:", height=150)
+    title = st.text_input("Lesson Title (optional)", value="Latest Lesson Plan")
+    
+    if st.button("Generate Lesson Plan"):
+        if prompt.strip() == "":
+            st.warning("⚠️ Please enter a prompt before generating a lesson plan.")
+        else:
+            generate_and_display_plan(prompt, title=title)
+
+if __name__ == "__main__":
+    main()
