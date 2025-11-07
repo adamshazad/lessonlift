@@ -1,9 +1,9 @@
 # -------------------------------
-# Set Google service account credentials
+# Set API credentials
 # -------------------------------
 import os
 import streamlit as st
-import google.generativeai as genai
+import openai
 import re
 import base64
 from io import BytesIO
@@ -15,7 +15,6 @@ from docx import Document
 import datetime
 from supabase import create_client, Client
 import json
-from google.oauth2 import service_account
 
 # -------------------------------
 # Page config
@@ -134,57 +133,17 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API setup (auto detects environment)
+# OpenAI API setup
 # -------------------------------
-model = None
 use_dummy_generator = True
+openai_api_key = st.secrets.get("OPENAI_API_KEY")
 
-try:
-    # 1️⃣ Use Streamlit secrets first (for deployment)
-    if "GEMINI_SERVICE_ACCOUNT" in st.secrets:
-        creds_json = json.loads(st.secrets["GEMINI_SERVICE_ACCOUNT"])
-        creds = service_account.Credentials.from_service_account_info(creds_json)
-        genai.configure(credentials=creds)
-        st.info("✅ Loaded Gemini credentials from Streamlit secrets.")
-    # 2️⃣ Otherwise, use local JSON file (for Mac testing)
-    else:
-        key_path = os.path.expanduser("~/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json")
-        if os.path.exists(key_path):
-            creds = service_account.Credentials.from_service_account_file(key_path)
-            genai.configure(credentials=creds)
-            st.info("✅ Loaded Gemini credentials from local JSON file.")
-        else:
-            raise FileNotFoundError(f"No service account file found at {key_path}")
-
-    # Pick a Gemini model that supports generateContent
-    available_models = list(genai.list_models())
-    for m in available_models:
-        if hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
-            model = genai.GenerativeModel(m.name)
-            use_dummy_generator = False
-            break
-    if model is None:
-        st.warning("⚠️ No models supporting generateContent found. Using dummy generator instead.")
-
-except Exception as e:
-    st.warning(f"⚠️ Gemini API configuration failed: {e}. Using dummy generator instead.")
-    model = None
-    use_dummy_generator = True
-
-# -------------------------------
-# Debug: List all models your service account can see
-# -------------------------------
-st.subheader("🔍 Gemini Available Models (for debugging)")
-try:
-    available_models = list(genai.list_models())
-    if not available_models:
-        st.warning("No models were returned by the Gemini API.")
-    else:
-        for m in available_models:
-            methods = getattr(m, "supported_methods", [])
-            st.markdown(f"- **{m.name}** — Supported methods: {methods}")
-except Exception as e:
-    st.error(f"⚠️ Could not list Gemini models: {e}")
+if openai_api_key:
+    openai.api_key = openai_api_key
+    use_dummy_generator = False
+    st.info("✅ Loaded OpenAI API key.")
+else:
+    st.warning("⚠️ OpenAI API key not found. Using dummy generator instead.")
 
 # -------------------------------
 # Helper functions
@@ -285,17 +244,19 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
 """
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            if use_dummy_generator or model is None:
+            if use_dummy_generator:
                 output = f"📝 Dummy Lesson Plan\n\n{structured_prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
             else:
-                response = model.generate_content(structured_prompt, max_output_tokens=1500)
-                output = response.text.strip()
+                response = openai.ChatCompletion.create(
+                    model="gpt-4",  # you can change to gpt-4-turbo if preferred
+                    messages=[{"role": "user", "content": structured_prompt}],
+                    max_tokens=1500,
+                    temperature=0.7
+                )
+                output = response.choices[0].message.content.strip()
 
             clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
-
-            if regen_message:
-                st.info(f"🔄 {regen_message}")
 
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
