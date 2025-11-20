@@ -135,15 +135,11 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 # OpenAI API setup
 # -------------------------------
-use_dummy_generator = True
 openai_api_key = st.secrets.get("OPENAI_API_KEY")
-
-if openai_api_key:
-    openai.api_key = openai_api_key
-    use_dummy_generator = False
-    st.info("✅ Loaded OpenAI API key.")
+if not openai_api_key:
+    st.error("⚠️ OpenAI API key not found. Add your key in Streamlit secrets to use the AI generator.")
 else:
-    st.warning("⚠️ OpenAI API key not found. Using dummy generator instead.")
+    openai.api_key = openai_api_key
 
 # -------------------------------
 # Helper functions
@@ -244,16 +240,13 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
 """
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            if use_dummy_generator:
-                output = f"📝 Dummy Lesson Plan\n\n{structured_prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
-            else:
-                response = openai.chat.completions.create(
-                    model="gpt-5-chat-latest",
-                    messages=[{"role": "user", "content": structured_prompt}],
-                    max_tokens=1500,
-                    temperature=0.7
-                )
-                output = response.choices[0].message.content.strip()
+            response = openai.chat.completions.create(
+                model="gpt-5-mini",
+                messages=[{"role": "user", "content": structured_prompt}],
+                max_tokens=1500,
+                temperature=0.7
+            )
+            output = response.choices[0].message.content.strip()
 
             clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
