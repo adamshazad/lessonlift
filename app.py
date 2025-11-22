@@ -243,8 +243,7 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
             response = openai.chat.completions.create(
                 model="gpt-5-mini",
                 messages=[{"role": "user", "content": structured_prompt}],
-                max_completion_tokens=1500,
-                temperature=0.7
+                max_completion_tokens=1500
             )
             output = response.choices[0].message.content.strip()
 
