@@ -1,9 +1,9 @@
 # -------------------------------
-# OpenAI setup
+# Set Google service account credentials
 # -------------------------------
 import os
 import streamlit as st
-import openai
+import google.generativeai as genai
 import re
 import base64
 from io import BytesIO
@@ -14,6 +14,8 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 from supabase import create_client, Client
+import json
+from google.oauth2 import service_account
 
 # -------------------------------
 # Page config
@@ -132,10 +134,30 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# OpenAI configuration
+# Gemini API setup (GPT-5 Mini)
 # -------------------------------
-openai.api_key = st.secrets.get("OPENAI_API_KEY")
-use_dummy_generator = openai.api_key is None
+model = None
+use_dummy_generator = True
+key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
+
+if os.path.exists(key_path):
+    try:
+        creds = service_account.Credentials.from_service_account_file(key_path)
+        genai.configure(credentials=creds)
+
+        # Automatically pick GPT-5 mini if available
+        available_models = list(genai.list_models())
+        for m in available_models:
+            if m.name == "gpt-5-mini" and hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
+                model = genai.GenerativeModel(m.name)
+                use_dummy_generator = False
+                break
+        if use_dummy_generator:
+            st.warning("⚠️ GPT-5-mini not found or not supported. Using dummy generator instead.")
+    except Exception as e:
+        st.warning(f"⚠️ Gemini API configuration failed: {e}. Using dummy generator instead.")
+else:
+    st.warning(f"⚠️ Gemini service account JSON not found at {key_path}. Using dummy generator instead.")
 
 # -------------------------------
 # Helper functions
@@ -234,19 +256,13 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
 
 {prompt}
 """
-
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            if use_dummy_generator:
+            if use_dummy_generator or model is None:
                 output = f"📝 Dummy Lesson Plan\n\n{structured_prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
             else:
-                response = openai.ChatCompletion.create(
-                    model="gpt-4.0-mini",
-                    messages=[{"role": "user", "content": structured_prompt}],
-                    max_tokens=1500,
-                    temperature=0.7
-                )
-                output = response['choices'][0]['message']['content'].strip()
+                response = model.generate_content(structured_prompt, max_output_tokens=1500)
+                output = response.text.strip()
 
             clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
