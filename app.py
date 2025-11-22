@@ -145,19 +145,15 @@ else:
 # Helper functions
 # -------------------------------
 def clean_markdown(text):
-    """Safe markdown cleaner that NEVER crashes."""
+    """Safe cleaner that keeps the content intact."""
     try:
-        text = re.sub(r'\|[^|]*\|', '', text)  # safer pipe removal
-        text = re.sub(r'#+\s*', '', text)
-        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-        text = re.sub(r'\*(.*?)\*', r'\1', text)
-        text = re.sub(r'`(.*?)`', r'\1', text)
-        text = re.sub(r'-{2,}', '', text)
-        text = re.sub(r'•', '-', text)
+        text = text.replace("**", "")
+        text = text.replace("*", "")
+        text = text.replace("`", "")
         text = re.sub(r'\n{3,}', '\n\n', text)
         return text.strip()
     except:
-        return text  # fallback so app NEVER crashes
+        return text
 
 def show_logo(path="logo.png", width=200):
     try:
@@ -289,7 +285,7 @@ def lesson_generator_page():
     show_logo()
     title_and_tagline()
 
-    # Full lesson plan form (Option A
+    # Full lesson plan form (Option A)
     lesson_data = {}
 
     with st.form("lesson_form"):
