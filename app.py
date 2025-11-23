@@ -1,9 +1,9 @@
 # -------------------------------
-# Set Google service account credentials
+# OpenAI setup (replacing Gemini)
 # -------------------------------
 import os
 import streamlit as st
-import google.generativeai as genai
+import openai
 import re
 import base64
 from io import BytesIO
@@ -15,7 +15,6 @@ from docx import Document
 import datetime
 from supabase import create_client, Client
 import json
-from google.oauth2 import service_account
 
 # -------------------------------
 # Page config
@@ -134,44 +133,19 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini API setup (GPT-5 mini)
+# OpenAI API setup
 # -------------------------------
-model = None
-use_dummy_generator = True
-key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
-
-if os.path.exists(key_path):
-    try:
-        creds = service_account.Credentials.from_service_account_file(key_path)
-        genai.configure(credentials=creds)
-
-        # Try to use GPT-5 mini
-        available_models = list(genai.list_models())
-        for m in available_models:
-            if m.name == "gpt-5-mini" and hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
-                model = genai.GenerativeModel(m.name)
-                use_dummy_generator = False
-                break
-        if use_dummy_generator:
-            st.warning("⚠️ GPT-5-mini not found or not supported. Using dummy generator instead.")
-    except Exception as e:
-        st.warning(f"⚠️ Gemini API configuration failed: {e}. Using dummy generator instead.")
-else:
-    st.warning(f"⚠️ Gemini service account JSON not found at {key_path}. Using dummy generator instead.")
+openai_api_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+if not openai_api_key:
+    st.error("⚠️ OpenAI API key not set. Please add it to Streamlit secrets or environment variables.")
+openai.api_key = openai_api_key
+openai_model = "gpt-5-mini"  # using the GPT-5 Mini model
 
 # -------------------------------
 # Helper functions
 # -------------------------------
 def clean_markdown(text):
-    text = re.sub(r'\|.*\|', '', text)
-    text = re.sub(r'#+\s*', '', text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
-    text = re.sub(r'-{2,}', '', text)
-    text = re.sub(r'•', '-', text)
-    text = re.sub(r'\n{3,}', '\n\n', text)  # ✅ corrected line
-    return text.strip()
+    return re.sub(r'\n{3,}', '\n\n', text).strip()
 
 def show_logo(path="logo.png", width=200):
     try:
@@ -200,16 +174,11 @@ def title_and_tagline():
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm,
+                            topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
-    story = []
-    for line in text.splitlines():
-        if not line.strip():
-            story.append(Spacer(1,6))
-        else:
-            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-            story.append(Paragraph(safe, normal))
+    story = [Paragraph(line.strip(), normal) for line in text.splitlines() if line.strip()]
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -233,36 +202,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     st.session_state.lesson_count += 1
-    structured_prompt = f"""
-Create a complete UK primary school lesson plan in a structured, teacher-ready template.
-Use this strict format:
 
-1. Lesson Title
-2. Subject
-3. Year Group
-4. Duration
-5. Learning Objectives
-6. Success Criteria (differentiated for All/Most/Some)
-7. Key Vocabulary
-8. Resources & Preparation
-9. Starter (with timings and teacher instructions)
-10. Main Input / Teaching Activities (with timings)
-11. Main Activity (with differentiated instructions and timings)
-12. Plenary / Review (with timings)
-13. Optional Homework or Extension
-14. Notes / SEN considerations
-
-Ensure each section is clearly labeled, include timings, differentiation, and step-by-step instructions.
-
-{prompt}
-"""
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            if use_dummy_generator or model is None:
-                output = f"📝 Dummy Lesson Plan\n\n{structured_prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
-            else:
-                response = model.generate_content(structured_prompt, max_output_tokens=1500)
-                output = response.text.strip()
+            response = openai.chat.completions.create(
+                model=openai_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_completion_tokens=1500
+            )
+            output = response.choices[0].message.content.strip()
 
             clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
