@@ -1,9 +1,9 @@
 # -------------------------------
-# Set Google service account credentials
+# Imports
 # -------------------------------
 import os
 import streamlit as st
-import google.generativeai as genai
+import openai
 import re
 import base64
 from io import BytesIO
@@ -14,8 +14,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 from supabase import create_client, Client
-import json
-from google.oauth2 import service_account
 
 # -------------------------------
 # Page config
@@ -56,6 +54,14 @@ body {background-color: white; color: black;}
 }
 </style>
 """, unsafe_allow_html=True)
+
+# -------------------------------
+# OpenAI API setup
+# -------------------------------
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    st.error("⚠️ OPENAI_API_KEY not found in secrets or environment variables.")
+openai.api_key = OPENAI_API_KEY
 
 # -------------------------------
 # Supabase setup
@@ -117,7 +123,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # -------------------------------
-# Session defaults (authenticated users)
+# Session defaults
 # -------------------------------
 if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
@@ -134,35 +140,18 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Gemini / OpenAI GPT-5 Mini API setup
-# -------------------------------
-model = None
-use_dummy_generator = True
-key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
-
-if os.path.exists(key_path):
-    try:
-        creds = service_account.Credentials.from_service_account_file(key_path)
-        genai.configure(credentials=creds)
-
-        available_models = list(genai.list_models())
-        for m in available_models:
-            if m.name == "models/gpt-5-mini" and hasattr(m, "supported_methods") and "generateContent" in m.supported_methods:
-                model = genai.GenerativeModel(m.name)
-                use_dummy_generator = False
-                break
-        if use_dummy_generator:
-            st.warning("⚠️ GPT-5 Mini not found or not supported. Using dummy generator instead.")
-    except Exception as e:
-        st.warning(f"⚠️ API configuration failed: {e}. Using dummy generator instead.")
-else:
-    st.warning(f"⚠️ Service account JSON not found at {key_path}. Using dummy generator instead.")
-
-# -------------------------------
 # Helper functions
 # -------------------------------
 def clean_markdown(text):
-    return text.strip()  # minimal cleaning to preserve full lesson content
+    text = re.sub(r'\|.*\|', '', text)
+    text = re.sub(r'#+\s*', '', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
+    text = re.sub(r'\*(.*?)\*', r'\1')
+    text = re.sub(r'`(.*?)`', r'\1')
+    text = re.sub(r'-{2,}', '', text)
+    text = re.sub(r'•', '-', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
 
 def show_logo(path="logo.png", width=200):
     try:
@@ -215,7 +204,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (permanent fix for GPT-5 Mini)
+# Generator using OpenAI GPT-5 Mini
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
@@ -224,41 +213,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     st.session_state.lesson_count += 1
-    structured_prompt = f"""
-Create a complete UK primary school lesson plan in a structured, teacher-ready template.
-Use this strict format:
-
-1. Lesson Title
-2. Subject
-3. Year Group
-4. Duration
-5. Learning Objectives
-6. Success Criteria (differentiated for All/Most/Some)
-7. Key Vocabulary
-8. Resources & Preparation
-9. Starter (with timings and teacher instructions)
-10. Main Input / Teaching Activities (with timings)
-11. Main Activity (with differentiated instructions and timings)
-12. Plenary / Review (with timings)
-13. Optional Homework or Extension
-14. Notes / SEN considerations
-
-Ensure each section is clearly labeled, include timings, differentiation, and step-by-step instructions.
-
-{prompt}
-"""
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            if use_dummy_generator or model is None:
-                output = f"📝 Dummy Lesson Plan\n\n{structured_prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
-            else:
-                response = model.generate_content(structured_prompt, max_completion_tokens=1500)
-                # Handle ChatCompletionMessage format correctly
-                if hasattr(response, "choices") and len(response.choices) > 0:
-                    message = response.choices[0].message
-                    output = getattr(message, "content", str(message))
-                else:
-                    output = getattr(response, "text", "[No response returned]")
+            response = openai.ChatCompletion.create(
+                model="gpt-5-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_completion_tokens=1500
+            )
+            output = response.choices[0].message.content.strip()
 
             clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -269,8 +231,8 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
 
-            safe_output = clean_output.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            st.markdown(f"<div class='stCard'>{safe_output}</div>", unsafe_allow_html=True)
+            st.markdown(f"### 📖 {title}")
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -290,7 +252,6 @@ Ensure each section is clearly labeled, include timings, differentiation, and st
                 """,
                 unsafe_allow_html=True
             )
-
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
 
