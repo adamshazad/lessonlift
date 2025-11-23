@@ -1,9 +1,8 @@
 # -------------------------------
-# Imports
+# OpenAI API setup
 # -------------------------------
 import os
 import streamlit as st
-import openai
 import re
 import base64
 from io import BytesIO
@@ -14,6 +13,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 from supabase import create_client, Client
+import openai
 
 # -------------------------------
 # Page config
@@ -54,14 +54,6 @@ body {background-color: white; color: black;}
 }
 </style>
 """, unsafe_allow_html=True)
-
-# -------------------------------
-# OpenAI API setup
-# -------------------------------
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    st.error("⚠️ OPENAI_API_KEY not found in secrets or environment variables.")
-openai.api_key = OPENAI_API_KEY
 
 # -------------------------------
 # Supabase setup
@@ -123,7 +115,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # -------------------------------
-# Session defaults
+# Session defaults (authenticated users)
 # -------------------------------
 if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
@@ -138,6 +130,18 @@ today = datetime.date.today()
 if st.session_state.last_reset_date != today:
     st.session_state.lesson_count = 0
     st.session_state.last_reset_date = today
+
+# -------------------------------
+# OpenAI GPT-5 Mini setup
+# -------------------------------
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
+if OPENAI_API_KEY:
+    openai.api_key = OPENAI_API_KEY
+    model_name = "gpt-5-mini"
+    use_dummy_generator = False
+else:
+    st.warning("⚠️ OpenAI API key not found. Using dummy generator instead.")
+    use_dummy_generator = True
 
 # -------------------------------
 # Helper functions
@@ -204,7 +208,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator using OpenAI GPT-5 Mini
+# Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
@@ -213,14 +217,40 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     st.session_state.lesson_count += 1
+    structured_prompt = f"""
+Create a complete UK primary school lesson plan in a structured, teacher-ready template.
+Use this strict format:
+
+1. Lesson Title
+2. Subject
+3. Year Group
+4. Duration
+5. Learning Objectives
+6. Success Criteria (differentiated for All/Most/Some)
+7. Key Vocabulary
+8. Resources & Preparation
+9. Starter (with timings and teacher instructions)
+10. Main Input / Teaching Activities (with timings)
+11. Main Activity (with differentiated instructions and timings)
+12. Plenary / Review (with timings)
+13. Optional Homework or Extension
+14. Notes / SEN considerations
+
+Ensure each section is clearly labeled, include timings, differentiation, and step-by-step instructions.
+
+{prompt}
+"""
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            response = openai.ChatCompletion.create(
-                model="gpt-5-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=1500
-            )
-            output = response.choices[0].message.content.strip()
+            if use_dummy_generator:
+                output = f"📝 Dummy Lesson Plan\n\n{structured_prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
+            else:
+                response = openai.chat.completions.create(
+                    model=model_name,
+                    messages=[{"role": "user", "content": structured_prompt}],
+                    max_completion_tokens=1500
+                )
+                output = response.choices[0].message.content.strip()
 
             clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -252,6 +282,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 """,
                 unsafe_allow_html=True
             )
+
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
 
