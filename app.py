@@ -1,9 +1,8 @@
 # -------------------------------
-# Set OpenAI GPT-4o Mini
+# Imports
 # -------------------------------
-import os
 import streamlit as st
-import openai
+import google.generativeai as genai
 import re
 import base64
 from io import BytesIO
@@ -13,6 +12,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
+from google.oauth2 import service_account
 
 # -------------------------------
 # Page config
@@ -20,7 +20,7 @@ import datetime
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (scrollable box, styled)
+# CSS
 # -------------------------------
 st.markdown("""
 <style>
@@ -44,13 +44,6 @@ body {background-color: white; color: black;}
     max-height: 70vh;
     overflow-y: auto;
 }
-[data-testid="stSidebar"][aria-expanded="false"] {
-    display: none !important;
-}
-[data-testid="stSidebar"] {
-    max-width: 250px !important;
-    min-width: 0px !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -72,21 +65,19 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# OpenAI GPT setup
+# GPT-4o Mini setup (OpenAI API in secrets)
 # -------------------------------
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
-model_name = "gpt-4o-mini"
+model = genai.GenerativeModel("models/gpt-4o-mini")
 
 # -------------------------------
-# Helpers
+# Helper functions
 # -------------------------------
 def clean_markdown(text):
     text = re.sub(r'\|.*\|', '', text)
     text = re.sub(r'#+\s*', '', text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
-    text = re.sub(r'\*(.*?)\*', r'\1')
-    text = re.sub(r'`(.*?)`', r'\1')
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
     text = re.sub(r'-{2,}', '', text)
     text = re.sub(r'•', '-', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
@@ -145,19 +136,41 @@ def create_docx(text):
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
-        st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day.")
+        st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
         return
 
     st.session_state.lesson_count += 1
+
+    structured_prompt = f"""
+Create a complete UK primary school lesson plan in a structured, teacher-ready template.
+Use this strict format:
+
+1. Lesson Title
+2. Subject
+3. Year Group
+4. Duration
+5. Learning Objectives
+6. Success Criteria (differentiated for All/Most/Some)
+7. Key Vocabulary
+8. Resources & Preparation
+9. Starter (with timings and teacher instructions)
+10. Main Input / Teaching Activities (with timings)
+11. Main Activity (with differentiated instructions and timings)
+12. Plenary / Review (with timings)
+13. Optional Homework or Extension
+14. Notes / SEN considerations
+
+Ensure each section is clearly labeled, include timings, differentiation, and step-by-step instructions.
+
+{prompt}
+"""
+
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            response = openai.chat.completions.create(
-                model=model_name,
-                messages=[{"role":"user","content":prompt}],
-                max_completion_tokens=1500
-            )
-            output = response.choices[0].message.content
+            response = model.generate_content(structured_prompt, max_completion_tokens=1500)
+            output = response.text.strip()
             clean_output = clean_markdown(output)
+
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -223,6 +236,48 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
+
+    if st.session_state.last_prompt:
+        st.markdown("### 🔄 Not happy with the plan?")
+        regen_style = st.selectbox(
+            "Choose a regeneration style:",
+            [
+                "♻️ Just regenerate (different variation)",
+                "🎨 More creative & engaging activities",
+                "📋 More structured with timings",
+                "🧩 Simplify for lower ability",
+                "🚀 Challenge for higher ability"
+            ],
+            key="regen_style"
+        )
+        custom_instruction = st.text_input(
+            "Or type your own custom instruction (optional)",
+            placeholder="e.g. Make it more interactive with outdoor activities",
+            key="custom_instruction"
+        )
+        if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
+            extra_instruction = ""
+            regen_message = ""
+            if not custom_instruction:
+                if regen_style == "🎨 More creative & engaging activities":
+                    extra_instruction = "Make activities more creative, interactive, and fun."
+                    regen_message = "Lesson updated with more creative and engaging activities."
+                elif regen_style == "📋 More structured with timings":
+                    extra_instruction = "Add clear structure with timings for each section."
+                    regen_message = "Lesson updated with clearer structure and timings."
+                elif regen_style == "🧩 Simplify for lower ability":
+                    extra_instruction = "Adapt for lower ability: simpler language, more scaffolding, step-by-step."
+                    regen_message = "Lesson simplified for lower ability."
+                elif regen_style == "🚀 Challenge for higher ability":
+                    extra_instruction = "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions."
+                    regen_message = "Lesson updated with higher ability challenge tasks."
+                else:
+                    regen_message = "Here’s a new updated version of your lesson plan."
+            else:
+                extra_instruction = custom_instruction
+                regen_message = f"Lesson updated: {custom_instruction}"
+            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
+            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
 # -------------------------------
 # Sidebar history
