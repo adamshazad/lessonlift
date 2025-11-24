@@ -1,7 +1,6 @@
 # -------------------------------
-# Imports
+# LessonLift - AI Lesson Planner (OpenAI GPT-4o-mini)
 # -------------------------------
-import os
 import streamlit as st
 import openai
 import re
@@ -20,7 +19,7 @@ import datetime
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (scrollable box etc.)
+# CSS
 # -------------------------------
 st.markdown("""
 <style>
@@ -39,27 +38,12 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em;
-    white-space: pre-wrap;
+    line-height: 1.5em;
     max-height: 70vh;
     overflow-y: auto;
 }
-[data-testid="stSidebar"][aria-expanded="false"] {
-    display: none !important;
-}
-[data-testid="stSidebar"] {
-    max-width: 250px !important;
-    min-width: 0px !important;
-}
 </style>
 """, unsafe_allow_html=True)
-
-# -------------------------------
-# OpenAI setup
-# -------------------------------
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
-MODEL_NAME = "gpt-4o-mini"
 
 # -------------------------------
 # Session defaults
@@ -79,7 +63,14 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# Helpers
+# OpenAI setup
+# -------------------------------
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
+openai.api_key = OPENAI_API_KEY
+MODEL_NAME = "gpt-4o-mini"
+
+# -------------------------------
+# Helper functions
 # -------------------------------
 def clean_markdown(text):
     text = re.sub(r'\|.*\|', '', text)
@@ -114,6 +105,9 @@ def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
+# -------------------------------
+# Exporters
+# -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
@@ -145,7 +139,7 @@ def create_docx(text):
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
-        st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
+        st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day.")
         return
 
     st.session_state.lesson_count += 1
@@ -155,10 +149,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             response = openai.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
-                max_output_tokens=1500
+                max_tokens=1500
             )
             output = response.choices[0].message.content.strip()
             clean_output = clean_markdown(output)
+
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -168,8 +163,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
 
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
+            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -188,7 +184,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 """,
                 unsafe_allow_html=True
             )
-
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
 
@@ -200,7 +195,6 @@ def lesson_generator_page():
     title_and_tagline()
 
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
@@ -275,7 +269,7 @@ def show_lesson_history():
     if st.session_state.lesson_history:
         for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
             with st.sidebar.expander(f"{entry['title']}"):
-                st.markdown(f"<div class='stCard'>{entry['content']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
     else:
         st.sidebar.write("No lesson history yet.")
 
