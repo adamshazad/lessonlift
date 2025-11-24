@@ -1,8 +1,9 @@
 # -------------------------------
-# LessonLift - AI Lesson Planner (OpenAI GPT-4o-mini)
+# Set Google service account credentials (if you were using Gemini)
 # -------------------------------
+import os
 import streamlit as st
-import openai
+import google.generativeai as genai
 import re
 import base64
 from io import BytesIO
@@ -12,6 +13,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
+from supabase import create_client, Client
+import json
+from google.oauth2 import service_account
 
 # -------------------------------
 # Page config
@@ -19,7 +23,7 @@ import datetime
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS
+# CSS (scrollable card)
 # -------------------------------
 st.markdown("""
 <style>
@@ -38,16 +42,28 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
+    line-height: 1.6em;
+    white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
+}
+[data-testid="stSidebar"][aria-expanded="false"] {
+    display: none !important;
+}
+[data-testid="stSidebar"] {
+    max-width: 250px !important;
+    min-width: 0px !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Session defaults
+# Supabase setup
 # -------------------------------
+SUPABASE_URL = st.secrets.get("SUPABASE_URL")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+
 if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
 if "last_prompt" not in st.session_state:
@@ -63,11 +79,24 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# OpenAI setup
+# Gemini/OpenAI setup
 # -------------------------------
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
-MODEL_NAME = "gpt-4o-mini"
+# Example: using GPT-4o-mini (cheap & good quality)
+model = None
+use_dummy_generator = False
+
+key_path = "/Users/adamshazad/Documents/lessonlift/gen-lang-client-0875480873-4b5bcde4f769.json"
+if os.path.exists(key_path):
+    try:
+        creds = service_account.Credentials.from_service_account_file(key_path)
+        genai.configure(credentials=creds)
+        model = genai.GenerativeModel("models/gpt-4o-mini")
+    except Exception as e:
+        st.warning(f"⚠️ Gemini/OpenAI API configuration failed: {e}. Using dummy generator instead.")
+        use_dummy_generator = True
+else:
+    st.warning(f"⚠️ Gemini service account JSON not found at {key_path}. Using dummy generator instead.")
+    use_dummy_generator = True
 
 # -------------------------------
 # Helper functions
@@ -75,9 +104,9 @@ MODEL_NAME = "gpt-4o-mini"
 def clean_markdown(text):
     text = re.sub(r'\|.*\|', '', text)
     text = re.sub(r'#+\s*', '', text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
-    text = re.sub(r'\*(.*?)\*', r'\1')
-    text = re.sub(r'`(.*?)`', r'\1')
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
     text = re.sub(r'-{2,}', '', text)
     text = re.sub(r'•', '-', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
@@ -105,9 +134,6 @@ def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
-# -------------------------------
-# Exporters
-# -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
@@ -139,21 +165,20 @@ def create_docx(text):
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
-        st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day.")
+        st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
         return
 
     st.session_state.lesson_count += 1
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            response = openai.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=1500
-            )
-            output = response.choices[0].message.content.strip()
-            clean_output = clean_markdown(output)
+            if use_dummy_generator or model is None:
+                output = f"📝 Dummy Lesson Plan\n\n{prompt}\n\n[This is a placeholder lesson plan for testing purposes.]"
+            else:
+                response = model.generate_content(prompt)
+                output = response.text.strip()
 
+            clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -163,9 +188,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
 
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -184,6 +208,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 """,
                 unsafe_allow_html=True
             )
+
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
 
@@ -269,7 +294,7 @@ def show_lesson_history():
     if st.session_state.lesson_history:
         for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
             with st.sidebar.expander(f"{entry['title']}"):
-                st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='stCard'>{entry['content']}</div>", unsafe_allow_html=True)
     else:
         st.sidebar.write("No lesson history yet.")
 
