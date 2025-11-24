@@ -1,5 +1,5 @@
 # -------------------------------
-# LessonLift - AI Lesson Planner (OpenAI GPT-4o-mini)
+# Imports
 # -------------------------------
 import os
 import streamlit as st
@@ -20,7 +20,7 @@ import datetime
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (scrollable boxes, card style)
+# CSS
 # -------------------------------
 st.markdown("""
 <style>
@@ -44,20 +44,8 @@ body {background-color: white; color: black;}
     max-height: 70vh;
     overflow-y: auto;
 }
-[data-testid="stSidebar"][aria-expanded="false"] {
-    display: none !important;
-}
-[data-testid="stSidebar"] {
-    max-width: 250px !important;
-    min-width: 0px !important;
-}
 </style>
 """, unsafe_allow_html=True)
-
-# -------------------------------
-# OpenAI API setup
-# -------------------------------
-openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
 # Session defaults
@@ -71,17 +59,25 @@ if "lesson_count" not in st.session_state:
 if "last_reset_date" not in st.session_state:
     st.session_state.last_reset_date = datetime.date.today()
 
+# Reset daily count
 today = datetime.date.today()
 if st.session_state.last_reset_date != today:
     st.session_state.lesson_count = 0
     st.session_state.last_reset_date = today
 
 # -------------------------------
+# OpenAI API setup
+# -------------------------------
+openai_api_key = st.secrets.get("OPENAI_API_KEY")
+if not openai_api_key:
+    st.error("⚠️ OpenAI API key not found. Add it to secrets.toml as OPENAI_API_KEY.")
+openai.api_key = openai_api_key
+MODEL_NAME = "gpt-4o-mini"
+
+# -------------------------------
 # Helper functions
 # -------------------------------
 def clean_markdown(text):
-    if not isinstance(text, str):
-        return ""
     text = re.sub(r'\|.*\|', '', text)
     text = re.sub(r'#+\s*', '', text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1')
@@ -140,7 +136,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator function
+# Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
@@ -152,24 +148,22 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            response = openai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role":"user","content":prompt}],
-                max_output_tokens=1500
+            response = openai.ChatCompletion.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}]
             )
-            output = response.choices[0].message.content
+            output = response.choices[0].message.content.strip()
             clean_output = clean_markdown(output)
-
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
-            remaining_today = daily_limit - st.session_state.lesson_count
-            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
-
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+
+            remaining = daily_limit - st.session_state.lesson_count
+            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining} remaining")
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -189,11 +183,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 """,
                 unsafe_allow_html=True
             )
+
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
 
 # -------------------------------
-# Main page
+# Main generator page
 # -------------------------------
 def lesson_generator_page():
     show_logo()
@@ -202,13 +197,13 @@ def lesson_generator_page():
     lesson_data = {}
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
-        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
-        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
-        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
-        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
-        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)")
-        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)")
+        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
+        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"], key="ability_level")
+        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"], key="lesson_duration")
+        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science", key="subject")
+        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth", key="topic")
+        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
+        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
@@ -234,12 +229,22 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                 "📋 More structured with timings",
                 "🧩 Simplify for lower ability",
                 "🚀 Challenge for higher ability"
-            ]
+            ],
+            key="regen_style"
         )
-        custom_instruction = st.text_input("Or type your own custom instruction (optional)")
-        if st.button("🔁 Regenerate Lesson Plan"):
-            extra_instruction = custom_instruction or ""
-            regen_message = f"Lesson updated: {extra_instruction}" if extra_instruction else "Here’s a new updated version of your lesson plan."
+        custom_instruction = st.text_input(
+            "Or type your own custom instruction (optional)",
+            placeholder="e.g. Make it more interactive with outdoor activities",
+            key="custom_instruction"
+        )
+        if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
+            extra_instruction = custom_instruction or {
+                "🎨 More creative & engaging activities": "Make activities more creative, interactive, and fun.",
+                "📋 More structured with timings": "Add clear structure with timings for each section.",
+                "🧩 Simplify for lower ability": "Adapt for lower ability: simpler language, more scaffolding, step-by-step.",
+                "🚀 Challenge for higher ability": "Adapt for higher ability: include stretch/challenge tasks and deeper thinking questions.",
+            }.get(regen_style, "")
+            regen_message = f"Lesson updated: {extra_instruction}" if custom_instruction else f"Lesson updated ({regen_style})"
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
 
