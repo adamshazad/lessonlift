@@ -138,7 +138,7 @@ openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 model_name = "gpt-4o-mini"
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# CLEAN MARKDOWN
 # -------------------------------
 def clean_markdown(text):
     import re
@@ -178,7 +178,7 @@ def title_and_tagline():
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 # -------------------------------
-# Exporters (unchanged)
+# PDF / DOCX
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
@@ -207,12 +207,12 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# GENERATOR
+# GENERATE PLAN
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
-        st.error(f"🚫 Daily limit reached.")
+        st.error("🚫 Daily limit reached.")
         return
 
     st.session_state.lesson_count += 1
@@ -246,7 +246,9 @@ Use this format:
                 messages=[{"role": "user", "content": structured_prompt}],
                 max_completion_tokens=1500
             )
-            output = response.choices[0].message["content"].strip()
+
+            # 🔥 FIXED LINE (This was the cause of the error)
+            output = response.choices[0].message.content
 
             clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -291,7 +293,7 @@ SEN Notes: {lesson_data['sen_notes'] or 'None'}
         generate_and_display_plan(prompt, title="Original")
 
 # -------------------------------
-# SIDEBAR HISTORY
+# SIDEBAR
 # -------------------------------
 def show_lesson_history():
     st.sidebar.title("📜 Lesson History")
