@@ -1,9 +1,15 @@
 # -------------------------------
-# Set OpenAI API credentials
+# Set OpenAI API key (hardcoded)
 # -------------------------------
-import os
-import streamlit as st
 import openai
+
+OPENAI_API_KEY = "your_openai_api_key_here"  # <-- replace with your OpenAI key
+openai.api_key = OPENAI_API_KEY
+
+# -------------------------------
+# The rest of your app.py
+# -------------------------------
+import streamlit as st
 import re
 import base64
 from io import BytesIO
@@ -20,7 +26,7 @@ import datetime
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS
+# CSS (scrollable boxes, card styling)
 # -------------------------------
 st.markdown("""
 <style>
@@ -40,8 +46,8 @@ body {background-color: white; color: black;}
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
     line-height: 1.5em;
-    max-height: 300px;   /* limit height */
-    overflow-y: auto;    /* make it scrollable */
+    max-height: 70vh;
+    overflow-y: auto;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -62,17 +68,6 @@ today = datetime.date.today()
 if st.session_state.last_reset_date != today:
     st.session_state.lesson_count = 0
     st.session_state.last_reset_date = today
-
-# -------------------------------
-# OpenAI setup
-# -------------------------------
-api_key = st.secrets.get("openai_api", None)
-if not api_key:
-    st.sidebar.title("🔑 OpenAI API Key Setup")
-    api_key = st.sidebar.text_input("OpenAI API Key", type="password")
-
-if api_key:
-    openai.api_key = api_key
 
 # -------------------------------
 # UI helpers
@@ -135,27 +130,25 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator
+# Generator using OpenAI
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
-    if st.session_state.lesson_count >= 10:
-        st.error("🚫 Daily limit reached. Please try again tomorrow.")
-        return
-
-    if not api_key:
-        st.error("⚠️ No OpenAI API key found. Add it in the sidebar or in st.secrets['openai_api'].")
+    daily_limit = 10
+    if st.session_state.lesson_count >= daily_limit:
+        st.error(f"🚫 Daily limit reached. Please try again tomorrow.")
         return
 
     st.session_state.lesson_count += 1
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            response = openai.chat.completions.create(
+            import openai
+            response = openai.ChatCompletion.create(
                 model="gpt-5.1-mini",
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role":"user","content":prompt}],
                 max_completion_tokens=1500
             )
-            output = response.choices[0].message.content.strip()
+            output = response.choices[0].message.content
             clean_output = strip_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -167,8 +160,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
 
             used = st.session_state.lesson_count
-            remaining = 10 - used
-            st.info(f"📊 {used}/10 lessons used today — {remaining} remaining")
+            remaining = daily_limit - used
+            st.info(f"📊 {used}/{daily_limit} lessons used today — {remaining} remaining")
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -199,11 +192,8 @@ def lesson_generator_page():
     show_logo()
     title_and_tagline()
 
-    if not api_key:
-        st.error("No OpenAI API key found. Add it in the sidebar to generate plans.")
-        return
-
     lesson_data = {}
+
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
