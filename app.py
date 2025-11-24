@@ -13,8 +13,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
-from supabase import create_client, Client
-import json
 
 # -------------------------------
 # Page config
@@ -57,62 +55,6 @@ body {background-color: white; color: black;}
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Supabase setup (login system)
-# -------------------------------
-SUPABASE_URL = st.secrets.get("SUPABASE_URL")
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
-
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-def signup(email, password):
-    if not supabase:
-        st.error("⚠️ Supabase not configured. Cannot sign up.")
-        return
-    try:
-        user = supabase.auth.sign_up({"email": email, "password": password})
-        if user.user:
-            st.success("✅ Signup successful! Please verify your email and login.")
-        else:
-            st.error("⚠️ Signup failed. " + str(user))
-    except Exception as e:
-        st.error(f"⚠️ Signup error: {str(e)}")
-
-def login(email, password):
-    if not supabase:
-        st.error("⚠️ Supabase not configured. Cannot login.")
-        return
-    try:
-        user = supabase.auth.sign_in_with_password({"email": email, "password": password})
-        if user.user:
-            st.session_state.user = user.user
-            st.session_state.authenticated = True
-            st.success("✅ Logged in successfully!")
-        else:
-            st.error("⚠️ Login failed. Check credentials.")
-    except Exception as e:
-        st.error(f"⚠️ Login error: {str(e)}")
-
-# -------------------------------
-# Show login/signup page if not authenticated
-# -------------------------------
-if not st.session_state.authenticated:
-    st.title("🔐 LessonLift Login / Signup")
-    choice = st.radio("Choose action:", ["Login", "Signup"])
-    email = st.text_input("Email")
-    password = st.text_input("Password", type="password")
-    if choice == "Signup":
-        if st.button("Sign Up"):
-            signup(email, password)
-    else:
-        if st.button("Login"):
-            login(email, password)
-    st.stop()
-
-# -------------------------------
 # Session defaults
 # -------------------------------
 if "lesson_history" not in st.session_state:
@@ -142,9 +84,9 @@ model_name = "gpt-4o-mini"
 def clean_markdown(text):
     text = re.sub(r'\|.*\|', '', text)
     text = re.sub(r'#+\s*', '', text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
+    text = re.sub(r'\*(.*?)\*', r'\1')
+    text = re.sub(r'`(.*?)`', r'\1')
     text = re.sub(r'-{2,}', '', text)
     text = re.sub(r'•', '-', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
