@@ -1,9 +1,8 @@
 # -------------------------------
-# OpenAI API setup
+# Set Google service account credentials
 # -------------------------------
 import os
 import streamlit as st
-import openai
 import re
 import base64
 from io import BytesIO
@@ -14,7 +13,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 from supabase import create_client, Client
-import json
+from openai import OpenAI
 
 # -------------------------------
 # Page config
@@ -133,26 +132,29 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# OpenAI GPT setup
+# OpenAI Setup (GPT-4o-mini)
 # -------------------------------
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
+openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 model_name = "gpt-4o-mini"
 
 # -------------------------------
-# Helper functions
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
 def clean_markdown(text):
+    import re
     text = re.sub(r'\|.*\|', '', text)
     text = re.sub(r'#+\s*', '', text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
-    text = re.sub(r'\*(.*?)\*', r'\1')
-    text = re.sub(r'`(.*?)`', r'\1')
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
     text = re.sub(r'-{2,}', '', text)
     text = re.sub(r'•', '-', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
+# -------------------------------
+# LOGO
+# -------------------------------
 def show_logo(path="logo.png", width=200):
     try:
         with open(path, "rb") as f:
@@ -168,7 +170,7 @@ def show_logo(path="logo.png", width=200):
             """,
             unsafe_allow_html=True,
         )
-    except FileNotFoundError:
+    except:
         st.warning("Logo file not found. Please upload 'logo.png' to the app folder.")
 
 def title_and_tagline():
@@ -176,11 +178,12 @@ def title_and_tagline():
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 # -------------------------------
-# Exporters
+# Exporters (unchanged)
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm,
+                            topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
@@ -204,60 +207,58 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator
+# GENERATOR
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
-        st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
+        st.error(f"🚫 Daily limit reached.")
         return
 
     st.session_state.lesson_count += 1
 
-    try:
-        completion = openai.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=2000
-        )
-        output = completion.choices[0].message.content.strip()
-    except Exception as e:
-        st.error(f"⚠️ Lesson plan could not be generated: {e}")
-        return
+    structured_prompt = f"""
+Create a complete UK primary school lesson plan in a structured, teacher-ready template.
 
-    clean_output = clean_markdown(output)
-    st.session_state.lesson_history.append({"title": title, "content": clean_output})
+Use this format:
+1. Lesson Title
+2. Subject
+3. Year Group
+4. Duration
+5. Learning Objectives
+6. Success Criteria
+7. Key Vocabulary
+8. Resources
+9. Starter
+10. Main Input
+11. Main Activity
+12. Plenary
+13. Homework
+14. SEN notes
 
-    if regen_message:
-        st.info(f"🔄 {regen_message}")
+{prompt}
+"""
 
-    remaining_today = daily_limit - st.session_state.lesson_count
-    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
+    with st.spinner("✨ Creating lesson plan..."):
+        try:
+            response = openai_client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": structured_prompt}],
+                max_completion_tokens=1500
+            )
+            output = response.choices[0].message["content"].strip()
 
-    st.markdown(f"### 📖 {title}")
-    st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            clean_output = clean_markdown(output)
+            st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
-    pdf_buffer = create_pdf(clean_output)
-    docx_buffer = create_docx(clean_output)
-    st.markdown(
-        f"""
-        <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-            <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
-            </a>
-            <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
-            </a>
-            <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
-            </a>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+            st.markdown(f"### 📖 {title}")
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+
+        except Exception as e:
+            st.error(f"⚠️ Lesson plan could not be generated: {e}")
 
 # -------------------------------
-# Main generator page
+# MAIN PAGE
 # -------------------------------
 def lesson_generator_page():
     show_logo()
@@ -267,13 +268,13 @@ def lesson_generator_page():
 
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
-        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"], key="year_group")
-        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"], key="ability_level")
-        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"], key="lesson_duration")
-        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science", key="subject")
-        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth", key="topic")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions", key="lo")
-        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters", key="sen")
+        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
+        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
+        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
+        lesson_data['subject'] = st.text_input("Subject")
+        lesson_data['topic'] = st.text_input("Topic")
+        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)")
+        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
@@ -283,50 +284,24 @@ Subject: {lesson_data['subject']}
 Topic: {lesson_data['topic']}
 Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
 Ability Level: {lesson_data['ability_level']}
-Lesson Duration: {lesson_data['lesson_duration']}
-SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
+Duration: {lesson_data['lesson_duration']}
+SEN Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
 
-    if st.session_state.last_prompt:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ],
-            key="regen_style"
-        )
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities",
-            key="custom_instruction"
-        )
-        if st.button("🔁 Regenerate Lesson Plan", key="regen_btn"):
-            extra_instruction = custom_instruction or ""
-            regen_message = f"Lesson updated: {extra_instruction}" if extra_instruction else "Lesson regenerated."
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message=regen_message)
-
 # -------------------------------
-# Sidebar history
+# SIDEBAR HISTORY
 # -------------------------------
 def show_lesson_history():
     st.sidebar.title("📜 Lesson History")
     if st.session_state.lesson_history:
-        for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
+        for entry in reversed(st.session_state.lesson_history):
             with st.sidebar.expander(f"{entry['title']}"):
                 st.markdown(f"<div class='stCard'>{entry['content']}</div>", unsafe_allow_html=True)
-    else:
-        st.sidebar.write("No lesson history yet.")
 
 # -------------------------------
-# Run
+# RUN
 # -------------------------------
 if __name__ == "__main__":
     show_lesson_history()
