@@ -1,5 +1,5 @@
 streamlit==1.38.0
-openai==1.52.2
+openai>=1.52.2
 supabase==2.4.0
 gotrue==2.4.1
 postgrest==0.15.0
