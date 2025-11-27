@@ -68,22 +68,29 @@ if st.session_state.last_reset_date != today:
 # -------------------------------
 # OpenAI API key from secrets
 # -------------------------------
-openai.api_key = st.secrets.get("OPENAI_API_KEY")  # already stored in secrets.toml
+openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Helper functions
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
-def clean_markdown(text):
-    text = re.sub(r'\|.*\|', '', text)
-    text = re.sub(r'#+\s*', '', text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
-    text = re.sub(r'\*(.*?)\*', r'\1')
-    text = re.sub(r'`(.*?)`', r'\1')
+def clean_markdown(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+
+    text = re.sub(r'\|.*?\|', '', text)
+    text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
     text = re.sub(r'-{2,}', '', text)
-    text = re.sub(r'•', '-', text)
+    text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
+
     return text.strip()
 
+# -------------------------------
+# Logo + title
+# -------------------------------
 def show_logo(path="logo.png", width=200):
     try:
         with open(path, "rb") as f:
@@ -100,7 +107,7 @@ def show_logo(path="logo.png", width=200):
             unsafe_allow_html=True,
         )
     except FileNotFoundError:
-        st.warning("Logo file not found. Please upload 'logo.png' to the app folder.")
+        st.warning("Logo file not found. Please upload 'logo.png'.")
 
 def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
@@ -140,7 +147,7 @@ def create_docx(text):
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
-        st.error(f"🚫 Daily limit reached. You can generate {daily_limit} lessons per day for your plan.")
+        st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
 
     st.session_state.lesson_count += 1
@@ -150,17 +157,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
-                max_completion_tokens=1500
             )
             output = response.choices[0].message.content
             clean_output = clean_markdown(output)
+
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
             remaining_today = daily_limit - st.session_state.lesson_count
-            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
+            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
@@ -171,13 +178,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                     <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ TXT</button>
+                        <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ PDF</button>
+                        <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
                     </a>
                     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                        <button style="padding:10px 16px; font-size:14px; border-radius:8px; border:none; background-color:#4CAF50; color:white; cursor:pointer;">⬇ DOCX</button>
+                        <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
                     </a>
                 </div>
                 """,
@@ -247,7 +254,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 def show_lesson_history():
     st.sidebar.title("📜 Lesson History")
     if st.session_state.lesson_history:
-        for i, entry in enumerate(reversed(st.session_state.lesson_history), 1):
+        for entry in reversed(st.session_state.lesson_history):
             with st.sidebar.expander(f"{entry['title']}"):
                 st.markdown(f"<div class='stCard'>{entry['content']}</div>", unsafe_allow_html=True)
     else:
