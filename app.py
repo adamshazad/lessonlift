@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration
+# App.py - LessonLift with OpenAI 1.0+ integration, fixed PDF emojis and UK spelling
 # -------------------------------
 
 import os
@@ -11,6 +11,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from docx import Document
 import datetime
 import openai
@@ -76,7 +78,6 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
-
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -85,7 +86,6 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
-
     return text.strip()
 
 # -------------------------------
@@ -114,13 +114,16 @@ def title_and_tagline():
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 # -------------------------------
-# Exporters
+# Exporters with emoji support
 # -------------------------------
+# Register DejaVu font for emoji support
+pdfmetrics.registerFont(TTFont('DejaVu', 'DejaVuSans.ttf'))
+
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontName='DejaVu', fontSize=11, leading=15, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
@@ -156,7 +159,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         try:
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role":"user","content":"Please use UK English spelling.\n"+prompt}],
             )
             output = response.choices[0].message.content
 
@@ -168,9 +171,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = output.replace("Extension", "⚡ Extension Activity")
             output = output.replace("Support", "🤝 Support")
 
-            # Normalize spacing for neat formatting
-            output = re.sub(r'\n{2,}', '\n\n', output)
-
             clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
@@ -180,11 +180,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            # Display in preview box
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # PDF / DOCX export
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
