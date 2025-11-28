@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration, fixed PDF emojis and UK spelling
+# App.py - LessonLift with OpenAI 1.0+ integration
 # -------------------------------
 
 import os
@@ -11,8 +11,6 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from docx import Document
 import datetime
 import openai
@@ -73,11 +71,13 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# Helper functions
 # -------------------------------
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
+    # Collapse multiple blank lines into one
+    text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -85,8 +85,16 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r'`(.*?)`', r'\1', text)
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
-    text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
+
+def add_emojis(text: str) -> str:
+    text = text.replace("Introduction", "✨ Introduction")
+    text = text.replace("Main Activity", "🛠️ Main Activity")
+    text = text.replace("Closing Activity", "✅ Closing Activity")
+    text = text.replace("Assessment", "📝 Assessment")
+    text = text.replace("Extension", "⚡ Extension Activity")
+    text = text.replace("Support", "🤝 Support")
+    return text
 
 # -------------------------------
 # Logo + title
@@ -114,16 +122,20 @@ def title_and_tagline():
     st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 # -------------------------------
-# Exporters with emoji support
+# Exporters
 # -------------------------------
-# Register DejaVu font for emoji support
-pdfmetrics.registerFont(TTFont('DejaVu', 'DejaVuSans.ttf'))
-
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontName='DejaVu', fontSize=11, leading=15, spaceAfter=6)
+    normal = ParagraphStyle(
+        'NormalFixed',
+        parent=styles['Normal'],
+        fontSize=11,
+        leading=15,
+        spaceAfter=6,
+        fontName="DejaVuSans"  # ensures emojis are rendered in PDF
+    )
     story = []
     for line in text.splitlines():
         if not line.strip():
@@ -150,7 +162,7 @@ def create_docx(text):
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
-        st.error(f"🚫 Daily limit reached. {daily_limit} lessons per day.")
+        st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
 
     st.session_state.lesson_count += 1
@@ -159,19 +171,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         try:
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role":"user","content":"Please use UK English spelling.\n"+prompt}],
+                messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
-
-            # Add emojis to section headers automatically
-            output = output.replace("Introduction", "✨ Introduction")
-            output = output.replace("Main Activity", "🛠️ Main Activity")
-            output = output.replace("Closing Activity", "✅ Closing Activity")
-            output = output.replace("Assessment", "📝 Assessment")
-            output = output.replace("Extension", "⚡ Extension Activity")
-            output = output.replace("Support", "🤝 Support")
-
+            output = add_emojis(output)
             clean_output = clean_markdown(output)
+
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -180,9 +185,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
+            # Preview with emojis and clean spacing
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
+            # PDF / DOCX downloads
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
