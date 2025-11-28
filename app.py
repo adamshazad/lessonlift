@@ -73,7 +73,7 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 # -------------------------------
 # FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
-def clean_markdown(text: str) -> str:
+def clean_markdown(text) -> str:
     if not isinstance(text, str):
         return ""
     text = re.sub(r'\|.*?\|', '', text)
@@ -83,14 +83,9 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r'`(.*?)`', r'\1')
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
-    # Normalize blank lines: max 2 consecutive newlines
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = "\n".join(line.rstrip() for line in text.splitlines())
     return text.strip()
-
-def strip_emojis(text: str) -> str:
-    # Remove emojis for PDF output
-    return re.sub(r'[^\w\s.,;:?!\-()\'"\n]', '', text)
 
 # -------------------------------
 # Logo + title
@@ -126,9 +121,7 @@ def create_pdf(text):
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
-    # Strip emojis for PDF
-    text_no_emoji = strip_emojis(text)
-    for line in text_no_emoji.splitlines():
+    for line in text.splitlines():
         if not line.strip():
             story.append(Spacer(1,6))
         else:
@@ -165,13 +158,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
-            # Add emojis to section headers for preview and downloads
+            # Add emojis to section headers automatically
             output = output.replace("Introduction", "✨ Introduction")
             output = output.replace("Main Activity", "🛠️ Main Activity")
             output = output.replace("Closing Activity", "✅ Closing Activity")
             output = output.replace("Assessment", "📝 Assessment")
             output = output.replace("Extension", "⚡ Extension Activity")
             output = output.replace("Support", "🤝 Support")
+
             clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -182,10 +176,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            # Preview box
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
+            st.markdown(f"### 📖 {title}")
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
