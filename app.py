@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (A2 Style)
+# App.py - LessonLift with OpenAI 1.0+ integration (emoji + spacing fixed)
 # -------------------------------
 
 import os
@@ -71,7 +71,7 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# Fixed clean markdown (preserves emojis + spacing)
 # -------------------------------
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
@@ -81,8 +81,8 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
-    text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
+    # Preserve paragraph spacing (2 newlines)
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
@@ -157,6 +157,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
+            # Add emojis to section headers automatically
+            output = output.replace("Introduction", "✨ Introduction")
+            output = output.replace("Main Activity", "🛠️ Main Activity")
+            output = output.replace("Closing Activity", "✅ Closing Activity")
+            output = output.replace("Assessment", "📝 Assessment")
+            output = output.replace("Extension", "⚡ Extension Activity")
+            output = output.replace("Support", "🤝 Support")
             clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
