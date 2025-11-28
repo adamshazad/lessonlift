@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration
+# App.py - LessonLift with OpenAI 1.0+ integration (A2 Style)
 # -------------------------------
 
 import os
@@ -71,7 +71,7 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean markdown for preview and downloads
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
@@ -150,7 +150,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     st.session_state.lesson_count += 1
 
-    with st.spinner("✨ Generating lesson plan..."):
+    with st.spinner("✨ Creating lesson plan..."):
         try:
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
@@ -167,11 +167,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            # Preview box
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output.replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # Download buttons
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
@@ -195,7 +193,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
 
 # -------------------------------
-# Main page
+# Main generator page
 # -------------------------------
 def lesson_generator_page():
     show_logo()
@@ -256,7 +254,7 @@ def show_lesson_history():
     if st.session_state.lesson_history:
         for entry in reversed(st.session_state.lesson_history):
             with st.sidebar.expander(f"{entry['title']}"):
-                st.markdown(f"<div class='stCard'>{entry['content'].replace(chr(10),'<br>')}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='stCard'>{entry['content']}</div>", unsafe_allow_html=True)
     else:
         st.sidebar.write("No lesson history yet.")
 
