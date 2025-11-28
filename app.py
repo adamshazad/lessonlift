@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration, fixed formatting & PDF emojis
+# App.py - LessonLift with OpenAI 1.0+ integration and emojis for sections
 # -------------------------------
 
 import os
@@ -11,8 +11,6 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase import pdfmetrics
 from docx import Document
 import datetime
 import openai
@@ -73,7 +71,7 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Helper functions
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
@@ -86,15 +84,11 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
-    text = "\n".join([line.strip() for line in text.splitlines()])
     return text.strip()
 
-def normalize_spacing(text: str) -> str:
-    # Ensures consistent spacing in preview & downloads
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    text = "\n".join([line.strip() for line in text.splitlines()])
-    return text
-
+# -------------------------------
+# Logo + title
+# -------------------------------
 def show_logo(path="logo.png", width=200):
     try:
         with open(path, "rb") as f:
@@ -120,13 +114,11 @@ def title_and_tagline():
 # -------------------------------
 # Exporters
 # -------------------------------
-pdfmetrics.registerFont(TTFont('DejaVu', 'DejaVuSans.ttf'))
-
 def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontName='DejaVu', fontSize=11, leading=15, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
@@ -160,24 +152,28 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            # Optionally, you can add emojis here for sections
-            emoji_prompt = prompt.replace("Introduction", "✨ Introduction").replace("Main Activity", "🎯 Main Activity").replace("Closing", "🏁 Closing")
-
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role":"user","content":emoji_prompt}],
+                messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
-            clean_output = clean_markdown(output)
-            clean_output = normalize_spacing(clean_output)
 
+            # Add emojis to section headers automatically
+            output = output.replace("Introduction", "✨ Introduction")
+            output = output.replace("Main Activity", "🛠️ Main Activity")
+            output = output.replace("Closing Activity", "✅ Closing Activity")
+            output = output.replace("Assessment", "📝 Assessment")
+            output = output.replace("Extension", "⚡ Extension Activity")
+            output = output.replace("Support", "🤝 Support")
+
+            clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
             remaining_today = daily_limit - st.session_state.lesson_count
-            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used today — {remaining_today} remaining")
+            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} lessons used — {remaining_today} remaining")
 
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
