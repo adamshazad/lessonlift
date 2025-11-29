@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fixed spacing, bullets, UK English)
+# App.py - LessonLift with OpenAI 1.0+ integration (fixed spacing & format)
 # -------------------------------
 
 import os
@@ -40,11 +40,10 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.4em; /* tighter spacing */
+    line-height: 1.4em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
-    font-family: Arial, sans-serif;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -72,35 +71,20 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# CLEAN FUNCTION (fix spacing, bullets, UK English)
+# Helper functions
 # -------------------------------
-def clean_lesson_text(text: str) -> str:
-    if not isinstance(text, str):
-        return ""
-    # Replace US English with UK English
-    replacements = {
-        "Math ": "Maths ",
-        "color": "colour",
-        "colors": "colours",
-        "center": "centre",
-        "organize": "organise",
-        "organizes": "organises",
-        "favorite": "favourite",
-        "realize": "realise"
-    }
-    for k, v in replacements.items():
-        text = re.sub(r'\b'+k+r'\b', v, text, flags=re.IGNORECASE)
-    # Replace bullets with dashes
-    text = text.replace("•", "-").replace("*", "-")
-    # Remove extra newlines
-    text = re.sub(r'\n{2,}', '\n\n', text)
-    # Strip leading/trailing spaces
-    text = text.strip()
-    return text
+def clean_markdown(text) -> str:
+    text = "" if text is None else str(text)
+    text = re.sub(r'\|.*?\|', '', text)
+    text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'-{2,}', '', text)
+    text = text.replace("•", "-")
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
 
-# -------------------------------
-# Logo + title
-# -------------------------------
 def show_logo(path="logo.png", width=200):
     try:
         with open(path, "rb") as f:
@@ -128,9 +112,11 @@ def title_and_tagline():
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=20*mm, leftMargin=20*mm,
+                            topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=4, fontName="Helvetica")
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=4)
     story = []
     for line in text.splitlines():
         if not line.strip():
@@ -164,25 +150,24 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
+            # Ensure UK spelling via prompt
+            uk_prompt = "Please generate in UK English only. " + prompt
+
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role":"user","content":prompt}],
+                messages=[{"role":"user","content":uk_prompt}],
             )
             output = response.choices[0].message.content
 
-            # Add emojis to section headers
-            emoji_map = {
-                "Introduction": "✨ Introduction",
-                "Main Activity": "🛠️ Main Activity",
-                "Closing Activity": "✅ Closing Activity",
-                "Assessment": "📝 Assessment",
-                "Extension": "⚡ Extension Activity",
-                "Support": "🤝 Support"
-            }
-            for k, v in emoji_map.items():
-                output = re.sub(rf'\b{k}\b', v, output)
+            # Add emojis to section headers for preview & TXT/DOCX
+            output = output.replace("Introduction", "✨ Introduction")
+            output = output.replace("Main Activity", "🛠️ Main Activity")
+            output = output.replace("Closing Activity", "✅ Closing Activity")
+            output = output.replace("Assessment", "📝 Assessment")
+            output = output.replace("Extension", "⚡ Extension Activity")
+            output = output.replace("Support", "🤝 Support")
 
-            clean_output = clean_lesson_text(output)
+            clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
@@ -192,11 +177,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            # Preview box
+            st.markdown(f"{title}\n\n<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # PDF: strip emojis
-            pdf_buffer = create_pdf(re.sub(r'[✨🛠️✅📝⚡🤝]', '', clean_output))
+            # Prepare downloads
+            pdf_text = clean_output
+            for emoji in ["✨","🛠️","✅","📝","⚡","🤝"]:
+                pdf_text = pdf_text.replace(emoji,"")  # remove emojis for PDF
+
+            pdf_buffer = create_pdf(pdf_text)
             docx_buffer = create_docx(clean_output)
 
             st.markdown(
