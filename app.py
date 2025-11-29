@@ -74,7 +74,11 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 # Clean markdown function
 # -------------------------------
 def clean_markdown(text) -> str:
-    text = "" if text is None else str(text)
+    # Ensure text is a string
+    if text is None:
+        text = ""
+    text = str(text)
+
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1')
@@ -82,7 +86,6 @@ def clean_markdown(text) -> str:
     text = re.sub(r'`(.*?)`', r'\1')
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
-    # Normalize spacing: max two line breaks
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
@@ -124,8 +127,7 @@ def create_pdf(text):
         if not line.strip():
             story.append(Spacer(1,6))
         else:
-            # Remove emojis for PDF
-            safe_line = re.sub(r'[✨🛠️✅📝⚡🤝]', '', line)
+            safe_line = re.sub(r'[✨🛠️✅📝⚡🤝]', '', line)  # remove emojis for PDF
             safe_line = safe_line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
             story.append(Paragraph(safe_line, normal))
     doc.build(story)
@@ -158,6 +160,7 @@ EMOJI_MAP = {
 }
 
 def add_emojis(text):
+    text = "" if text is None else str(text)
     for key, val in EMOJI_MAP.items():
         text = re.sub(rf"(?<!\S){key}(?!\S)", val, text)
     return text
@@ -177,9 +180,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         try:
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role":"user","content":prompt}],
+                messages=[{"role":"user","content":str(prompt)}],
             )
-            output = response.choices[0].message.content
+            output = str(response.choices[0].message.content)  # ensure string
             output = add_emojis(output)
             clean_output = clean_markdown(output)
 
