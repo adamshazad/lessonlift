@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration
+# App.py - LessonLift with OpenAI 1.0+ integration (fixed clean_markdown)
 # -------------------------------
 
 import os
@@ -71,10 +71,12 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean markdown function
+# Clean markdown function (fully safe)
 # -------------------------------
 def clean_markdown(text) -> str:
-    text = "" if text is None else str(text)
+    if not isinstance(text, str):
+        text = ""  # fallback for None or invalid type
+
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1')
@@ -158,7 +160,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
-            output = response.choices[0].message.content
+            output = str(response.choices[0].message.content or "")
 
             # Add emojis to section headers for preview & TXT/DOCX
             headers = {
@@ -170,11 +172,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 "Support": "🤝 Support"
             }
             for k, v in headers.items():
-                # Add a line break after header for spacing
-                output = output.replace(f"{k}", f"{v}\n")
+                output = output.replace(f"{k}", f"{v}\n")  # spacing after header
 
             clean_output = clean_markdown(output)
-
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -186,10 +186,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # PDFs: remove emojis, keep British English spelling
             pdf_text = re.sub(r"[✨🛠️✅📝⚡🤝]", "", clean_output)
             pdf_buffer = create_pdf(pdf_text)
             docx_buffer = create_docx(clean_output)
+
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
