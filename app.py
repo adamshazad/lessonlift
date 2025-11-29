@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
+    line-height: 1.5em;  /* reduced spacing */
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,32 +71,18 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# Safe markdown cleaning
 # -------------------------------
-def clean_markdown(text: str) -> str:
-    # Ensure string
-    if not isinstance(text, str):
-        text = ""
-    
-    # Standardize bullets
-    text = text.replace("*", "-")
-    
-    # Remove unnecessary markdown symbols
+def clean_markdown(text) -> str:
+    text = "" if text is None else str(text)
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
     text = re.sub(r'-{2,}', '', text)
-    
-    # Normalize spacing
-    text = re.sub(r'\n{2,}', '\n\n', text)
-    
-    # Add one blank line after headers
-    headers = ["✨ Introduction", "🛠️ Main Activity", "✅ Closing Activity",
-               "📝 Assessment", "⚡ Extension Activity", "🤝 Support"]
-    for h in headers:
-        text = re.sub(f"({h})\n*", r"\1\n\n", text)
-    
+    text = text.replace("•", "-")
+    text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
 # -------------------------------
@@ -131,7 +117,8 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontName='Helvetica', fontSize=11, leading=15, spaceAfter=6)
+    # Use a standard font that supports UK English characters, no emojis
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontName='Helvetica', fontSize=11, leading=14, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
@@ -170,15 +157,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 messages=[{"role":"user","content":prompt}],
             )
             output = str(response.choices[0].message.content)
-            
-            # Add emojis for preview/TXT/DOCX
+
+            # Add emojis only for preview/TXT/DOCX
             output = output.replace("Introduction", "✨ Introduction")
             output = output.replace("Main Activity", "🛠️ Main Activity")
             output = output.replace("Closing Activity", "✅ Closing Activity")
             output = output.replace("Assessment", "📝 Assessment")
             output = output.replace("Extension", "⚡ Extension Activity")
             output = output.replace("Support", "🤝 Support")
-            
+
             clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -189,11 +176,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
+            st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
+            # PDF removes emojis
             pdf_buffer = create_pdf(clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝",""))
             docx_buffer = create_docx(clean_output)
-            
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
