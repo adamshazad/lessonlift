@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration
+# App.py - LessonLift with OpenAI 1.0+ integration (Fixed spacing & emoji handling)
 # -------------------------------
 
 import os
@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em;
+    line-height: 1.4em;  /* Fixed smaller line spacing */
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -66,17 +66,16 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# OpenAI API key from secrets
+# OpenAI API key
 # -------------------------------
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# Clean Markdown
 # -------------------------------
-def clean_markdown(text) -> str:
+def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
-    text = str(text)
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -119,15 +118,13 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
-            story.append(Spacer(1,6))
+            story.append(Spacer(1,4))
         else:
-            # remove emojis for PDF
-            safe_line = line.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝","")
-            safe = safe_line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
             story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
@@ -141,6 +138,22 @@ def create_docx(text):
     doc.save(bio)
     bio.seek(0)
     return bio
+
+# -------------------------------
+# Add emojis to text for preview/TXT/DOCX
+# -------------------------------
+def add_emojis(text):
+    emoji_map = {
+        "Introduction": "✨ Introduction",
+        "Main Activity": "🛠️ Main Activity",
+        "Closing Activity": "✅ Closing Activity",
+        "Assessment": "📝 Assessment",
+        "Extension": "⚡ Extension Activity",
+        "Support": "🤝 Support"
+    }
+    for k,v in emoji_map.items():
+        text = re.sub(rf"\b{k}\b", v, text)
+    return text
 
 # -------------------------------
 # Generator
@@ -160,17 +173,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
+            output = clean_markdown(output)
+            preview_output = add_emojis(output)  # emojis only for preview & TXT/DOCX
 
-            # Add emojis to section headers for preview/TXT/DOCX
-            output = output.replace("Introduction", "✨ Introduction")
-            output = output.replace("Main Activity", "🛠️ Main Activity")
-            output = output.replace("Closing Activity", "✅ Closing Activity")
-            output = output.replace("Assessment", "📝 Assessment")
-            output = output.replace("Extension", "⚡ Extension Activity")
-            output = output.replace("Support", "🤝 Support")
-
-            clean_output = clean_markdown(output)
-            st.session_state.lesson_history.append({"title": title, "content": clean_output})
+            st.session_state.lesson_history.append({"title": title, "content": preview_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -178,15 +184,18 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
+            # Display preview
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{preview_output}</div>", unsafe_allow_html=True)
 
-            pdf_buffer = create_pdf(clean_output)
-            docx_buffer = create_docx(clean_output)
+            # Create downloadables
+            pdf_buffer = create_pdf(output)  # PDF no emojis
+            docx_buffer = create_docx(preview_output)
+
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                    <a href="data:text/plain;base64,{base64.b64encode(preview_output.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
@@ -219,8 +228,8 @@ def lesson_generator_page():
         lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
         lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
         lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="Optional")
-        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="Optional")
+        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
+        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
