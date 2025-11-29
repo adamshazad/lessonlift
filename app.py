@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift Fixed Version
+# App.py - LessonLift with OpenAI 1.0+ integration (fixed spacing & format)
 # -------------------------------
 
 import os
@@ -66,20 +66,21 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# OpenAI API key
+# OpenAI API key from secrets
 # -------------------------------
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean markdown safely
+# Helper: clean markdown
 # -------------------------------
-def clean_markdown(text) -> str:
-    text = "" if text is None else str(text)
+def clean_markdown(text):
+    if not isinstance(text, str):
+        return ""
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
+    text = re.sub(r'\*(.*?)\*', r'\1')
+    text = re.sub(r'`(.*?)`', r'\1')
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
@@ -115,9 +116,7 @@ def title_and_tagline():
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                            rightMargin=20*mm, leftMargin=20*mm,
-                            topMargin=20*mm, bottomMargin=20*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
@@ -157,20 +156,19 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
-            output = str(response.choices[0].message.content)
+            output = response.choices[0].message.content
 
-            # Add emojis for preview/TXT/DOCX only
-            output_preview = output.replace("Introduction", "✨ Introduction") \
-                                   .replace("Main Activity", "🛠️ Main Activity") \
-                                   .replace("Closing Activity", "✅ Closing Activity") \
-                                   .replace("Assessment", "📝 Assessment") \
-                                   .replace("Extension", "⚡ Extension Activity") \
-                                   .replace("Support", "🤝 Support")
+            # Add emojis to section headers
+            output = output.replace("Introduction", "✨ Introduction")
+            output = output.replace("Main Activity", "🛠️ Main Activity")
+            output = output.replace("Closing Activity", "✅ Closing Activity")
+            output = output.replace("Assessment", "📝 Assessment")
+            output = output.replace("Extension", "⚡ Extension Activity")
+            output = output.replace("Support", "🤝 Support")
 
-            clean_output_preview = clean_markdown(output_preview)
-            clean_output_pdf = clean_markdown(output)  # no emojis in PDF
+            clean_output = clean_markdown(output)
 
-            st.session_state.lesson_history.append({"title": title, "content": clean_output_preview})
+            st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -179,14 +177,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output_preview}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            pdf_buffer = create_pdf(clean_output_pdf)
-            docx_buffer = create_docx(clean_output_preview)
+            pdf_text = clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝","")
+            pdf_buffer = create_pdf(pdf_text)
+            docx_buffer = create_docx(clean_output)
+
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output_preview.encode()).decode()}" download="lesson_plan.txt">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
