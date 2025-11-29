@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration
+# App.py - LessonLift with OpenAI 1.0+ integration (Fixed formatting)
 # -------------------------------
 
 import os
@@ -37,10 +37,10 @@ body {background-color: white; color: black;}
     background-color: #f9f9f9 !important;
     color: black !important;
     border-radius: 12px !important;
-    padding: 16px !important;
+    padding: 12px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em;
+    line-height: 1.4em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,35 +71,17 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean and format lesson plan
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
-def clean_lesson_plan(text: str) -> str:
+def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
-    
-    # Normalize newlines
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    
-    # Remove extra blank lines (more than 1)
+    # Remove markdown headers and extra line breaks
+    text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+    # Convert bullets to consistent dash bullets
+    text = re.sub(r'[\*\•]\s+', '- ', text)
+    # Remove extra spacing: max 1 blank line
     text = re.sub(r'\n{3,}', '\n\n', text)
-
-    # Normalize bullet points to '-'
-    text = re.sub(r'^\s*[\*\u2022]\s+', '- ', text, flags=re.MULTILINE)
-
-    # Ensure one blank line before and after section headers (lines ending with ':')
-    lines = text.splitlines()
-    new_lines = []
-    for i, line in enumerate(lines):
-        if line.strip().endswith(":") and (i == 0 or lines[i-1].strip() != ""):
-            new_lines.append("")  # blank line before
-        new_lines.append(line)
-        if i < len(lines)-1 and lines[i+1].strip() != "":
-            new_lines.append("")  # blank line after
-    text = "\n".join(new_lines)
-
-    # Remove excessive trailing whitespace
-    text = re.sub(r'[ \t]+$', '', text, flags=re.MULTILINE)
-
     return text.strip()
 
 # -------------------------------
@@ -134,11 +116,11 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=4)
     story = []
     for line in text.splitlines():
         if not line.strip():
-            story.append(Spacer(1,6))
+            story.append(Spacer(1,4))
         else:
             safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
             story.append(Paragraph(safe, normal))
@@ -174,15 +156,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
             output = response.choices[0].message.content
 
-            # Add emojis to preview and DOCX only
-            output_with_emojis = output.replace("Introduction", "✨ Introduction")
-            output_with_emojis = output_with_emojis.replace("Main Activity", "🛠️ Main Activity")
-            output_with_emojis = output_with_emojis.replace("Closing Activity", "✅ Closing Activity")
-            output_with_emojis = output_with_emojis.replace("Assessment", "📝 Assessment")
-            output_with_emojis = output_with_emojis.replace("Extension", "⚡ Extension Activity")
-            output_with_emojis = output_with_emojis.replace("Support", "🤝 Support")
+            # Add emojis to section headers for preview and DOCX
+            output = output.replace("Introduction", "✨ Introduction")
+            output = output.replace("Main Activity", "🛠️ Main Activity")
+            output = output.replace("Closing Activity", "✅ Closing Activity")
+            output = output.replace("Assessment", "📝 Assessment")
+            output = output.replace("Extension", "⚡ Extension Activity")
+            output = output.replace("Support", "🤝 Support")
 
-            clean_output = clean_lesson_plan(output_with_emojis)
+            clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
@@ -192,12 +174,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
+            st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # PDF without emojis
-            pdf_buffer = create_pdf(clean_lesson_plan(output))
+            # PDF: remove emojis
+            pdf_text = clean_output
+            for emoji in ["✨","🛠️","✅","📝","⚡","🤝"]:
+                pdf_text = pdf_text.replace(emoji, "")
+            pdf_buffer = create_pdf(pdf_text)
             docx_buffer = create_docx(clean_output)
-
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
