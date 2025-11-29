@@ -71,25 +71,24 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# FIXED CLEAN MARKDOWN FUNCTION (Permanent sub() fix)
 # -------------------------------
 def clean_markdown(text) -> str:
-    # Ensure input is always a string
-    if not text or not isinstance(text, str):
+    try:
         text = str(text or "")
-
-    text = re.sub(r'\|.*?\|', '', text)
-    text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
-    text = re.sub(r'\*(.*?)\*', r'\1')
-    text = re.sub(r'`(.*?)`', r'\1')
-    text = re.sub(r'-{2,}', '', text)
-    text = text.replace("•", "-")
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    text = text.strip()
-    # Force British spelling
-    text = text.replace("color", "colour").replace("center", "centre")
-    return text
+        text = re.sub(r'\|.*?\|', '', text)
+        text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        text = re.sub(r'\*(.*?)\*', r'\1', text)
+        text = re.sub(r'`(.*?)`', r'\1', text)
+        text = re.sub(r'-{2,}', '', text)
+        text = text.replace("•", "-")
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        # British spelling
+        text = text.replace("color", "colour").replace("center", "centre")
+    except Exception:
+        return ""
+    return text.strip()
 
 # -------------------------------
 # Logo + title
@@ -161,7 +160,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
-            output = response.choices[0].message.content or ""
+            output = response.choices[0].message.content
+
             # Add emojis to section headers automatically for preview & TXT/DOCX
             output = output.replace("Introduction", "✨ Introduction")
             output = output.replace("Main Activity", "🛠️ Main Activity")
@@ -169,8 +169,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = output.replace("Assessment", "📝 Assessment")
             output = output.replace("Extension", "⚡ Extension Activity")
             output = output.replace("Support", "🤝 Support")
-            clean_output = clean_markdown(output)
 
+            clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -184,6 +184,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
             pdf_buffer = create_pdf(clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝",""))
             docx_buffer = create_docx(clean_output)
+
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
