@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (Fixed Formatting)
+# App.py - LessonLift with OpenAI 1.0+ integration
 # -------------------------------
 
 import os
@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
+    line-height: 1.6em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,19 +71,20 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean markdown function with proper spacing
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
 def clean_markdown(text) -> str:
-    text = "" if text is None else str(text)
+    if not isinstance(text, str):
+        return ""
+    text = str(text)
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
     text = re.sub(r'-{2,}', '', text)
-    text = text.replace('•','-')
-    # Normalize spacing: max 1 blank line between sections
-    text = re.sub(r'\n{2,}', '\n\n', text)
+    text = text.replace("•", "-")
+    text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
 # -------------------------------
@@ -118,14 +119,14 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=4, fontName='Helvetica')
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
             story.append(Spacer(1,6))
         else:
-            # Remove emojis for PDF
-            safe_line = line.replace('✨','').replace('🛠️','').replace('✅','').replace('📝','').replace('⚡','').replace('🤝','')
+            # remove emojis for PDF
+            safe_line = line.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝","")
             safe = safe_line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
             story.append(Paragraph(safe, normal))
     doc.build(story)
@@ -154,16 +155,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            # Force UK English and detailed instructions
-            prompt += "\nPlease provide UK English spelling and detailed step-by-step activities with materials, differentiation, assessment, and extension activities. Use dashes '-' for bullet points and include one blank line after section titles."
-
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
 
-            # Add emojis to section headers for preview and TXT/DOCX
+            # Add emojis to section headers for preview/TXT/DOCX
             output = output.replace("Introduction", "✨ Introduction")
             output = output.replace("Main Activity", "🛠️ Main Activity")
             output = output.replace("Closing Activity", "✅ Closing Activity")
@@ -221,8 +219,8 @@ def lesson_generator_page():
         lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
         lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
         lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
-        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
+        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="Optional")
+        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="Optional")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
