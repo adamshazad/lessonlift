@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em;
+    line-height: 1.4em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,13 +71,18 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean Markdown for consistent formatting
+# Clean markdown function
 # -------------------------------
-def clean_markdown(text) -> str:
+def clean_markdown(text):
     text = "" if text is None else str(text)
-    # Normalize spacing
+    text = re.sub(r'\|.*?\|', '', text)
+    text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'-{2,}', '', text)
+    text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
-    text = text.replace("•", "-")  # use dashes for bullet points
     return text.strip()
 
 # -------------------------------
@@ -90,9 +95,9 @@ def show_logo(path="logo.png", width=200):
         b64 = base64.b64encode(data).decode()
         st.markdown(
             f"""
-            <div style="display:flex; justify-content:center; align-items:center; margin-bottom:16px;">
-                <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
-                    <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;" />
+            <div style='display:flex; justify-content:center; align-items:center; margin-bottom:16px;'>
+                <div style='box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;'>
+                    <img src='data:image/png;base64,{b64}' width='{width}' style='border-radius:12px;' />
                 </div>
             </div>
             """,
@@ -112,13 +117,13 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=4)
     story = []
     for line in text.splitlines():
         if not line.strip():
             story.append(Spacer(1,6))
         else:
-            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            safe = line.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
             story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
@@ -152,17 +157,18 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
             output = response.choices[0].message.content
 
-            # Add emojis for preview & TXT/DOCX
-            output = output.replace("Introduction", "✨ Introduction")
-            output = output.replace("Main Activity", "🛠️ Main Activity")
-            output = output.replace("Closing Activity", "✅ Closing Activity")
-            output = output.replace("Assessment", "📝 Assessment")
-            output = output.replace("Extension", "⚡ Extension Activity")
-            output = output.replace("Support", "🤝 Support")
+            # Add emojis for preview and DOCX/TXT only
+            output_with_emojis = output.replace("Introduction", "✨ Introduction")
+            output_with_emojis = output_with_emojis.replace("Main Activity", "🛠️ Main Activity")
+            output_with_emojis = output_with_emojis.replace("Closing Activity", "✅ Closing Activity")
+            output_with_emojis = output_with_emojis.replace("Assessment", "📝 Assessment")
+            output_with_emojis = output_with_emojis.replace("Extension", "⚡ Extension Activity")
+            output_with_emojis = output_with_emojis.replace("Support", "🤝 Support")
 
-            clean_output = clean_markdown(output)
+            clean_output_preview = clean_markdown(output_with_emojis)
+            clean_output_pdf = clean_markdown(output)  # PDF no emojis
 
-            st.session_state.lesson_history.append({"title": title, "content": clean_output})
+            st.session_state.lesson_history.append({"title": title, "content": clean_output_preview})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -170,27 +176,23 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-weight:bold; font-size:18px; margin-bottom:6px;'>{title}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output_preview}</div>", unsafe_allow_html=True)
 
-            # PDF removes emojis; DOCX/TXT keep emojis
-            pdf_text = clean_output
-            for e in ["✨","🛠️","✅","📝","⚡","🤝"]:
-                pdf_text = pdf_text.replace(e,"")
-            pdf_buffer = create_pdf(pdf_text)
-            docx_buffer = create_docx(clean_output)
+            pdf_buffer = create_pdf(clean_output_pdf)
+            docx_buffer = create_docx(clean_output_preview)
 
             st.markdown(
                 f"""
-                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
+                <div style='display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;'>
+                    <a href='data:text/plain;base64,{base64.b64encode(clean_output_preview.encode()).decode()}' download='lesson_plan.txt'>
+                        <button style='padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;'>⬇ TXT</button>
                     </a>
-                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+                    <a href='data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}' download='lesson_plan.pdf'>
+                        <button style='padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;'>⬇ PDF</button>
                     </a>
-                    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                        <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+                    <a href='data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}' download='lesson_plan.docx'>
+                        <button style='padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;'>⬇ DOCX</button>
                     </a>
                 </div>
                 """,
