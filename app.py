@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (Fixed formatting)
+# App.py - LessonLift with OpenAI 1.0+ integration (Updated format)
 # -------------------------------
 
 import os
@@ -37,10 +37,10 @@ body {background-color: white; color: black;}
     background-color: #f9f9f9 !important;
     color: black !important;
     border-radius: 12px !important;
-    padding: 12px !important;
+    padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.4em;
+    line-height: 1.6em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -66,21 +66,24 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# OpenAI API key from secrets
+# OpenAI API key
 # -------------------------------
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# Clean Markdown Function
 # -------------------------------
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
-    # Remove markdown headers and extra line breaks
+
+    text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    # Convert bullets to consistent dash bullets
-    text = re.sub(r'[\*\•]\s+', '- ', text)
-    # Remove extra spacing: max 1 blank line
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'-{2,}', '-', text)  # replace extra dashes with single dash
+    text = text.replace('•', '-')  # replace bullets with dash
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
@@ -105,6 +108,7 @@ def show_logo(path="logo.png", width=200):
     except FileNotFoundError:
         st.warning("Logo file not found. Please upload 'logo.png'.")
 
+
 def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
     st.write("Generate tailored UK primary school lesson plans in seconds!")
@@ -116,17 +120,18 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=4)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
-            story.append(Spacer(1,4))
+            story.append(Spacer(1,6))
         else:
-            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            safe = line.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
             story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
     return buffer
+
 
 def create_docx(text):
     doc = Document()
@@ -155,15 +160,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
-
-            # Add emojis to section headers for preview and DOCX
-            output = output.replace("Introduction", "✨ Introduction")
-            output = output.replace("Main Activity", "🛠️ Main Activity")
-            output = output.replace("Closing Activity", "✅ Closing Activity")
-            output = output.replace("Assessment", "📝 Assessment")
-            output = output.replace("Extension", "⚡ Extension Activity")
-            output = output.replace("Support", "🤝 Support")
-
             clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -174,14 +170,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # PDF: remove emojis
-            pdf_text = clean_output
-            for emoji in ["✨","🛠️","✅","📝","⚡","🤝"]:
-                pdf_text = pdf_text.replace(emoji, "")
-            pdf_buffer = create_pdf(pdf_text)
+            pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
             st.markdown(
                 f"""
@@ -219,8 +210,6 @@ def lesson_generator_page():
         lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
         lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
         lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
-        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
@@ -228,34 +217,11 @@ def lesson_generator_page():
 Year Group: {lesson_data['year_group']}
 Subject: {lesson_data['subject']}
 Topic: {lesson_data['topic']}
-Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
-Ability Level: {lesson_data['ability_level']}
 Lesson Duration: {lesson_data['lesson_duration']}
-SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
+Ability Level: {lesson_data['ability_level']}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original")
-
-    if st.session_state.last_prompt:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ]
-        )
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities"
-        )
-        if st.button("🔁 Regenerate Lesson Plan"):
-            extra_instruction = custom_instruction if custom_instruction else regen_style
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}")
 
 # -------------------------------
 # Sidebar history
