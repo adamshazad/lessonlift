@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em;
+    line-height: 1.5em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,14 +71,10 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean markdown function
+# Clean Markdown safely
 # -------------------------------
 def clean_markdown(text) -> str:
-    # Ensure text is a string
-    if text is None:
-        text = ""
-    text = str(text)
-
+    text = "" if text is None else str(text)
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1')
@@ -121,22 +117,21 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontName='Helvetica', fontSize=11, leading=15, spaceAfter=6)
     story = []
-    for line in text.splitlines():
+    for line in str(text).splitlines():
         if not line.strip():
             story.append(Spacer(1,6))
         else:
-            safe_line = re.sub(r'[✨🛠️✅📝⚡🤝]', '', line)  # remove emojis for PDF
-            safe_line = safe_line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-            story.append(Paragraph(safe_line, normal))
+            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
     return buffer
 
 def create_docx(text):
     doc = Document()
-    for line in text.splitlines():
+    for line in str(text).splitlines():
         doc.add_paragraph(line.rstrip())
     bio = BytesIO()
     doc.save(bio)
@@ -144,25 +139,16 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Emoji mapping for headers
+# Add emojis for preview/TXT/DOCX
 # -------------------------------
-EMOJI_MAP = {
-    "Starter Activity": "🏁 Starter Activity",
-    "Introduction": "✨ Introduction",
-    "Main Activity": "🛠️ Main Activity",
-    "Guided Practice": "🧩 Guided Practice",
-    "Independent Practice": "📚 Independent Practice",
-    "Plenary": "✅ Closing Activity",
-    "Closing Activity": "✅ Closing Activity",
-    "Assessment": "📝 Assessment",
-    "Extension Activity": "⚡ Extension Activity",
-    "Support": "🤝 Support"
-}
-
 def add_emojis(text):
-    text = "" if text is None else str(text)
-    for key, val in EMOJI_MAP.items():
-        text = re.sub(rf"(?<!\S){key}(?!\S)", val, text)
+    text = str(text)
+    text = text.replace("Introduction", "✨ Introduction")
+    text = text.replace("Main Activity", "🛠️ Main Activity")
+    text = text.replace("Closing Activity", "✅ Closing Activity")
+    text = text.replace("Assessment", "📝 Assessment")
+    text = text.replace("Extension", "⚡ Extension Activity")
+    text = text.replace("Support", "🤝 Support")
     return text
 
 # -------------------------------
@@ -182,8 +168,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":str(prompt)}],
             )
-            output = str(response.choices[0].message.content)  # ensure string
-            output = add_emojis(output)
+            output = str(response.choices[0].message.content)
+            output = add_emojis(output)  # Add emojis for preview/TXT/DOCX
             clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
@@ -194,10 +180,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
+            # Preview box
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            pdf_buffer = create_pdf(clean_output)
+            # Downloads: PDF without emojis, DOCX/TXT with emojis
+            pdf_buffer = create_pdf(clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝",""))
             docx_buffer = create_docx(clean_output)
             st.markdown(
                 f"""
@@ -270,7 +258,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         )
         if st.button("🔁 Regenerate Lesson Plan"):
             extra_instruction = custom_instruction if custom_instruction else regen_style
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
+            new_prompt = str(st.session_state.last_prompt) + "\n\n" + str(extra_instruction)
             generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}")
 
 # -------------------------------
