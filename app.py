@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fixed formatting)
+# App.py - LessonLift with OpenAI 1.0+ integration
 # -------------------------------
 
 import os
@@ -9,8 +9,8 @@ import base64
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
 import datetime
 import openai
@@ -71,22 +71,33 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean and normalize text for consistent formatting
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
-def clean_markdown(text) -> str:
-    text = "" if text is None else str(text)
+def clean_markdown(text: str) -> str:
+    # Ensure string
+    if not isinstance(text, str):
+        text = ""
+    
+    # Standardize bullets
+    text = text.replace("*", "-")
+    
+    # Remove unnecessary markdown symbols
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
-    text = re.sub(r'-{2,}', '-', text)
-    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r'-{2,}', '', text)
+    
+    # Normalize spacing
+    text = re.sub(r'\n{2,}', '\n\n', text)
+    
+    # Add one blank line after headers
+    headers = ["✨ Introduction", "🛠️ Main Activity", "✅ Closing Activity",
+               "📝 Assessment", "⚡ Extension Activity", "🤝 Support"]
+    for h in headers:
+        text = re.sub(f"({h})\n*", r"\1\n\n", text)
+    
     return text.strip()
-
-def normalize_bullets(text: str) -> str:
-    text = text.replace("*", "-")
-    return text
 
 # -------------------------------
 # Logo + title
@@ -120,14 +131,7 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle(
-        'NormalFixed',
-        parent=styles['Normal'],
-        fontName='DejaVuSans',
-        fontSize=11,
-        leading=15,
-        spaceAfter=6
-    )
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontName='Helvetica', fontSize=11, leading=15, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
@@ -165,8 +169,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
-            output = response.choices[0].message.content
-
+            output = str(response.choices[0].message.content)
+            
             # Add emojis for preview/TXT/DOCX
             output = output.replace("Introduction", "✨ Introduction")
             output = output.replace("Main Activity", "🛠️ Main Activity")
@@ -174,11 +178,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = output.replace("Assessment", "📝 Assessment")
             output = output.replace("Extension", "⚡ Extension Activity")
             output = output.replace("Support", "🤝 Support")
+            
+            clean_output = clean_markdown(output)
 
-            output = clean_markdown(output)
-            output = normalize_bullets(output)
-
-            st.session_state.lesson_history.append({"title": title, "content": output})
+            st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -186,16 +189,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            st.markdown(f"<div class='stCard'>{output}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # PDF: remove emojis, normalize spacing
-            pdf_buffer = create_pdf(output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝",""))
-            docx_buffer = create_docx(output)
-
+            pdf_buffer = create_pdf(clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝",""))
+            docx_buffer = create_docx(clean_output)
+            
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(output.encode()).decode()}" download="lesson_plan.txt">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
