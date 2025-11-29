@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration
+# App.py - LessonLift Fixed Version
 # -------------------------------
 
 import os
@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em;
+    line-height: 1.5em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -66,28 +66,23 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# OpenAI API key from secrets
+# OpenAI API key
 # -------------------------------
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION (Permanent sub() fix)
+# Clean markdown safely
 # -------------------------------
 def clean_markdown(text) -> str:
-    try:
-        text = str(text or "")
-        text = re.sub(r'\|.*?\|', '', text)
-        text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-        text = re.sub(r'\*(.*?)\*', r'\1', text)
-        text = re.sub(r'`(.*?)`', r'\1', text)
-        text = re.sub(r'-{2,}', '', text)
-        text = text.replace("•", "-")
-        text = re.sub(r'\n{3,}', '\n\n', text)
-        # British spelling
-        text = text.replace("color", "colour").replace("center", "centre")
-    except Exception:
-        return ""
+    text = "" if text is None else str(text)
+    text = re.sub(r'\|.*?\|', '', text)
+    text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'-{2,}', '', text)
+    text = text.replace("•", "-")
+    text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
 # -------------------------------
@@ -120,7 +115,9 @@ def title_and_tagline():
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=20*mm, leftMargin=20*mm,
+                            topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
     normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
@@ -160,18 +157,20 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
-            output = response.choices[0].message.content
+            output = str(response.choices[0].message.content)
 
-            # Add emojis to section headers automatically for preview & TXT/DOCX
-            output = output.replace("Introduction", "✨ Introduction")
-            output = output.replace("Main Activity", "🛠️ Main Activity")
-            output = output.replace("Closing Activity", "✅ Closing Activity")
-            output = output.replace("Assessment", "📝 Assessment")
-            output = output.replace("Extension", "⚡ Extension Activity")
-            output = output.replace("Support", "🤝 Support")
+            # Add emojis for preview/TXT/DOCX only
+            output_preview = output.replace("Introduction", "✨ Introduction") \
+                                   .replace("Main Activity", "🛠️ Main Activity") \
+                                   .replace("Closing Activity", "✅ Closing Activity") \
+                                   .replace("Assessment", "📝 Assessment") \
+                                   .replace("Extension", "⚡ Extension Activity") \
+                                   .replace("Support", "🤝 Support")
 
-            clean_output = clean_markdown(output)
-            st.session_state.lesson_history.append({"title": title, "content": clean_output})
+            clean_output_preview = clean_markdown(output_preview)
+            clean_output_pdf = clean_markdown(output)  # no emojis in PDF
+
+            st.session_state.lesson_history.append({"title": title, "content": clean_output_preview})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -180,15 +179,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output_preview}</div>", unsafe_allow_html=True)
 
-            pdf_buffer = create_pdf(clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝",""))
-            docx_buffer = create_docx(clean_output)
-
+            pdf_buffer = create_pdf(clean_output_pdf)
+            docx_buffer = create_docx(clean_output_preview)
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output_preview.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
