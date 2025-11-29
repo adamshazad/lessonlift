@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (Fixed)
+# App.py - LessonLift with OpenAI 1.0+ integration
 # -------------------------------
 
 import os
@@ -71,17 +71,15 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# Clean markdown function
 # -------------------------------
 def clean_markdown(text) -> str:
-    # Force text to be a string
     text = "" if text is None else str(text)
-
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
+    text = re.sub(r'\*(.*?)\*', r'\1')
+    text = re.sub(r'`(.*?)`', r'\1')
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
@@ -117,10 +115,12 @@ def title_and_tagline():
 # -------------------------------
 def create_pdf(text):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=20*mm, leftMargin=20*mm,
+                            topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    # Use normal style compatible with PDF
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'],
+                            fontName='Helvetica', fontSize=11, leading=15, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
@@ -158,21 +158,22 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
-
             output = response.choices[0].message.content
-            # Safety check
-            if not output:
-                output = "⚠️ The model returned no content."
 
-            # Add emojis for preview, TXT, DOCX only
-            output_with_emojis = output.replace("Introduction", "✨ Introduction")
-            output_with_emojis = output_with_emojis.replace("Main Activity", "🛠️ Main Activity")
-            output_with_emojis = output_with_emojis.replace("Closing Activity", "✅ Closing Activity")
-            output_with_emojis = output_with_emojis.replace("Assessment", "📝 Assessment")
-            output_with_emojis = output_with_emojis.replace("Extension", "⚡ Extension Activity")
-            output_with_emojis = output_with_emojis.replace("Support", "🤝 Support")
+            # Add emojis to section headers for preview & TXT/DOCX
+            headers = {
+                "Introduction": "✨ Introduction",
+                "Main Activity": "🛠️ Main Activity",
+                "Closing Activity": "✅ Closing Activity",
+                "Assessment": "📝 Assessment",
+                "Extension": "⚡ Extension Activity",
+                "Support": "🤝 Support"
+            }
+            for k, v in headers.items():
+                # Add a line break after header for spacing
+                output = output.replace(f"{k}", f"{v}\n")
 
-            clean_output = clean_markdown(output_with_emojis)
+            clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
@@ -182,12 +183,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            # Preview box with emojis
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # Downloads
-            pdf_text = clean_markdown(output)  # Remove emojis for PDF
+            # PDFs: remove emojis, keep British English spelling
+            pdf_text = re.sub(r"[✨🛠️✅📝⚡🤝]", "", clean_output)
             pdf_buffer = create_pdf(pdf_text)
             docx_buffer = create_docx(clean_output)
             st.markdown(
