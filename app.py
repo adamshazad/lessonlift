@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (Fixed clean_markdown)
+# App.py - LessonLift with OpenAI 1.0+ integration (Formatted & Fixed)
 # -------------------------------
 
 import os
@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em;
+    line-height: 1.5em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,10 +71,9 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# Clean markdown & English spelling fix
 # -------------------------------
 def clean_markdown(text) -> str:
-    # Force text to be a string safely
     if not text:
         text = ""
     elif not isinstance(text, str):
@@ -82,15 +81,17 @@ def clean_markdown(text) -> str:
             text = str(text)
         except:
             text = ""
-    # Now safe to run regex
+    # Standardize bullet points and spacing
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
+    text = re.sub(r'\*(.*?)\*', r'\1')
+    text = re.sub(r'`(.*?)`', r'\1')
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
+    # Force British English
+    text = text.replace("color", "colour").replace("center", "centre")
     return text.strip()
 
 # -------------------------------
@@ -164,15 +165,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
-            # Add emojis to section headers for preview/TXT/DOCX
+
+            # Add emojis for preview/TXT/DOCX
             output = output.replace("Introduction", "✨ Introduction")
             output = output.replace("Main Activity", "🛠️ Main Activity")
             output = output.replace("Closing Activity", "✅ Closing Activity")
             output = output.replace("Assessment", "📝 Assessment")
             output = output.replace("Extension", "⚡ Extension Activity")
             output = output.replace("Support", "🤝 Support")
-            clean_output = clean_markdown(output)
 
+            clean_output = clean_markdown(output)
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -185,7 +187,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
             # PDF removes emojis for compatibility
-            pdf_text = clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝","")
+            pdf_text = re.sub(r"[✨🛠️✅📝⚡🤝]", "", clean_output)
             pdf_buffer = create_pdf(pdf_text)
             docx_buffer = create_docx(clean_output)
 
