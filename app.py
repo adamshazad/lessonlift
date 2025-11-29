@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (Updated for Perfect Formatting)
+# App.py - LessonLift with OpenAI 1.0+ integration (Fixed formatting)
 # -------------------------------
 
 import os
@@ -25,14 +25,6 @@ st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered
 # -------------------------------
 st.markdown("""
 <style>
-body {background-color: white; color: black;}
-.stTextInput>div>div>input, textarea, select {
-    background-color: white !important;
-    color: black !important;
-    border: 1px solid #ccc !important;
-    padding: 8px !important;
-    border-radius: 5px !important;
-}
 .stCard {
     background-color: #f9f9f9 !important;
     color: black !important;
@@ -40,7 +32,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.4em;
+    line-height: 1.4em !important;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,31 +63,24 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# Clean markdown
 # -------------------------------
-def clean_markdown(text: str, for_download=False) -> str:
+def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
-    text = str(text)
-
-    # Remove Markdown headers, bold, italics, code formatting
+    text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
-
-    # Replace any bullet variations with simple dash
-    text = re.sub(r'•', '-', text)
-
-    # Remove emojis for downloads
-    if for_download:
-        text = re.sub(r'[✨🛠️✅📝⚡🤝]', '', text)
-
-    # Reduce multiple newlines to single blank line
-    text = re.sub(r'\n{3,}', '\n\n', text)
-
-    # Trim spaces
-    return text.strip()
+    text = re.sub(r'-{2,}', '', text)
+    text = text.replace("•", "-")
+    # Normalize spacing: 1 empty line between bullets, 2 empty lines between sections
+    lines = text.splitlines()
+    cleaned = []
+    for line in lines:
+        cleaned.append(line.rstrip())
+    return "\n".join(cleaned)
 
 # -------------------------------
 # Logo + title
@@ -129,11 +114,11 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=4)
     story = []
     for line in text.splitlines():
         if not line.strip():
-            story.append(Spacer(1,6))
+            story.append(Spacer(1,4))
         else:
             safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
             story.append(Paragraph(safe, normal))
@@ -169,13 +154,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
             output = response.choices[0].message.content
 
-            # Preview keeps emojis
-            preview_output = clean_markdown(output, for_download=False)
+            # Add preview emojis for titles only
+            preview_output = output.replace("Introduction", "✨ Introduction") \
+                                   .replace("Main Activity", "🛠️ Main Activity") \
+                                   .replace("Closing", "✅ Closing") \
+                                   .replace("Assessment", "📝 Assessment") \
+                                   .replace("Extension", "⚡ Extension Activity") \
+                                   .replace("Support", "🤝 Support")
 
-            # Downloads remove emojis
-            download_output = clean_markdown(output, for_download=True)
+            clean_output = clean_markdown(output)
 
-            st.session_state.lesson_history.append({"title": title, "content": preview_output})
+            st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -186,12 +175,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{preview_output}</div>", unsafe_allow_html=True)
 
-            pdf_buffer = create_pdf(download_output)
-            docx_buffer = create_docx(download_output)
+            pdf_buffer = create_pdf(clean_output)
+            docx_buffer = create_docx(clean_output)
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(download_output.encode()).decode()}" download="lesson_plan.txt">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
