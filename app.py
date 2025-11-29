@@ -21,7 +21,7 @@ import openai
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (scrollable box) - FIXED SPACING
+# CSS (scrollable box)
 # -------------------------------
 st.markdown("""
 <style>
@@ -37,10 +37,10 @@ body {background-color: white; color: black;}
     background-color: #f9f9f9 !important;
     color: black !important;
     border-radius: 12px !important;
-    padding: 10px !important;       /* reduced padding */
-    margin-bottom: 8px !important;  /* smaller margin */
+    padding: 16px !important;
+    margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.3em;             /* tighter spacing */
+    line-height: 1.6em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,20 +71,34 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# FIXED CLEAN MARKDOWN FUNCTION
+# Clean and format lesson plan
 # -------------------------------
-def clean_markdown(text: str) -> str:
+def clean_lesson_plan(text: str) -> str:
     if not isinstance(text, str):
         return ""
-
-    text = re.sub(r'\|.*?\|', '', text)
-    text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
-    text = re.sub(r'-{2,}', '', text)
-    text = text.replace("•", "-")
+    
+    # Normalize newlines
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    
+    # Remove extra blank lines (more than 1)
     text = re.sub(r'\n{3,}', '\n\n', text)
+
+    # Normalize bullet points to '-'
+    text = re.sub(r'^\s*[\*\u2022]\s+', '- ', text, flags=re.MULTILINE)
+
+    # Ensure one blank line before and after section headers (lines ending with ':')
+    lines = text.splitlines()
+    new_lines = []
+    for i, line in enumerate(lines):
+        if line.strip().endswith(":") and (i == 0 or lines[i-1].strip() != ""):
+            new_lines.append("")  # blank line before
+        new_lines.append(line)
+        if i < len(lines)-1 and lines[i+1].strip() != "":
+            new_lines.append("")  # blank line after
+    text = "\n".join(new_lines)
+
+    # Remove excessive trailing whitespace
+    text = re.sub(r'[ \t]+$', '', text, flags=re.MULTILINE)
 
     return text.strip()
 
@@ -159,7 +173,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
-            clean_output = clean_markdown(output)
+
+            # Add emojis to preview and DOCX only
+            output_with_emojis = output.replace("Introduction", "✨ Introduction")
+            output_with_emojis = output_with_emojis.replace("Main Activity", "🛠️ Main Activity")
+            output_with_emojis = output_with_emojis.replace("Closing Activity", "✅ Closing Activity")
+            output_with_emojis = output_with_emojis.replace("Assessment", "📝 Assessment")
+            output_with_emojis = output_with_emojis.replace("Extension", "⚡ Extension Activity")
+            output_with_emojis = output_with_emojis.replace("Support", "🤝 Support")
+
+            clean_output = clean_lesson_plan(output_with_emojis)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
@@ -169,11 +192,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            pdf_buffer = create_pdf(clean_output)
+            # PDF without emojis
+            pdf_buffer = create_pdf(clean_lesson_plan(output))
             docx_buffer = create_docx(clean_output)
+
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
