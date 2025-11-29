@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fixed spacing & format)
+# App.py - LessonLift with OpenAI 1.0+ integration (fixed re.sub bug)
 # -------------------------------
 
 import os
@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
+    line-height: 1.6em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,19 +71,37 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Helper: clean markdown
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
-def clean_markdown(text):
-    if not isinstance(text, str):
+def clean_markdown(text) -> str:
+    """
+    Robust markdown cleaner.
+    Guarantees 'text' is a string and always passes it as the third argument to re.sub.
+    This prevents 'sub() missing 1 required positional argument: string' errors.
+    """
+    if text is None:
         return ""
+    # Ensure we operate on a string
+    text = str(text)
+
+    # Remove pipe table lines
     text = re.sub(r'\|.*?\|', '', text)
+
+    # Remove markdown headers
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
-    text = re.sub(r'\*(.*?)\*', r'\1')
-    text = re.sub(r'`(.*?)`', r'\1')
+
+    # Bold/italic/code => plain
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
+
+    # Remove long dashes, convert bullets
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
+
+    # Collapse many blank lines to two
     text = re.sub(r'\n{3,}', '\n\n', text)
+
     return text.strip()
 
 # -------------------------------
@@ -105,7 +123,7 @@ def show_logo(path="logo.png", width=200):
             unsafe_allow_html=True,
         )
     except FileNotFoundError:
-        st.warning("Logo file not found. Please upload 'logo.png'.")
+        st.warning("Logo file not found. Please upload 'logo.png' to the app folder.")
 
 def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
@@ -152,13 +170,21 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
+            # Use OpenAI chat completions (your environment pins/openai version must support this call)
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
-            output = response.choices[0].message.content
+            # Extract the assistant text safely
+            # different OpenAI versions might return slightly different structures, but this is standard
+            output = ""
+            try:
+                output = response.choices[0].message.content
+            except Exception:
+                # fallback: try to stringify response
+                output = str(response)
 
-            # Add emojis to section headers
+            # Add emojis to section headers automatically for preview & TXT/DOCX
             output = output.replace("Introduction", "✨ Introduction")
             output = output.replace("Main Activity", "🛠️ Main Activity")
             output = output.replace("Closing Activity", "✅ Closing Activity")
@@ -179,6 +205,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
+            # For PDF we strip emojis (some fonts can't render them)
             pdf_text = clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝","")
             pdf_buffer = create_pdf(pdf_text)
             docx_buffer = create_docx(clean_output)
