@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (Formatted & Fixed)
+# App.py - LessonLift with OpenAI 1.0+ integration
 # -------------------------------
 
 import os
@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
+    line-height: 1.6em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,17 +71,13 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean markdown & English spelling fix
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
 def clean_markdown(text) -> str:
-    if not text:
-        text = ""
-    elif not isinstance(text, str):
-        try:
-            text = str(text)
-        except:
-            text = ""
-    # Standardize bullet points and spacing
+    # Ensure input is always a string
+    if not text or not isinstance(text, str):
+        text = str(text or "")
+
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1')
@@ -90,9 +86,10 @@ def clean_markdown(text) -> str:
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
-    # Force British English
+    text = text.strip()
+    # Force British spelling
     text = text.replace("color", "colour").replace("center", "centre")
-    return text.strip()
+    return text
 
 # -------------------------------
 # Logo + title
@@ -164,17 +161,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
-            output = response.choices[0].message.content
-
-            # Add emojis for preview/TXT/DOCX
+            output = response.choices[0].message.content or ""
+            # Add emojis to section headers automatically for preview & TXT/DOCX
             output = output.replace("Introduction", "✨ Introduction")
             output = output.replace("Main Activity", "🛠️ Main Activity")
             output = output.replace("Closing Activity", "✅ Closing Activity")
             output = output.replace("Assessment", "📝 Assessment")
             output = output.replace("Extension", "⚡ Extension Activity")
             output = output.replace("Support", "🤝 Support")
-
             clean_output = clean_markdown(output)
+
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
@@ -186,11 +182,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # PDF removes emojis for compatibility
-            pdf_text = re.sub(r"[✨🛠️✅📝⚡🤝]", "", clean_output)
-            pdf_buffer = create_pdf(pdf_text)
+            pdf_buffer = create_pdf(clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝",""))
             docx_buffer = create_docx(clean_output)
-
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
