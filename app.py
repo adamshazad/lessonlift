@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (Fixed)
+# App.py - LessonLift with OpenAI 1.0+ integration
 # -------------------------------
 
 import os
@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.4em;
+    line-height: 1.6em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -71,19 +71,18 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# CLEAN MARKDOWN FUNCTION
+# Clean markdown function
 # -------------------------------
 def clean_markdown(text) -> str:
-    if text is None:
-        text = ""
-    text = str(text)
+    text = "" if text is None else str(text)
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1')
+    text = re.sub(r'\*(.*?)\*', r'\1')
+    text = re.sub(r'`(.*?)`', r'\1')
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
+    # Normalize spacing: max two line breaks
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
@@ -125,8 +124,10 @@ def create_pdf(text):
         if not line.strip():
             story.append(Spacer(1,6))
         else:
-            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-            story.append(Paragraph(safe, normal))
+            # Remove emojis for PDF
+            safe_line = re.sub(r'[✨🛠️✅📝⚡🤝]', '', line)
+            safe_line = safe_line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            story.append(Paragraph(safe_line, normal))
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -141,6 +142,27 @@ def create_docx(text):
     return bio
 
 # -------------------------------
+# Emoji mapping for headers
+# -------------------------------
+EMOJI_MAP = {
+    "Starter Activity": "🏁 Starter Activity",
+    "Introduction": "✨ Introduction",
+    "Main Activity": "🛠️ Main Activity",
+    "Guided Practice": "🧩 Guided Practice",
+    "Independent Practice": "📚 Independent Practice",
+    "Plenary": "✅ Closing Activity",
+    "Closing Activity": "✅ Closing Activity",
+    "Assessment": "📝 Assessment",
+    "Extension Activity": "⚡ Extension Activity",
+    "Support": "🤝 Support"
+}
+
+def add_emojis(text):
+    for key, val in EMOJI_MAP.items():
+        text = re.sub(rf"(?<!\S){key}(?!\S)", val, text)
+    return text
+
+# -------------------------------
 # Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message=""):
@@ -151,27 +173,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     st.session_state.lesson_count += 1
 
-    # Force UK English instruction
-    prompt += "\n\nPlease use UK English spelling."
-
     with st.spinner("✨ Creating lesson plan..."):
         try:
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role":"user","content":prompt}],
             )
-            output_obj = response.choices[0].message
-            output_text = getattr(output_obj, "content", "")
-            output_text = str(output_text)
-
-            # Add emojis for preview / TXT / DOCX
-            output_text_with_emojis = output_text.replace("Introduction", "✨ Introduction")\
-                                                 .replace("Main Activity", "🛠️ Main Activity")\
-                                                 .replace("Closing Activity", "✅ Closing Activity")\
-                                                 .replace("Assessment", "📝 Assessment")\
-                                                 .replace("Extension", "⚡ Extension Activity")\
-                                                 .replace("Support", "🤝 Support")
-            clean_output = clean_markdown(output_text_with_emojis)
+            output = response.choices[0].message.content
+            output = add_emojis(output)
+            clean_output = clean_markdown(output)
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
@@ -184,10 +194,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # PDF without emojis
-            pdf_buffer = create_pdf(clean_output.replace("✨","").replace("🛠️","").replace("✅","").replace("📝","").replace("⚡","").replace("🤝",""))
+            pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
-
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
