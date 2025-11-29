@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (Fixed spacing & emoji handling)
+# App.py - LessonLift with OpenAI 1.0+ integration
 # -------------------------------
 
 import os
@@ -21,7 +21,7 @@ import openai
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (scrollable box)
+# CSS (scrollable box) - FIXED SPACING
 # -------------------------------
 st.markdown("""
 <style>
@@ -37,10 +37,10 @@ body {background-color: white; color: black;}
     background-color: #f9f9f9 !important;
     color: black !important;
     border-radius: 12px !important;
-    padding: 16px !important;
-    margin-bottom: 12px !important;
+    padding: 10px !important;       /* reduced padding */
+    margin-bottom: 8px !important;  /* smaller margin */
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.4em;  /* Fixed smaller line spacing */
+    line-height: 1.3em;             /* tighter spacing */
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -66,16 +66,17 @@ if st.session_state.last_reset_date != today:
     st.session_state.last_reset_date = today
 
 # -------------------------------
-# OpenAI API key
+# OpenAI API key from secrets
 # -------------------------------
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean Markdown
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
+
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -84,6 +85,7 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
+
     return text.strip()
 
 # -------------------------------
@@ -118,11 +120,11 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=14, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
-            story.append(Spacer(1,4))
+            story.append(Spacer(1,6))
         else:
             safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
             story.append(Paragraph(safe, normal))
@@ -138,22 +140,6 @@ def create_docx(text):
     doc.save(bio)
     bio.seek(0)
     return bio
-
-# -------------------------------
-# Add emojis to text for preview/TXT/DOCX
-# -------------------------------
-def add_emojis(text):
-    emoji_map = {
-        "Introduction": "✨ Introduction",
-        "Main Activity": "🛠️ Main Activity",
-        "Closing Activity": "✅ Closing Activity",
-        "Assessment": "📝 Assessment",
-        "Extension": "⚡ Extension Activity",
-        "Support": "🤝 Support"
-    }
-    for k,v in emoji_map.items():
-        text = re.sub(rf"\b{k}\b", v, text)
-    return text
 
 # -------------------------------
 # Generator
@@ -173,10 +159,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 messages=[{"role":"user","content":prompt}],
             )
             output = response.choices[0].message.content
-            output = clean_markdown(output)
-            preview_output = add_emojis(output)  # emojis only for preview & TXT/DOCX
+            clean_output = clean_markdown(output)
 
-            st.session_state.lesson_history.append({"title": title, "content": preview_output})
+            st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
             if regen_message:
                 st.info(f"🔄 {regen_message}")
@@ -184,18 +169,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            # Display preview
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{preview_output}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
-            # Create downloadables
-            pdf_buffer = create_pdf(output)  # PDF no emojis
-            docx_buffer = create_docx(preview_output)
-
+            pdf_buffer = create_pdf(clean_output)
+            docx_buffer = create_docx(clean_output)
             st.markdown(
                 f"""
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(preview_output.encode()).decode()}" download="lesson_plan.txt">
+                    <a href="data:text/plain;base64,{base64.b64encode(clean_output.encode()).decode()}" download="lesson_plan.txt">
                         <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
