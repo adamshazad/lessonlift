@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration
+# App.py - LessonLift with OpenAI 1.0+ integration (Updated)
 # -------------------------------
 
 import os
@@ -21,7 +21,7 @@ import openai
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (scrollable box + styling)
+# CSS (scrollable box)
 # -------------------------------
 st.markdown("""
 <style>
@@ -40,8 +40,8 @@ body {background-color: white; color: black;}
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em !important;
-    white-space: pre-wrap !important;
+    line-height: 1.5em;
+    white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
 }
@@ -71,17 +71,18 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# Clean Markdown Function
+# CLEAN MARKDOWN FUNCTION
 # -------------------------------
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
-    text = re.sub(r'\|.*?\|', '', text)
+    # Remove markdown headers, bold, italics, code, and star bullet points
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
-    text = re.sub(r'-{2,}', '-', text)
+    text = re.sub(r'•', '-', text)
+    # Replace multiple newlines with max two
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
@@ -123,9 +124,9 @@ def create_pdf(text):
         if not line.strip():
             story.append(Spacer(1,6))
         else:
-            # remove emojis for PDF
-            safe_line = re.sub(r'[\U0001F300-\U0001FAFF]', '', line)
-            safe = safe_line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            # Remove any emojis for PDF
+            safe = re.sub(r'[^\x00-\x7F]+','', safe)
             story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
@@ -153,9 +154,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
+            # Force UK English
+            full_prompt = prompt + "\n\nPlease write the lesson plan in UK English spelling, with clear spacing: titles followed by bullet points using '-' and a line break after each section. Include emojis where appropriate in preview."
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role":"user","content":prompt}],
+                messages=[{"role":"user","content":full_prompt}],
             )
             output = response.choices[0].message.content
             clean_output = clean_markdown(output)
@@ -168,6 +171,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
+            st.markdown(f"### 📖 {title}")
             st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(clean_output)
@@ -206,9 +210,9 @@ def lesson_generator_page():
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
         lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
-        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
+        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. Maths, English, Science")
         lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
+        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To identify fractions")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
@@ -223,7 +227,7 @@ Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
-        generate_and_display_plan(prompt, title="Original", regen_message="Generated fresh lesson plan.")
+        generate_and_display_plan(prompt, title="Original")
 
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
@@ -244,7 +248,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         if st.button("🔁 Regenerate Lesson Plan"):
             extra_instruction = custom_instruction if custom_instruction else regen_style
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}", regen_message="Lesson plan regenerated.")
+            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}")
 
 # -------------------------------
 # Sidebar history
