@@ -71,12 +71,11 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# CLEAN MARKDOWN FUNCTION
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
-
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -85,7 +84,6 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
-
     return text.strip()
 
 # -------------------------------
@@ -161,24 +159,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             output = response.choices[0].message.content
             clean_output = clean_markdown(output)
 
-            # Enforce word count: min 750, max 1000
-            word_count = len(clean_output.split())
+            # -------------------------------
+            # Word count enforcement
+            words = clean_output.split()
+            word_count = len(words)
             if word_count < 750:
-                expand_prompt = f"Please expand this lesson plan so that it reaches at least 750 words, keeping all details:\n\n{clean_output}"
-                response_expand = openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role":"user","content":expand_prompt}],
-                )
-                clean_output = clean_markdown(response_expand.choices[0].message.content)
-                word_count = len(clean_output.split())
+                st.warning(f"⚠️ Generated plan is too short ({word_count} words). Minimum 750 words required.")
             elif word_count > 1000:
-                condense_prompt = f"Please condense this lesson plan so that it does not exceed 1000 words, keeping all main details:\n\n{clean_output}"
-                response_condense = openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role":"user","content":condense_prompt}],
-                )
-                clean_output = clean_markdown(response_condense.choices[0].message.content)
-                word_count = len(clean_output.split())
+                st.warning(f"⚠️ Generated plan is too long ({word_count} words). Maximum 1000 words allowed.")
 
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
 
@@ -188,13 +176,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            lesson_html = f"""
-            <div style="font-family:sans-serif; font-size:14px; line-height:1.6em; color:black;">
-                <h2 style="font-size:16px; margin-bottom:12px;">{title}</h2>
-                {clean_output.replace('\n\n','<br><br>').replace('\n- ','<br>- ').replace('\n1. ','<br>1. ')}
-            </div>
-            """
-            st.markdown(f"<div class='stCard'>{lesson_html}</div>", unsafe_allow_html=True)
+            st.markdown(f"### 📖 {title}")
+            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
