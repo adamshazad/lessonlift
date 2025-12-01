@@ -21,7 +21,7 @@ import openai
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (scrollable box)
+# CSS (scrollable box, spacing adjusted)
 # -------------------------------
 st.markdown("""
 <style>
@@ -37,10 +37,10 @@ body {background-color: white; color: black;}
     background-color: #f9f9f9 !important;
     color: black !important;
     border-radius: 12px !important;
-    padding: 16px !important;
-    margin-bottom: 12px !important;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.6em;
+    padding: 12px !important;
+    margin-bottom: 8px !important;
+    box-shadow: 0px 2px 6px rgba(0,0,0,0.15) !important;
+    line-height: 1.4em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -151,13 +151,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         return
 
     st.session_state.lesson_count += 1
-
-    # Force AI to generate minimum 750 words, max 1000, UK English
-    prompt += (
-        "\n\nPlease generate the lesson plan in full detail, minimum 750 words, maximum 1000 words. "
-        "Use clear titles, spaces, and dash bullet points exactly like this format: Title, space, bullet points, space, next title. "
-        "Use British English spelling only (e.g., 'colour', 'favour', 'maths', not 'color' or 'math')."
-    )
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
