@@ -21,7 +21,7 @@ import openai
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (scrollable box + uniform font)
+# CSS (scrollable box)
 # -------------------------------
 st.markdown("""
 <style>
@@ -34,15 +34,14 @@ body {background-color: white; color: black;}
     border-radius: 5px !important;
 }
 .stCard {
-    font-size: 14px !important;
-    line-height: 1.6em !important;
-    white-space: pre-wrap;
     background-color: #f9f9f9 !important;
     color: black !important;
     border-radius: 12px !important;
     padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
+    line-height: 1.6em;
+    white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
 }
@@ -77,6 +76,7 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
+
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -85,6 +85,7 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r'-{2,}', '', text)
     text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
+
     return text.strip()
 
 # -------------------------------
@@ -119,7 +120,7 @@ def create_pdf(text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     styles = getSampleStyleSheet()
-    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=12, leading=15, spaceAfter=6)
+    normal = ParagraphStyle('NormalFixed', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=6)
     story = []
     for line in text.splitlines():
         if not line.strip():
@@ -159,16 +160,41 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             )
             output = response.choices[0].message.content
             clean_output = clean_markdown(output)
+
+            # Enforce word count: min 750, max 1000
+            word_count = len(clean_output.split())
+            if word_count < 750:
+                expand_prompt = f"Please expand this lesson plan so that it reaches at least 750 words, keeping all details:\n\n{clean_output}"
+                response_expand = openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role":"user","content":expand_prompt}],
+                )
+                clean_output = clean_markdown(response_expand.choices[0].message.content)
+                word_count = len(clean_output.split())
+            elif word_count > 1000:
+                condense_prompt = f"Please condense this lesson plan so that it does not exceed 1000 words, keeping all main details:\n\n{clean_output}"
+                response_condense = openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role":"user","content":condense_prompt}],
+                )
+                clean_output = clean_markdown(response_condense.choices[0].message.content)
+                word_count = len(clean_output.split())
+
             st.session_state.lesson_history.append({"title": title, "content": clean_output})
+
             if regen_message:
                 st.info(f"🔄 {regen_message}")
 
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            # Display title + content uniformly
-            st.markdown(f"<div style='font-size:16px; font-weight:bold;'>{title}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            lesson_html = f"""
+            <div style="font-family:sans-serif; font-size:14px; line-height:1.6em; color:black;">
+                <h2 style="font-size:16px; margin-bottom:12px;">{title}</h2>
+                {clean_output.replace('\n\n','<br><br>').replace('\n- ','<br>- ').replace('\n1. ','<br>1. ')}
+            </div>
+            """
+            st.markdown(f"<div class='stCard'>{lesson_html}</div>", unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
@@ -206,8 +232,8 @@ def lesson_generator_page():
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
         lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
-        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. Maths, English, Science")
-        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, Plant Growth, The Romans")
+        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
+        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
         lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
