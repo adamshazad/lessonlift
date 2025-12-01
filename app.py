@@ -71,20 +71,21 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# CLEAN MARKDOWN FUNCTION
+# FIXED CLEAN MARKDOWN FUNCTION
 # -------------------------------
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
-    # Remove markdown headers and extra symbols
+
     text = re.sub(r'\|.*?\|', '', text)
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
-    text = text.replace("•", "-")
     text = re.sub(r'-{2,}', '', text)
+    text = text.replace("•", "-")
     text = re.sub(r'\n{3,}', '\n\n', text)
+
     return text.strip()
 
 # -------------------------------
@@ -110,7 +111,7 @@ def show_logo(path="logo.png", width=200):
 
 def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
-    st.write("Generate detailed UK primary school lesson plans with a minimum of 750 words per plan!")
+    st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 # -------------------------------
 # Exporters
@@ -151,8 +152,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     st.session_state.lesson_count += 1
 
-    # Force AI to generate minimum 750 words
-    prompt += "\n\nPlease generate the lesson plan in full detail, minimum 750 words, maximum 1000 words. Use clear titles, spaces, and dash bullet points exactly like this format: Title, space, bullet points, space, next title."
+    # Force AI to generate minimum 750 words, max 1000, UK English
+    prompt += (
+        "\n\nPlease generate the lesson plan in full detail, minimum 750 words, maximum 1000 words. "
+        "Use clear titles, spaces, and dash bullet points exactly like this format: Title, space, bullet points, space, next title. "
+        "Use British English spelling only (e.g., 'colour', 'favour', 'maths', not 'color' or 'math')."
+    )
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
@@ -210,8 +215,8 @@ def lesson_generator_page():
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
         lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
-        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. Maths, English, Science")
-        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Shapes, Fractions, Plant Growth")
+        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
+        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
         lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
