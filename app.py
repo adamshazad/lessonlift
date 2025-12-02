@@ -309,18 +309,18 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     st.session_state.lesson_count += 1
 
     # Append strict generation requirements
-          generation_instructions = (
-            "\n\nImportant instructions for generation:\n"
-            "- Use British English spelling only (e.g., 'colour', 'favour', 'maths').\n"
-            "- Do NOT include any emojis anywhere.\n"
-            "- DO NOT repeat or recreate the header fields: Lesson Title, Subject, Topic, Year Group, Duration, Ability Level, SEN/EAL Notes, or Learning Objective.\n"
-            "- Start directly with the section **Lesson Outline**, followed by clear, well-structured sections.\n"
-            "- Format exactly: Section Title (bold in preview), one blank line, then dash '-' bullet points or tight paragraphs.\n"
-            "- Collapse extra blank lines so there is at most one blank line between sections.\n"
-            "- Minimum 750 words, maximum 1000 words.\n"
-            "- Focus on: timings, differentiation, modelling, assessment, misconceptions, resources.\n"
-        )
-
+              # Append strict generation requirements
+    generation_instructions = (
+        "\n\nImportant instructions for generation:\n"
+        "- Use British English spelling only (e.g., 'colour', 'favour', 'maths').\n"
+        "- Do NOT include any emojis anywhere.\n"
+        "- DO NOT repeat or recreate the header fields: Lesson Title, Subject, Topic, Year Group, Duration, Ability Level, SEN/EAL Notes, or Learning Objective.\n"
+        "- Start directly with the section **Lesson Outline**, followed by clear, well-structured sections.\n"
+        "- Format exactly: Section Title (bold in preview), one blank line, then dash '-' bullet points or tight paragraphs.\n"
+        "- Collapse extra blank lines so there is at most one blank line between sections.\n"
+        "- Minimum 750 words, maximum 1000 words.\n"
+        "- Focus on: timings, differentiation, modelling, assessment, misconceptions, resources.\n"
+    )
     prompt_with_req = prompt + generation_instructions
 
     with st.spinner("✨ Creating lesson plan..."):
