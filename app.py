@@ -438,28 +438,32 @@ Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
-        generate_and_display_plan(prompt, lesson_data, title="Original")  # <-- pass lesson_data here
+generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)  # <-- pass lesson_data correctly
 
-    if st.session_state.last_prompt:
-        st.markdown("### 🔄 Not happy with the plan?")
-        regen_style = st.selectbox(
-            "Choose a regeneration style:",
-            [
-                "♻️ Just regenerate (different variation)",
-                "🎨 More creative & engaging activities",
-                "📋 More structured with timings",
-                "🧩 Simplify for lower ability",
-                "🚀 Challenge for higher ability"
-            ]
+if st.session_state.last_prompt:
+    st.markdown("### 🔄 Not happy with the plan?")
+    regen_style = st.selectbox(
+        "Choose a regeneration style:",
+        [
+            "♻️ Just regenerate (different variation)",
+            "🎨 More creative & engaging activities",
+            "📋 More structured with timings",
+            "🧩 Simplify for lower ability",
+            "🚀 Challenge for higher ability"
+        ]
+    )
+    custom_instruction = st.text_input(
+        "Or type your own custom instruction (optional)",
+        placeholder="e.g. Make it more interactive with outdoor activities"
+    )
+    if st.button("🔁 Regenerate Lesson Plan"):
+        extra_instruction = custom_instruction if custom_instruction else regen_style
+        new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
+        generate_and_display_plan(
+            new_prompt,
+            title=f"Regenerated {len(st.session_state.lesson_history)+1}",
+            lesson_data=lesson_data  # <-- pass lesson_data correctly
         )
-        custom_instruction = st.text_input(
-            "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities"
-        )
-        if st.button("🔁 Regenerate Lesson Plan"):
-            extra_instruction = custom_instruction if custom_instruction else regen_style
-            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, lesson_data, title=f"Regenerated {len(st.session_state.lesson_history)+1}")  # <-- pass lesson_data here
 
 # -------------------------------
 # Sidebar history
