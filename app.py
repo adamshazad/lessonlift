@@ -321,12 +321,20 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     prompt_with_req = prompt + generation_instructions
 
     # ✅ This line must be indented to match the function scope
-    with st.spinner("✨ Creating lesson plan..."):
-        try:
-            # generation code here...
-            pass
-        except Exception as e:
-            st.error(f"⚠️ Lesson plan could not be generated: {e}")
+  with st.spinner("✨ Creating lesson plan..."):
+    try:
+        # Code inside try block indented one level further
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role":"user","content":prompt_with_req}],
+            temperature=0.3,
+            max_tokens=2200,
+        )
+        output = response.choices[0].message.content
+
+        # Further processing here...
+    except Exception as e:
+        st.error(f"⚠️ Lesson plan could not be generated: {e}")
         # Save to history
         st.session_state.lesson_history.append({"title": title, "content": final_output})
 
