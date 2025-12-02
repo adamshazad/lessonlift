@@ -366,10 +366,18 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-         # -------------------------------
-# Metadata + Lesson preview with tight formatting
 # -------------------------------
-            metadata_html = f"""
+# Metadata + Lesson preview with proper bold formatting
+# -------------------------------
+
+# Ensure Lesson Title is at the top of the output
+if not final_output.lower().startswith("lesson title:"):
+    final_output = f"Lesson Title: {title}\n\n{final_output}"
+
+# Convert markdown-style bold **...** to HTML <b>...</b>
+final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+
+metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {title}</div>
     <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
@@ -380,10 +388,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
     <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
     <br>
-    {final_output.replace('\\n','<br>')}
+    {final_output_html.replace('\\n','<br>')}
 </div>
 """
-            st.markdown(metadata_html, unsafe_allow_html=True)
+
+st.markdown(metadata_html, unsafe_allow_html=True)
 
             # Exports
             pdf_buffer = create_pdf(final_output)
