@@ -310,12 +310,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
         "\n\nImportant instructions for generation:\n"
         "- Use British English spelling only (e.g., 'colour', 'favour', 'maths').\n"
         "- Do NOT include emojis or special emoji characters anywhere.\n"
-        "- Format exactly: Section Title (bold in preview), single blank line, then dash '-' bullet points or tight paragraph lines. "
-        "Use dashes for bullets (e.g., '- Activity: ...').\n"
+        "- Format exactly: Section Title (bold in preview), single blank line, then dash '-' bullet points or tight paragraph lines.\n"
         "- Tight spacing: collapse extra blank lines so there is at most one blank line between sections/paragraphs.\n"
         "- Minimum length: 750 words. Maximum length: 1000 words.\n"
         "- Include these fields at the top: Lesson Title, Subject, Topic, Year Group, Lesson Duration, Ability Level, SEN/EAL Notes, Learning Objective (short), then 'Lesson Outline' and sections.\n"
-        "- Produce a detailed plan suitable for Year 1 mixed ability, with clear timings and differentiation.\n"
     )
 
     prompt_with_req = prompt + generation_instructions
@@ -345,13 +343,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                 else:
                     # If too short, ask model to expand (append an instruction) and retry once
                     prompt_with_req += "\n\nPlease expand the plan with more detail, examples, differentiation and assessment to reach at least 750 words. Use British English and keep format tight."
-                    # loop will retry
+
             if final_output is None:
-                # final attempt result even if short
                 final_output = formatted
 
-            # Final safety: ensure no emoji characters remain (strip any surrogate glyphs)
-            final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)  # remove astral plane chars
+            # Final safety: ensure no emoji characters remain
+            final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
             final_output = final_output.replace("🛠️", "").replace("✨", "").replace("✅", "").replace("📝", "").replace("⚡", "").replace("🤝", "")
 
             # Save to history
@@ -363,49 +360,44 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            # Display title and preview box (tight spacing)
-            # -------------------------------
-# Metadata + Lesson preview with tight formatting
-# -------------------------------
-metadata_html = f"""
+            # Metadata + Lesson preview with tight formatting
+            metadata_html = f"""
 <div class='stCard'>
-    <div class='metadata-line'>Lesson Title: {title}</div>
-    <div class='metadata-line'>Subject: {lesson_data.get('subject','')}</div>
-    <div class='metadata-line'>Topic: {lesson_data.get('topic','')}</div>
-    <div class='metadata-line'>Year Group: {lesson_data.get('year_group','')}</div>
-    <div class='metadata-line'>Duration: {lesson_data.get('lesson_duration','')}</div>
-    <div class='metadata-line'>Ability Level: {lesson_data.get('ability_level','')}</div>
-    <div class='metadata-line'>SEN/EAL Notes: {lesson_data.get('sen_notes','None')}</div>
+    <div class='metadata-line'><b>Lesson Title:</b> {title}</div>
+    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
     <br>
     {final_output.replace('\\n','<br>')}
 </div>
 """
-
-st.markdown(metadata_html, unsafe_allow_html=True)
+            st.markdown(metadata_html, unsafe_allow_html=True)
 
             # Exports
             pdf_buffer = create_pdf(final_output)
             docx_buffer = create_docx(final_output)
             st.markdown(
                 f"""
-                <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-                    <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
-                    </a>
-                    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
-                    </a>
-                    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
-                    </a>
-                </div>
-                """,
+<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+    <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
+    </a>
+    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+    </a>
+    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+    </a>
+</div>
+""",
                 unsafe_allow_html=True
             )
 
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
-
 # -------------------------------
 # Main generator page
 # -------------------------------
