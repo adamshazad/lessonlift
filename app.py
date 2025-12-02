@@ -323,61 +323,60 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     )
     prompt_with_req = prompt + generation_instructions
 
-    with st.spinner("✨ Creating lesson plan..."):
-        try:
-            # Try generating up to 2 times if word count too low
-            attempts = 0
-            final_output = None
-            while attempts < 2:
-                attempts += 1
-                response = openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role":"user","content":prompt_with_req}],
-                    temperature=0.3,
-                    max_tokens=2200,
-                )
-                output = response.choices[0].message.content
+   with st.spinner("✨ Creating lesson plan..."):
+    try:
+        # Generate AI output (cleaning, formatting, word count)
+        attempts = 0
+        final_output = None
+        while attempts < 2:
+            attempts += 1
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role":"user","content":prompt_with_req}],
+                temperature=0.3,
+                max_tokens=2200,
+            )
+            output = response.choices[0].message.content
 
-                # Clean & format
-                cleaned = clean_markdown(output)
-                formatted = format_tight_output(cleaned)
-                wcount = count_words(formatted)
+            # Clean & format
+            cleaned = clean_markdown(output)
+            formatted = format_tight_output(cleaned)
+            wcount = count_words(formatted)
 
-                if wcount >= 750:
-                    final_output = formatted
-                    break
-                else:
-                    # Append instruction to expand if too short
-                    prompt_with_req += "\n\nPlease expand the lesson plan with more detail, examples, differentiation and assessment to reach at least 750 words. Keep British English and tight format."
-
-            if final_output is None:
+            if wcount >= 750:
                 final_output = formatted
+                break
+            else:
+                prompt_with_req += "\n\nPlease expand the lesson plan..."
 
-            # Remove emojis / surrogate glyphs
-            final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
-            final_output = final_output.replace("🛠️", "").replace("✨", "").replace("✅", "").replace("📝", "").replace("⚡", "").replace("🤝", "")
+        if final_output is None:
+            final_output = formatted
 
-            # Save to history
-            st.session_state.lesson_history.append({"title": title, "content": final_output})
+        # Remove emojis
+        final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
+        final_output = final_output.replace("🛠️", "").replace("✨", "").replace("✅", "").replace("📝", "").replace("⚡", "").replace("🤝", "")
 
-            if regen_message:
-                st.info(f"🔄 {regen_message}")
+        # Save to history
+        st.session_state.lesson_history.append({"title": title, "content": final_output})
 
-            remaining_today = daily_limit - st.session_state.lesson_count
-            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
+        if regen_message:
+            st.info(f"🔄 {regen_message}")
 
-# -------------------------------
-# Metadata + Lesson preview with proper bold formatting
-# -------------------------------
+        remaining_today = daily_limit - st.session_state.lesson_count
+        st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-# Ensure Lesson Title is at the top of the output
-if not final_output.lower().startswith("lesson title:"):
-    final_output = f"Lesson Title: {title}\n\n{final_output}"
+        # -------------------------------
+        # Metadata + Lesson preview
+        # -------------------------------
 
-# Convert markdown-style bold **...** to HTML <b>...</b>
-final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+        # Ensure Lesson Title is at top of content
+        if not final_output.lower().startswith("lesson title:"):
+            final_output = f"Lesson Title: {title}\n\n{final_output}"
 
-metadata_html = f"""
+        # Convert markdown bold **...** to HTML <b>...</b>
+        final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+
+        metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {title}</div>
     <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
@@ -391,14 +390,13 @@ metadata_html = f"""
     {final_output_html.replace('\\n','<br>')}
 </div>
 """
+        st.markdown(metadata_html, unsafe_allow_html=True)
 
-st.markdown(metadata_html, unsafe_allow_html=True)
-
-            # Exports
-            pdf_buffer = create_pdf(final_output)
-            docx_buffer = create_docx(final_output)
-            st.markdown(
-                f"""
+        # Exports
+        pdf_buffer = create_pdf(final_output)
+        docx_buffer = create_docx(final_output)
+        st.markdown(
+            f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
     <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
@@ -411,13 +409,11 @@ st.markdown(metadata_html, unsafe_allow_html=True)
     </a>
 </div>
 """,
-                unsafe_allow_html=True
-            )
+            unsafe_allow_html=True
+        )
 
-        except Exception as e:
-            st.error(f"⚠️ Lesson plan could not be generated: {e}")
-
-
+    except Exception as e:
+        st.error(f"⚠️ Lesson plan could not be generated: {e}")
 # -------------------------------
 # Main generator page
 # -------------------------------
