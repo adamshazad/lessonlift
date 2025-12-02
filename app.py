@@ -309,45 +309,38 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     st.session_state.lesson_count += 1
 
     # Append strict generation requirements
-              # Append strict generation requirements
     generation_instructions = (
         "\n\nImportant instructions for generation:\n"
-        "- Use British English spelling only (e.g., 'colour', 'favour', 'maths').\n"
-        "- Do NOT include any emojis anywhere.\n"
-        "- DO NOT repeat or recreate the header fields: Lesson Title, Subject, Topic, Year Group, Duration, Ability Level, SEN/EAL Notes, or Learning Objective.\n"
-        "- Start directly with the section **Lesson Outline**, followed by clear, well-structured sections.\n"
-        "- Format exactly: Section Title (bold in preview), one blank line, then dash '-' bullet points or tight paragraphs.\n"
-        "- Collapse extra blank lines so there is at most one blank line between sections.\n"
-        "- Minimum 750 words, maximum 1000 words.\n"
-        "- Focus on: timings, differentiation, modelling, assessment, misconceptions, resources.\n"
+        "- Use British English spelling only...\n"
+        # ...
     )
+
     prompt_with_req = prompt + generation_instructions
 
-   with st.spinner("✨ Creating lesson plan..."):
-    try:
-        # Generate AI output (cleaning, formatting, word count)
-        attempts = 0
-        final_output = None
-        while attempts < 2:
-            attempts += 1
-            response = openai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role":"user","content":prompt_with_req}],
-                temperature=0.3,
-                max_tokens=2200,
-            )
-            output = response.choices[0].message.content
+    with st.spinner("✨ Creating lesson plan..."):
+        try:
+            # All code inside try must be indented one level further (8 spaces from def)
+            attempts = 0
+            final_output = None
+            while attempts < 2:
+                attempts += 1
+                response = openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role":"user","content":prompt_with_req}],
+                    temperature=0.3,
+                    max_tokens=2200,
+                )
+                output = response.choices[0].message.content
 
-            # Clean & format
-            cleaned = clean_markdown(output)
-            formatted = format_tight_output(cleaned)
-            wcount = count_words(formatted)
+                cleaned = clean_markdown(output)
+                formatted = format_tight_output(cleaned)
+                wcount = count_words(formatted)
 
-            if wcount >= 750:
-                final_output = formatted
-                break
-            else:
-                prompt_with_req += "\n\nPlease expand the lesson plan..."
+                if wcount >= 750:
+                    final_output = formatted
+                    break
+                else:
+                    prompt_with_req += "\n\nPlease expand the lesson plan..."
 
         if final_output is None:
             final_output = formatted
