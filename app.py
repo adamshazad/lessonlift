@@ -21,7 +21,7 @@ import openai
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
 # -------------------------------
-# CSS (UPDATED WITH NORMAL TEXT FIX)
+# CSS (scrollable box)
 # -------------------------------
 st.markdown("""
 <style>
@@ -37,17 +37,13 @@ body {background-color: white; color: black;}
     background-color: #f9f9f9 !important;
     color: black !important;
     border-radius: 12px !important;
-    padding: 12px !important;
+    padding: 16px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.45em;
+    line-height: 1.6em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
-
-    /* 🔥 FIX: make ALL text normal readable size */
-    font-size: 16px !important;
-    font-weight: 500 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -80,14 +76,19 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 def clean_markdown(text: str) -> str:
     if not isinstance(text, str):
         return ""
-    text = re.sub(r'\|.*?\|', '', text)
+
+    # Remove markdown headers
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'`(.*?)`', r'\1', text)
-    text = re.sub(r'-{2,}', '', text)
+
+    # Convert section titles ending with colon to bold
+    text = re.sub(r'^(.*?):\s*$', r'**\1:**', text, flags=re.MULTILINE)
+
+    # Replace bullet symbols
     text = text.replace("•", "-")
-    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    # Reduce excessive blank lines to a single line
+    text = re.sub(r'\n{2,}', '\n', text)
+
     return text.strip()
 
 # -------------------------------
@@ -154,10 +155,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     st.session_state.lesson_count += 1
 
+    # Force AI to generate minimum 750 words, max 1000, UK English
     prompt += (
         "\n\nPlease generate the lesson plan in full detail, minimum 750 words, maximum 1000 words. "
         "Use clear titles, spaces, and dash bullet points exactly like this format: Title, space, bullet points, space, next title. "
-        "Use British English spelling only."
+        "Use British English spelling only (e.g., 'colour', 'favour', 'maths', not 'color' or 'math')."
     )
 
     with st.spinner("✨ Creating lesson plan..."):
