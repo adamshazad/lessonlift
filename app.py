@@ -33,6 +33,8 @@ body {background-color: white; color: black;}
     padding: 8px !important;
     border-radius: 5px !important;
 }
+
+/* Main scrollable lesson plan box */
 .stCard {
     background-color: #f9f9f9 !important;
     color: black !important;
@@ -40,12 +42,20 @@ body {background-color: white; color: black;}
     padding: 12px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.45em; /* slightly tighter */
+    line-height: 1.45em; /* slightly tighter for closer spacing */
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
-    font-size: 16px !important;  /* make all text slightly larger */
-    font-weight: 500 !important; /* normal weight for titles */
+    font-size: 16px !important;  /* consistent font size */
+    font-weight: 500 !important; /* normal weight for text */
+}
+
+/* Metadata at top of lesson plan (Lesson Title, Subject, Topic, etc.) */
+.metadata-line {
+    font-weight: bold;
+    font-size: 16px !important;
+    margin-top: 6px;
+    margin-bottom: 6px;
 }
 </style>
 """, unsafe_allow_html=True)
