@@ -412,7 +412,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 # -------------------------------
 def lesson_generator_page():
     show_logo()
-       title_and_tagline()
+    title_and_tagline()
 
     lesson_data = {}
 
@@ -442,10 +442,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)
 
-    # Ensure lesson_data exists for regeneration
-    if "lesson_data" not in locals():
-        lesson_data = {}
-
+    # Regeneration options
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
@@ -462,11 +459,9 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
             "Or type your own custom instruction (optional)",
             placeholder="e.g. Make it more interactive with outdoor activities"
         )
-
         if st.button("🔁 Regenerate Lesson Plan"):
             extra_instruction = custom_instruction if custom_instruction else regen_style
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-
             generate_and_display_plan(
                 new_prompt,
                 title=f"Regenerated {len(st.session_state.lesson_history)+1}",
