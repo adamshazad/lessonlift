@@ -419,17 +419,16 @@ def lesson_generator_page():
 
     if submitted:
         prompt = f"""
-Lesson Title: {lesson_data['topic'] or 'Lesson'}
 Year Group: {lesson_data['year_group']}
-Subject: {lesson_data['subject'] or 'Not specified'}
-Topic: {lesson_data['topic'] or 'Not specified'}
-Lesson Duration: {lesson_data['lesson_duration']}
-Ability Level: {lesson_data['ability_level']}
-SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
+Subject: {lesson_data['subject']}
+Topic: {lesson_data['topic']}
 Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
+Ability Level: {lesson_data['ability_level']}
+Lesson Duration: {lesson_data['lesson_duration']}
+SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
-        generate_and_display_plan(prompt, title="Original")
+        generate_and_display_plan(prompt, lesson_data, title="Original")  # <-- pass lesson_data here
 
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
@@ -450,7 +449,7 @@ Learning Objective: {lesson_data['learning_objective'] or 'Not specified'}
         if st.button("🔁 Regenerate Lesson Plan"):
             extra_instruction = custom_instruction if custom_instruction else regen_style
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-            generate_and_display_plan(new_prompt, title=f"Regenerated {len(st.session_state.lesson_history)+1}")
+            generate_and_display_plan(new_prompt, lesson_data, title=f"Regenerated {len(st.session_state.lesson_history)+1}")  # <-- pass lesson_data here
 
 # -------------------------------
 # Sidebar history
