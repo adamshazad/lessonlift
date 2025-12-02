@@ -317,31 +317,30 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     prompt_with_req = prompt + generation_instructions
 
-    with st.spinner("✨ Creating lesson plan..."):
-        try:
-            # All code inside try must be indented one level further (8 spaces from def)
-            attempts = 0
-            final_output = None
-            while attempts < 2:
-                attempts += 1
-                response = openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role":"user","content":prompt_with_req}],
-                    temperature=0.3,
-                    max_tokens=2200,
-                )
-                output = response.choices[0].message.content
+   with st.spinner("✨ Creating lesson plan..."):
+    try:
+        attempts = 0
+        final_output = None
+        while attempts < 2:
+            attempts += 1
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role":"user","content":prompt_with_req}],
+                temperature=0.3,
+                max_tokens=2200,
+            )
+            output = response.choices[0].message.content
+            cleaned = clean_markdown(output)
+            formatted = format_tight_output(cleaned)
+            wcount = count_words(formatted)
 
-                cleaned = clean_markdown(output)
-                formatted = format_tight_output(cleaned)
-                wcount = count_words(formatted)
+            if wcount >= 750:
+                final_output = formatted
+                break
+            else:
+                prompt_with_req += "\n\nPlease expand the lesson plan..."
 
-                if wcount >= 750:
-                    final_output = formatted
-                    break
-                else:
-                    prompt_with_req += "\n\nPlease expand the lesson plan..."
-
+        # If still None after loop, assign last formatted
         if final_output is None:
             final_output = formatted
 
@@ -349,6 +348,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
         final_output = final_output.replace("🛠️", "").replace("✨", "").replace("✅", "").replace("📝", "").replace("⚡", "").replace("🤝", "")
 
+    except Exception as e:
+        st.error(f"⚠️ Lesson plan could not be generated: {e}")
         # Save to history
         st.session_state.lesson_history.append({"title": title, "content": final_output})
 
