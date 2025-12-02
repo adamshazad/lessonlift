@@ -365,9 +365,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
-            # -------------------------------
-            # Metadata + Lesson preview with tight formatting
-            # -------------------------------
+         # -------------------------------
+# Metadata + Lesson preview with tight formatting
+# -------------------------------
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {title}</div>
@@ -382,7 +382,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     {final_output.replace('\\n','<br>')}
 </div>
 """
-
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             # Exports
@@ -407,6 +406,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
+
+
 # -------------------------------
 # Main generator page
 # -------------------------------
