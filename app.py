@@ -297,7 +297,10 @@ def create_docx(text):
 # -------------------------------
 # Generator
 # -------------------------------
-def generate_and_display_plan(prompt, lesson_data, title="Latest", regen_message=""):
+def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
+    if lesson_data is None:
+        lesson_data = {}
+
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
@@ -305,21 +308,23 @@ def generate_and_display_plan(prompt, lesson_data, title="Latest", regen_message
 
     st.session_state.lesson_count += 1
 
-    # Append strict generation requirements (UK English, no emojis, tight format, word count)
+    # Append strict generation requirements
     generation_instructions = (
         "\n\nImportant instructions for generation:\n"
         "- Use British English spelling only (e.g., 'colour', 'favour', 'maths').\n"
         "- Do NOT include emojis or special emoji characters anywhere.\n"
         "- Format exactly: Section Title (bold in preview), single blank line, then dash '-' bullet points or tight paragraph lines.\n"
-        "- Tight spacing: collapse extra blank lines so there is at most one blank line between sections/paragraphs.\n"
+        "- Collapse extra blank lines so there is at most one blank line between sections/paragraphs.\n"
         "- Minimum length: 750 words. Maximum length: 1000 words.\n"
-        "- Include these fields at the top: Lesson Title, Subject, Topic, Year Group, Lesson Duration, Ability Level, SEN/EAL Notes, Learning Objective (short), then 'Lesson Outline' and sections.\n"
+        "- Include these fields at the top once: Lesson Title, Subject, Topic, Year Group, Lesson Duration, Ability Level, SEN/EAL Notes, Learning Objective (short), then 'Lesson Outline' and detailed sections.\n"
+        "- Produce a detailed, structured plan suitable for primary school students with clear timings, activities, differentiation, and assessment.\n"
     )
 
     prompt_with_req = prompt + generation_instructions
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
+            # Try generating up to 2 times if word count too low
             attempts = 0
             final_output = None
             while attempts < 2:
@@ -331,6 +336,8 @@ def generate_and_display_plan(prompt, lesson_data, title="Latest", regen_message
                     max_tokens=2200,
                 )
                 output = response.choices[0].message.content
+
+                # Clean & format
                 cleaned = clean_markdown(output)
                 formatted = format_tight_output(cleaned)
                 wcount = count_words(formatted)
@@ -339,12 +346,13 @@ def generate_and_display_plan(prompt, lesson_data, title="Latest", regen_message
                     final_output = formatted
                     break
                 else:
-                    prompt_with_req += "\n\nPlease expand the plan with more detail, examples, differentiation and assessment to reach at least 750 words. Use British English and keep format tight."
+                    # Append instruction to expand if too short
+                    prompt_with_req += "\n\nPlease expand the lesson plan with more detail, examples, differentiation and assessment to reach at least 750 words. Keep British English and tight format."
 
             if final_output is None:
                 final_output = formatted
 
-            # Remove emojis
+            # Remove emojis / surrogate glyphs
             final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
             final_output = final_output.replace("🛠️", "").replace("✨", "").replace("✅", "").replace("📝", "").replace("⚡", "").replace("🤝", "")
 
@@ -369,10 +377,12 @@ def generate_and_display_plan(prompt, lesson_data, title="Latest", regen_message
     <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
     <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
     <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
+    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
     <br>
     {final_output.replace('\\n','<br>')}
 </div>
 """
+
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             # Exports
