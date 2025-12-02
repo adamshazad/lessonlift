@@ -40,11 +40,12 @@ body {background-color: white; color: black;}
     padding: 12px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.45em; /* slightly tighter for Option A */
+    line-height: 1.45em; /* slightly tighter */
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
-    font-size: 14px;
+    font-size: 16px !important;  /* make all text slightly larger */
+    font-weight: 500 !important; /* normal weight for titles */
 }
 </style>
 """, unsafe_allow_html=True)
