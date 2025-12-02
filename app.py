@@ -364,8 +364,24 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
             # Display title and preview box (tight spacing)
-            st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{final_output}</div>", unsafe_allow_html=True)
+            # -------------------------------
+# Metadata + Lesson preview with tight formatting
+# -------------------------------
+metadata_html = f"""
+<div class='stCard'>
+    <div class='metadata-line'>Lesson Title: {title}</div>
+    <div class='metadata-line'>Subject: {lesson_data.get('subject','')}</div>
+    <div class='metadata-line'>Topic: {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'>Year Group: {lesson_data.get('year_group','')}</div>
+    <div class='metadata-line'>Duration: {lesson_data.get('lesson_duration','')}</div>
+    <div class='metadata-line'>Ability Level: {lesson_data.get('ability_level','')}</div>
+    <div class='metadata-line'>SEN/EAL Notes: {lesson_data.get('sen_notes','None')}</div>
+    <br>
+    {final_output.replace('\\n','<br>')}
+</div>
+"""
+
+st.markdown(metadata_html, unsafe_allow_html=True)
 
             # Exports
             pdf_buffer = create_pdf(final_output)
