@@ -416,22 +416,21 @@ def lesson_generator_page():
 
     lesson_data = {}
 
-   with st.form("lesson_form"):
-    st.subheader("Lesson Details")
-    # Initialize lesson_data in form scope
-    lesson_data = {}
-    lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
-    lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
-    lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
-    lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
-    lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
-    lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
-    lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
-    submitted = st.form_submit_button("🚀 Generate Lesson Plan")
+       with st.form("lesson_form"):
+        st.subheader("Lesson Details")
 
-    if submitted:
-        # Store prompt for AI generation
-        prompt = f"""
+        lesson_data = {}
+        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
+        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
+        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
+        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
+        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
+        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
+        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
+        submitted = st.form_submit_button("🚀 Generate Lesson Plan")
+
+        if submitted:
+            prompt = f"""
 Year Group: {lesson_data['year_group']}
 Subject: {lesson_data['subject']}
 Topic: {lesson_data['topic']}
@@ -440,39 +439,39 @@ Ability Level: {lesson_data['ability_level']}
 Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
-        st.session_state.last_prompt = prompt
-        # Pass lesson_data explicitly
-        generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)
+            st.session_state.last_prompt = prompt
+            generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)
 
-# Make sure lesson_data exists for regeneration even if form wasn't submitted
-if 'lesson_data' not in locals():
-    lesson_data = {}
+    # Ensure lesson_data exists for regeneration
+    if "lesson_data" not in locals():
+        lesson_data = {}
 
-if st.session_state.last_prompt:
-    st.markdown("### 🔄 Not happy with the plan?")
-    regen_style = st.selectbox(
-        "Choose a regeneration style:",
-        [
-            "♻️ Just regenerate (different variation)",
-            "🎨 More creative & engaging activities",
-            "📋 More structured with timings",
-            "🧩 Simplify for lower ability",
-            "🚀 Challenge for higher ability"
-        ]
-    )
-    custom_instruction = st.text_input(
-        "Or type your own custom instruction (optional)",
-        placeholder="e.g. Make it more interactive with outdoor activities"
-    )
-    if st.button("🔁 Regenerate Lesson Plan"):
-        extra_instruction = custom_instruction if custom_instruction else regen_style
-        new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
-        # Pass lesson_data safely
-        generate_and_display_plan(
-            new_prompt,
-            title=f"Regenerated {len(st.session_state.lesson_history)+1}",
-            lesson_data=lesson_data
+    if st.session_state.last_prompt:
+        st.markdown("### 🔄 Not happy with the plan?")
+        regen_style = st.selectbox(
+            "Choose a regeneration style:",
+            [
+                "♻️ Just regenerate (different variation)",
+                "🎨 More creative & engaging activities",
+                "📋 More structured with timings",
+                "🧩 Simplify for lower ability",
+                "🚀 Challenge for higher ability"
+            ]
         )
+        custom_instruction = st.text_input(
+            "Or type your own custom instruction (optional)",
+            placeholder="e.g. Make it more interactive with outdoor activities"
+        )
+
+        if st.button("🔁 Regenerate Lesson Plan"):
+            extra_instruction = custom_instruction if custom_instruction else regen_style
+            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
+
+            generate_and_display_plan(
+                new_prompt,
+                title=f"Regenerated {len(st.session_state.lesson_history)+1}",
+                lesson_data=lesson_data
+            )
 
 # -------------------------------
 # Sidebar history
