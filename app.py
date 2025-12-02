@@ -416,8 +416,9 @@ def lesson_generator_page():
 
     lesson_data = {}
 
-    with st.form("lesson_form"):
+   with st.form("lesson_form"):
     st.subheader("Lesson Details")
+    # Initialize lesson_data in form scope
     lesson_data = {}
     lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
     lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
@@ -429,6 +430,7 @@ def lesson_generator_page():
     submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
+        # Store prompt for AI generation
         prompt = f"""
 Year Group: {lesson_data['year_group']}
 Subject: {lesson_data['subject']}
@@ -439,7 +441,12 @@ Lesson Duration: {lesson_data['lesson_duration']}
 SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
+        # Pass lesson_data explicitly
         generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)
+
+# Make sure lesson_data exists for regeneration even if form wasn't submitted
+if 'lesson_data' not in locals():
+    lesson_data = {}
 
 if st.session_state.last_prompt:
     st.markdown("### 🔄 Not happy with the plan?")
@@ -460,10 +467,11 @@ if st.session_state.last_prompt:
     if st.button("🔁 Regenerate Lesson Plan"):
         extra_instruction = custom_instruction if custom_instruction else regen_style
         new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
+        # Pass lesson_data safely
         generate_and_display_plan(
             new_prompt,
             title=f"Regenerated {len(st.session_state.lesson_history)+1}",
-            lesson_data=lesson_data  # <-- pass lesson_data correctly
+            lesson_data=lesson_data
         )
 
 # -------------------------------
