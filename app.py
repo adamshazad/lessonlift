@@ -45,6 +45,9 @@ body {background-color: white; color: black;}
     max-height: 70vh;
     overflow-y: auto;
 }
+.stCard strong {
+    font-weight: bold;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -151,10 +154,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     st.session_state.lesson_count += 1
 
-    # Force AI to generate UK English, 750–1000 words, proper formatting
     prompt += (
         "\n\nPlease generate the lesson plan with minimum 750 words, maximum 1000 words. "
-        "Use bold section titles, dash bullet points, compact spacing: one blank line after titles, "
+        "Use **bold section titles**, dash bullet points, compact spacing: one blank line after titles, "
         "one blank line after bullet lists, and normal font for all text including main title. "
         "Use British English spelling only (e.g., 'colour', 'favour', 'maths')."
     )
@@ -177,7 +179,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
             st.markdown(f"### 📖 {title}")
-            st.markdown(f"<div class='stCard'>{clean_output}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='stCard'><strong>{clean_output}</strong></div>", unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(clean_output)
             docx_buffer = create_docx(clean_output)
