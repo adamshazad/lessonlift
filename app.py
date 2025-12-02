@@ -297,7 +297,7 @@ def create_docx(text):
 # -------------------------------
 # Generator
 # -------------------------------
-def generate_and_display_plan(prompt, title="Latest", regen_message=""):
+def generate_and_display_plan(prompt, lesson_data, title="Latest", regen_message=""):
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
@@ -320,7 +320,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
-            # Attempt generation up to 2 times if word count too low
             attempts = 0
             final_output = None
             while attempts < 2:
@@ -332,7 +331,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                     max_tokens=2200,
                 )
                 output = response.choices[0].message.content
-                # Clean & format
                 cleaned = clean_markdown(output)
                 formatted = format_tight_output(cleaned)
                 wcount = count_words(formatted)
@@ -341,13 +339,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
                     final_output = formatted
                     break
                 else:
-                    # If too short, ask model to expand (append an instruction) and retry once
                     prompt_with_req += "\n\nPlease expand the plan with more detail, examples, differentiation and assessment to reach at least 750 words. Use British English and keep format tight."
 
             if final_output is None:
                 final_output = formatted
 
-            # Final safety: ensure no emoji characters remain
+            # Remove emojis
             final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
             final_output = final_output.replace("🛠️", "").replace("✨", "").replace("✅", "").replace("📝", "").replace("⚡", "").replace("🤝", "")
 
@@ -360,7 +357,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             remaining_today = daily_limit - st.session_state.lesson_count
             st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
+            # -------------------------------
             # Metadata + Lesson preview with tight formatting
+            # -------------------------------
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {title}</div>
