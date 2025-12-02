@@ -361,15 +361,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message=""):
             docx_buffer = create_docx(final_output)
             st.markdown(
                 f"""
-                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
                     <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
-                        <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
+                        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
                     </a>
                     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-                        <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+                        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
                     </a>
                     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-                        <button style="padding:10px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+                        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
                     </a>
                 </div>
                 """,
