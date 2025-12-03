@@ -465,11 +465,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     </a>
 </div>
 """,
-                unsafe_allow_html=True
-            )
+            unsafe_allow_html=True
+        )
 
-        except Exception as e:
-            st.error(f"⚠️ Lesson plan could not be generated: {e}")
+    except Exception as e:
+        st.error(f"⚠️ Lesson plan could not be generated: {e}")
+
 # -------------------------------
 # Main generator page
 # -------------------------------
