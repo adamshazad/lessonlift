@@ -308,15 +308,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     st.session_state.lesson_count += 1
 
-    # Append strict generation requirements
     generation_instructions = (
         "\n\nImportant instructions for generation:\n"
         "- Use British English spelling only (e.g., 'colour', 'favour', 'maths').\n"
         "- Do NOT include emojis.\n"
-        "- Do NOT repeat or recreate the metadata fields (Subject, Topic, Year Group, etc.).\n"
-        "- Start the content directly with the section 'Lesson Outline'.\n"
-        "- Every section title should be **bold** and followed by one blank line.\n"
-        "- Use '-' dash bullet points where appropriate.\n"
+        "- Format exactly: Section Title (bold in preview), single blank line, then dash '-' bullet points or tight paragraphs.\n"
+        "- Collapse extra blank lines so there is at most one blank line between sections.\n"
         "- Minimum 750 words, maximum 1000 words.\n"
     )
 
@@ -324,6 +321,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
+            # Try generating up to 2 times if word count too low
             attempts = 0
             final_output = None
 
@@ -344,39 +342,25 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 if wcount >= 750:
                     final_output = formatted
                     break
-
-                prompt_with_req += (
-                    "\n\nPlease expand the lesson plan with more detail, examples, "
-                    "differentiation and assessment to reach at least 750 words."
-                )
+                else:
+                    prompt_with_req += (
+                        "\n\nPlease expand the lesson plan with more detail, "
+                        "examples, differentiation and assessment to reach at least 750 words."
+                    )
 
             if final_output is None:
                 final_output = formatted
 
-            # Remove emojis
+            # Remove emojis / surrogate glyphs
             final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
 
-            # Fix bold formatting
-            final_output = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
-
-            # Ensure Lesson Title appears at top
-            if not final_output.lower().startswith("lesson title:"):
-                final_output = f"Lesson Title: {title}\n\n{final_output}"
-
-            # Save to history
-            st.session_state.lesson_history.append({
-                "title": title,
-                "content": final_output
-            })
-
-            if regen_message:
-                st.info(f"🔄 {regen_message}")
-
-            remaining_today = daily_limit - st.session_state.lesson_count
-            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
+            # Ensure Lesson Outline header is bold in HTML
+            final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+            if not final_output_html.lower().startswith("lesson title:"):
+                final_output_html = f"<b>Lesson Title:</b> {title}<br>" + final_output_html
 
             # -------------------------------
-            # Display metadata + final plan
+            # Metadata + Lesson preview
             # -------------------------------
             metadata_html = f"""
 <div class='stCard'>
@@ -389,9 +373,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
     <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
     <br>
-    {final_output.replace('\\n','<br>')}
+    {final_output_html.replace('\\n','<br>')}
 </div>
 """
+
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             # Exports
