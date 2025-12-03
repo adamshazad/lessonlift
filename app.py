@@ -321,12 +321,50 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     prompt_with_req = prompt + generation_instructions
 
     # ✅ Ensure this is indented exactly 4 spaces inside the function
-    with st.spinner("✨ Creating lesson plan..."):
+       with st.spinner("✨ Creating lesson plan..."):
         try:
-            # Your lesson generation code goes here
-            pass
+            # Try generating up to 2 times if word count too low
+            attempts = 0
+            final_output = None
+
+            while attempts < 2:
+                attempts += 1
+                response = openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt_with_req}],
+                    temperature=0.3,
+                    max_tokens=2200,
+                )
+                output = response.choices[0].message.content
+
+                # Clean & format text
+                cleaned = clean_markdown(output)
+                formatted = format_tight_output(cleaned)
+                wcount = count_words(formatted)
+
+                if wcount >= 750:
+                    final_output = formatted
+                    break
+                else:
+                    prompt_with_req += (
+                        "\n\nPlease expand the lesson plan with more detail, "
+                        "examples, differentiation and assessment to reach at least 750 words."
+                    )
+
+            if final_output is None:
+                final_output = formatted
+
+            # Remove emojis / surrogate glyphs
+            final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
+
+            # ⭐ Ensure lesson outline header is bold & clean
+            final_output = final_output.replace("**Lesson Outline**", "<b>Lesson Outline</b>")
+            final_output = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
+            return
+
         # Save to history
         st.session_state.lesson_history.append({"title": title, "content": final_output})
 
@@ -339,17 +377,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         # -------------------------------
         # Metadata + Lesson preview
         # -------------------------------
-
-        # Ensure Lesson Title is at top of content
-        if not final_output.lower().startswith("lesson title:"):
-            final_output = f"Lesson Title: {title}\n\n{final_output}"
-
-        # Convert markdown bold **...** to HTML <b>...</b>
-        final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
-
         metadata_html = f"""
 <div class='stCard'>
-    <div class='metadata-line'><b>Lesson Title:</b> {title}</div>
+    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
     <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
     <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
     <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
@@ -358,9 +388,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
     <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
     <br>
-    {final_output_html.replace('\\n','<br>')}
+    {final_output.replace('\\n','<br>')}
 </div>
 """
+
         st.markdown(metadata_html, unsafe_allow_html=True)
 
         # Exports
