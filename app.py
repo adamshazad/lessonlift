@@ -450,8 +450,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         # Exports
         pdf_buffer = create_pdf(final_output)
         docx_buffer = create_docx(final_output)
-            st.markdown(
-                f"""
+
+        st.markdown(
+            f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
     <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
