@@ -313,17 +313,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         "\n\nImportant instructions for generation:\n"
         "- Use British English spelling only (e.g., 'colour', 'favour', 'maths').\n"
         "- Do NOT include emojis.\n"
-        "- Format exactly: Section Title (bold in preview), single blank line, then dash '-' bullet points or tight paragraphs.\n"
-        "- Collapse extra blank lines so there is at most one blank line between sections.\n"
+        "- Do NOT repeat or recreate the metadata fields (Subject, Topic, Year Group, etc.).\n"
+        "- Start the content directly with the section 'Lesson Outline'.\n"
+        "- Every section title should be **bold** and followed by one blank line.\n"
+        "- Use '-' dash bullet points where appropriate.\n"
         "- Minimum 750 words, maximum 1000 words.\n"
     )
 
     prompt_with_req = prompt + generation_instructions
 
-    # ✅ Ensure this is indented exactly 4 spaces inside the function
-       with st.spinner("✨ Creating lesson plan..."):
+    with st.spinner("✨ Creating lesson plan..."):
         try:
-            # Try generating up to 2 times if word count too low
             attempts = 0
             final_output = None
 
@@ -337,7 +337,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 )
                 output = response.choices[0].message.content
 
-                # Clean & format text
                 cleaned = clean_markdown(output)
                 formatted = format_tight_output(cleaned)
                 wcount = count_words(formatted)
@@ -345,25 +344,79 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 if wcount >= 750:
                     final_output = formatted
                     break
-                else:
-                    prompt_with_req += (
-                        "\n\nPlease expand the lesson plan with more detail, "
-                        "examples, differentiation and assessment to reach at least 750 words."
-                    )
+
+                prompt_with_req += (
+                    "\n\nPlease expand the lesson plan with more detail, examples, "
+                    "differentiation and assessment to reach at least 750 words."
+                )
 
             if final_output is None:
                 final_output = formatted
 
-            # Remove emojis / surrogate glyphs
+            # Remove emojis
             final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
 
-            # ⭐ Ensure lesson outline header is bold & clean
-            final_output = final_output.replace("**Lesson Outline**", "<b>Lesson Outline</b>")
+            # Fix bold formatting
             final_output = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+
+            # Ensure Lesson Title appears at top
+            if not final_output.lower().startswith("lesson title:"):
+                final_output = f"Lesson Title: {title}\n\n{final_output}"
+
+            # Save to history
+            st.session_state.lesson_history.append({
+                "title": title,
+                "content": final_output
+            })
+
+            if regen_message:
+                st.info(f"🔄 {regen_message}")
+
+            remaining_today = daily_limit - st.session_state.lesson_count
+            st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
+
+            # -------------------------------
+            # Display metadata + final plan
+            # -------------------------------
+            metadata_html = f"""
+<div class='stCard'>
+    <div class='metadata-line'><b>Lesson Title:</b> {title}</div>
+    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
+    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+    <br>
+    {final_output.replace('\\n','<br>')}
+</div>
+"""
+            st.markdown(metadata_html, unsafe_allow_html=True)
+
+            # Exports
+            pdf_buffer = create_pdf(final_output)
+            docx_buffer = create_docx(final_output)
+
+            st.markdown(
+                f"""
+<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+    <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
+    </a>
+    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+    </a>
+    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+    </a>
+</div>
+""",
+                unsafe_allow_html=True
+            )
 
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
-            return
 
         # Save to history
         st.session_state.lesson_history.append({"title": title, "content": final_output})
