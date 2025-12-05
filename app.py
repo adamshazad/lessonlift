@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fixed + final)
+# App.py - LessonLift with OpenAI 1.0+ integration (final + fixed)
 # -------------------------------
 
 import os
@@ -102,14 +102,16 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
     header_keywords = [
-        "Learning Objective", "Lesson Duration", "Ability Level", "SEN/EAL Notes",
-        "Introduction", "Direct Instruction", "Guided Practice", "Independent Practice",
-        "Main Activity", "Shape Hunt", "Shape Sorting", "Conclusion", "Assessment",
-        "Differentiation", "Extension Activities", "Follow-Up Activities", "Resources Needed"
+        "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
+        "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
+        "Materials Needed", "Resources", "Resources Needed",
+        "Lesson Outline", "Lesson Structure", "Introduction", "Main Activity",
+        "Direct Instruction", "Guided Practice", "Independent Practice",
+        "Closing", "Conclusion", "Assessment", "Differentiation",
+        "Extension", "Reflection", "Homework", "Plenary", "Starter"
     ]
     lines = text.splitlines()
     out_lines = []
-    bullet_indent = "  "  # Indentation for wrapped lines under bullets
     i = 0
 
     while i < len(lines):
@@ -119,34 +121,36 @@ def format_tight_output(text: str) -> str:
                 out_lines.append("")
             i += 1
             continue
-
-        # Header detection
-        is_header = any(line.lower().startswith(kw.lower()) for kw in header_keywords)
-        if is_header:
-            out_lines.append(f"**{line}**")
-            out_lines.append("")
+        if re.match(r'^[\-\*\u2022]\s+', lines[i]) or re.match(r'^\d+\.\s+', lines[i]):
+            content = re.sub(r'^[\-\*\u2022]?\s*', '', lines[i]).strip()
+            out_lines.append(f"- {content}")
             i += 1
             continue
 
-        # Bullet detection
-        if re.match(r'^[-\*\u2022]\s+', line):
-            content = re.sub(r'^[-\*\u2022]\s*', '', line).strip()
-            out_lines.append(f"- {content}")
+        is_header = False
+        for kw in header_keywords:
+            if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I):
+                is_header = True
+                header_text = kw
+                break
+            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) and len(line.split()) <= 10:
+                is_header = True
+                header_text = line
+                break
+
+        if is_header:
+            out_lines.append(f"**{header_text.strip()}**")
             j = i + 1
-            while j < len(lines) and lines[j].strip() != "" and not lines[j].startswith("-") and not any(lines[j].lower().startswith(kw.lower()) for kw in header_keywords):
-                out_lines.append(bullet_indent + lines[j].strip())
+            while j < len(lines) and lines[j].strip() == "":
                 j += 1
             i = j
+            if i < len(lines):
+                out_lines.append("")
             continue
 
-        # Numbered list or normal paragraph
-        if re.match(r'^\d+\.\s+', line):
-            out_lines.append(line)
-        else:
-            out_lines.append(line)
+        out_lines.append(line)
         i += 1
 
-    # Remove consecutive blank lines
     final_text = []
     for ln in out_lines:
         if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
@@ -256,27 +260,37 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             while attempts < 2:
                 attempts += 1
+
                 response = openai.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt_with_req}],
                     temperature=0.3,
                     max_tokens=2200,
                 )
+
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
                 wcount = count_words(formatted)
+
                 if wcount >= 750:
                     final_output = formatted
                     break
+
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
 
-            # Convert bold markers (**) to HTML <b> for preview
+            # Ensure final_output is never None
+            if final_output is None:
+                final_output = formatted if 'formatted' in locals() else ""
+
+            # Convert bold markers to HTML
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
             final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
             final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
 
+            # -------------------------------
             # Metadata + Lesson preview
+            # -------------------------------
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -291,6 +305,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     {final_output_html.replace('\\n','<br>').strip()}
 </div>
 """
+
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(final_output)
@@ -323,7 +338,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         st.info(f"🔄 {regen_message}")
 
     remaining_today = daily_limit - st.session_state.lesson_count
-    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left", icon="📊")
+    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
 # -------------------------------
 # Main generator page
@@ -331,12 +346,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
-
     lesson_data = {}
 
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
-
         lesson_data['year_group'] = st.selectbox("Year Group",
             ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level",
