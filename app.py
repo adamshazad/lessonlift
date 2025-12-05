@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (spacing + bullets fixed)
+# App.py - LessonLift with OpenAI 1.0+ integration (full spacing + bullets fixed)
 # -------------------------------
 
 import os
@@ -102,8 +102,8 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
     header_keywords = [
-        "Learning Objective", "Lesson Duration", "Topic", "Year Group", "Subject", 
-        "Ability Level", "SEN/EAL Notes", "Materials Needed", "Resources",
+        "Lesson Title", "Learning Objective", "Lesson Duration", "Topic", "Year Group",
+        "Subject", "Ability Level", "SEN/EAL Notes", "Materials Needed", "Resources",
         "Lesson Outline", "Introduction", "Main Activity", "Direct Instruction",
         "Guided Practice", "Independent Practice", "Closing", "Conclusion",
         "Assessment", "Differentiation", "Extension", "Reflection", "Homework", "Plenary", "Starter"
@@ -126,7 +126,7 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # Check if line is a header
+        # Header detection
         is_header = False
         for kw in header_keywords:
             if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I) or (re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) and len(line.split()) <= 10):
@@ -144,6 +144,7 @@ def format_tight_output(text: str) -> str:
                 out_lines.append("")
             continue
 
+        # Regular paragraph
         out_lines.append(line)
         i += 1
 
@@ -153,6 +154,11 @@ def format_tight_output(text: str) -> str:
         if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
             continue
         final_text.append(ln)
+
+    # Ensure proper spacing for bullet points: indent 2 spaces
+    for idx, ln in enumerate(final_text):
+        if ln.startswith("- "):
+            final_text[idx] = "  " + ln
 
     return "\n".join(final_text).strip()
 
@@ -225,7 +231,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (fixed)
+# Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -240,7 +246,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     generation_instructions = (
         "\n\nImportant instructions:\n"
-        "- Use British English only.\n"
+        "- British English only.\n"
         "- No emojis.\n"
         "- Section Title (bold), single blank line, then '-' bullet points.\n"
         "- Collapse extra blank lines.\n"
@@ -253,39 +259,29 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         try:
             attempts = 0
             final_output = None
-
             while attempts < 2:
                 attempts += 1
-
                 response = openai.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt_with_req}],
                     temperature=0.3,
                     max_tokens=2200,
                 )
-
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
-                wcount = count_words(formatted)
-
-                if wcount >= 750:
+                if count_words(formatted) >= 750:
                     final_output = formatted
                     break
-
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
 
             if final_output is None:
                 final_output = formatted
 
-            # Convert bold markers for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
-
-            # Remove any leading "Lesson Title" lines
             final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
             final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
 
-            # Metadata at top
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -306,8 +302,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             pdf_buffer = create_pdf(final_output)
             docx_buffer = create_docx(final_output)
 
-            st.markdown(
-                f"""
+            st.markdown(f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
     <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
@@ -318,17 +313,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
-</div>
-""",
-                unsafe_allow_html=True
-            )
+</div>""", unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
             return
 
     st.session_state.lesson_history.append({"title": title, "content": final_output})
-
     if regen_message:
         st.info(f"🔄 {regen_message}")
 
@@ -341,12 +332,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
-
     lesson_data = {}
 
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
-
         lesson_data['year_group'] = st.selectbox("Year Group",
             ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level",
