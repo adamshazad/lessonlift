@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fixed + final)
+# App.py - LessonLift with OpenAI 1.0+ integration (fixed + final, bullets aligned)
 # -------------------------------
 
 import os
@@ -101,6 +101,7 @@ def clean_markdown(text) -> str:
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
+
     header_keywords = [
         "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
         "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
@@ -110,23 +111,31 @@ def format_tight_output(text: str) -> str:
         "Closing", "Conclusion", "Assessment", "Differentiation",
         "Extension", "Reflection", "Homework", "Plenary", "Starter"
     ]
+
     lines = text.splitlines()
     out_lines = []
     i = 0
 
     while i < len(lines):
-        line = lines[i].strip()
+        line = lines[i].rstrip()
+
         if line == "":
             if len(out_lines) == 0 or out_lines[-1].strip() != "":
                 out_lines.append("")
             i += 1
             continue
-        if re.match(r'^[\-\*\u2022]\s+', lines[i]) or re.match(r'^\d+\.\s+', lines[i]):
-            content = re.sub(r'^[\-\*\u2022]?\s*', '', lines[i]).strip()
+
+        # Fix bullet alignment
+        if re.match(r'^[-*•]\s+', line) or re.match(r'^\d+\.\s+', line):
+            content = re.sub(r'^[-*•]?\s*', '', line).strip()
             out_lines.append(f"- {content}")
             i += 1
+            while i < len(lines) and lines[i].startswith(" "):
+                out_lines.append("  " + lines[i].strip())
+                i += 1
             continue
 
+        # Headers
         is_header = False
         for kw in header_keywords:
             if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I):
@@ -229,7 +238,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (FINAL)
+# Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -239,6 +248,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
+
     st.session_state.lesson_count += 1
 
     generation_instructions = (
@@ -256,44 +266,51 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         try:
             attempts = 0
             final_output = None
+
             while attempts < 2:
                 attempts += 1
                 response = openai.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=[{"role":"user","content":prompt_with_req}],
+                    messages=[{"role": "user", "content": prompt_with_req}],
                     temperature=0.3,
                     max_tokens=2200,
                 )
+
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
                 wcount = count_words(formatted)
+
                 if wcount >= 750:
                     final_output = formatted
                     break
+
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
 
             if final_output is None:
                 final_output = formatted
 
-            # -------------------------------
-            # Metadata display with bold labels and correct spacing
-            # -------------------------------
+            # Convert bold markers to HTML <b> for preview
+            final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+            final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
+            final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
+
+            # Metadata HTML
             metadata_html = f"""
 <div class='stCard'>
-<b>Lesson Plan:</b> {lesson_data.get('topic','')}
-
-<b>Year Group:</b> {lesson_data.get('year_group','')}
-<b>Subject:</b> {lesson_data.get('subject','')}
-<b>Topic:</b> {lesson_data.get('topic','')}
-<b>Learning Objective:</b> {lesson_data.get('learning_objective','')}
-<b>Ability Level:</b> {lesson_data.get('ability_level','')}
-<b>Lesson Duration:</b> {lesson_data.get('lesson_duration','')}
-<b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}
-
-{final_output.replace('\\n','<br>').strip()}
+    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
+    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+    <br>
+    {final_output_html.replace('\\n','<br>').strip()}
 </div>
 """
+
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(final_output)
@@ -321,8 +338,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             return
 
     st.session_state.lesson_history.append({"title": title, "content": final_output})
+
     if regen_message:
         st.info(f"🔄 {regen_message}")
+
     remaining_today = daily_limit - st.session_state.lesson_count
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
@@ -333,9 +352,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
+
     lesson_data = {}
+
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
+
         lesson_data['year_group'] = st.selectbox("Year Group",
             ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level",
