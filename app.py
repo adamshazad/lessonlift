@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (final + fixed)
+# App.py - LessonLift with OpenAI 1.0+ integration (spacing + bullets fixed)
 # -------------------------------
 
 import os
@@ -102,18 +102,15 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
     header_keywords = [
-        "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
-        "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
-        "Materials Needed", "Resources", "Resources Needed",
-        "Lesson Outline", "Lesson Structure", "Introduction", "Main Activity",
-        "Direct Instruction", "Guided Practice", "Independent Practice",
-        "Closing", "Conclusion", "Assessment", "Differentiation",
-        "Extension", "Reflection", "Homework", "Plenary", "Starter"
+        "Learning Objective", "Lesson Duration", "Topic", "Year Group", "Subject", 
+        "Ability Level", "SEN/EAL Notes", "Materials Needed", "Resources",
+        "Lesson Outline", "Introduction", "Main Activity", "Direct Instruction",
+        "Guided Practice", "Independent Practice", "Closing", "Conclusion",
+        "Assessment", "Differentiation", "Extension", "Reflection", "Homework", "Plenary", "Starter"
     ]
     lines = text.splitlines()
     out_lines = []
     i = 0
-
     while i < len(lines):
         line = lines[i].strip()
         if line == "":
@@ -121,19 +118,18 @@ def format_tight_output(text: str) -> str:
                 out_lines.append("")
             i += 1
             continue
+
+        # Normalize bullets
         if re.match(r'^[\-\*\u2022]\s+', lines[i]) or re.match(r'^\d+\.\s+', lines[i]):
             content = re.sub(r'^[\-\*\u2022]?\s*', '', lines[i]).strip()
             out_lines.append(f"- {content}")
             i += 1
             continue
 
+        # Check if line is a header
         is_header = False
         for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I):
-                is_header = True
-                header_text = kw
-                break
-            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) and len(line.split()) <= 10:
+            if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I) or (re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) and len(line.split()) <= 10):
                 is_header = True
                 header_text = line
                 break
@@ -151,6 +147,7 @@ def format_tight_output(text: str) -> str:
         out_lines.append(line)
         i += 1
 
+    # Collapse multiple blank lines
     final_text = []
     for ln in out_lines:
         if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
@@ -179,8 +176,7 @@ def show_logo(path="logo.png", width=200):
                     <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;" />
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
     except FileNotFoundError:
         st.warning("Logo file not found. Please upload 'logo.png'.")
 
@@ -229,7 +225,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator
+# Generator (fixed)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -244,10 +240,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     generation_instructions = (
         "\n\nImportant instructions:\n"
-        "- British English only.\n"
+        "- Use British English only.\n"
         "- No emojis.\n"
-        "- Section Title (bold), one blank line, then '-' bullet points.\n"
-        "- Remove extra blank lines.\n"
+        "- Section Title (bold), single blank line, then '-' bullet points.\n"
+        "- Collapse extra blank lines.\n"
         "- 750–1000 words.\n"
     )
 
@@ -279,18 +275,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
 
-            # Ensure final_output is never None
             if final_output is None:
-                final_output = formatted if 'formatted' in locals() else ""
+                final_output = formatted
 
-            # Convert bold markers to HTML
+            # Convert bold markers for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+
+            # Remove any leading "Lesson Title" lines
             final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
             final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
 
-            # -------------------------------
-            # Metadata + Lesson preview
-            # -------------------------------
+            # Metadata at top
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -315,13 +310,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
     <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
-        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
+        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
     </a>
     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
 </div>
 """,
@@ -338,7 +333,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         st.info(f"🔄 {regen_message}")
 
     remaining_today = daily_limit - st.session_state.lesson_count
-    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
+    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left", icon="📊")
 
 # -------------------------------
 # Main generator page
@@ -346,10 +341,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
+
     lesson_data = {}
 
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
+
         lesson_data['year_group'] = st.selectbox("Year Group",
             ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level",
