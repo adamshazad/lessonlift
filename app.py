@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (final + formatting fixes)
+# App.py - LessonLift with OpenAI 1.0+ integration (fixed + final)
 # -------------------------------
 
 import os
@@ -109,6 +109,7 @@ def format_tight_output(text: str) -> str:
     ]
     lines = text.splitlines()
     out_lines = []
+    bullet_indent = "  "  # Indentation for wrapped lines under bullets
     i = 0
 
     while i < len(lines):
@@ -119,6 +120,7 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
+        # Header detection
         is_header = any(line.lower().startswith(kw.lower()) for kw in header_keywords)
         if is_header:
             out_lines.append(f"**{line}**")
@@ -126,18 +128,22 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # Bullets
+        # Bullet detection
         if re.match(r'^[-\*\u2022]\s+', line):
             content = re.sub(r'^[-\*\u2022]\s*', '', line).strip()
             out_lines.append(f"- {content}")
-        elif re.match(r'^\d+\.\s+', line):
+            j = i + 1
+            while j < len(lines) and lines[j].strip() != "" and not lines[j].startswith("-") and not any(lines[j].lower().startswith(kw.lower()) for kw in header_keywords):
+                out_lines.append(bullet_indent + lines[j].strip())
+                j += 1
+            i = j
+            continue
+
+        # Numbered list or normal paragraph
+        if re.match(r'^\d+\.\s+', line):
             out_lines.append(line)
         else:
-            # Wrap text under previous bullet if needed
-            if out_lines and out_lines[-1].startswith("- "):
-                out_lines.append("  " + line)
-            else:
-                out_lines.append(line)
+            out_lines.append(line)
         i += 1
 
     # Remove consecutive blank lines
@@ -265,16 +271,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                     break
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
 
-            if final_output is None:
-                final_output = formatted
-
+            # Convert bold markers (**) to HTML <b> for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
             final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
             final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
 
-            # -------------------------------
             # Metadata + Lesson preview
-            # -------------------------------
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -298,13 +300,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
     <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
     </a>
     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
 </div>
 """,
@@ -321,7 +323,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         st.info(f"🔄 {regen_message}")
 
     remaining_today = daily_limit - st.session_state.lesson_count
-    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
+    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left", icon="📊")
 
 # -------------------------------
 # Main generator page
@@ -329,9 +331,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
+
     lesson_data = {}
+
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
+
         lesson_data['year_group'] = st.selectbox("Year Group",
             ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level",
@@ -361,6 +366,31 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)
+
+    if st.session_state.last_prompt:
+        st.markdown("### 🔄 Not happy with the plan?")
+        regen_style = st.selectbox(
+            "Choose a regeneration style:",
+            [
+                "♻️ Just regenerate (different variation)",
+                "🎨 More creative & engaging activities",
+                "📋 More structured with timings",
+                "🧩 Simplify for lower ability",
+                "🚀 Challenge for higher ability"
+            ]
+        )
+        custom_instruction = st.text_input(
+            "Or type your own custom instruction (optional)",
+            placeholder="e.g. Make it more interactive with outdoor activities"
+        )
+        if st.button("🔁 Regenerate Lesson Plan"):
+            extra_instruction = custom_instruction if custom_instruction else regen_style
+            new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
+            generate_and_display_plan(
+                new_prompt,
+                title=f"Regenerated {len(st.session_state.lesson_history)+1}",
+                lesson_data=lesson_data
+            )
 
 # -------------------------------
 # Sidebar history
