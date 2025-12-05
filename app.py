@@ -238,7 +238,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (fixed spacing + bullets)
+# Generator (fixed spacing + aligned bullets)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -286,21 +286,26 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted
 
+            # Convert bold markers (**) to HTML <b> for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
             final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
             final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
 
+            # -------------------------------
+            # Metadata + Lesson preview (clean spacing)
+            # -------------------------------
             metadata_html = f"""
 <div class='stCard'>
-    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div><br><br>
-    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div><br><br>
-    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div><br><br>
-    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div><br><br>
-    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div><br><br>
-    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div><br><br>
-    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div><br><br>
-    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div><br><br>
-    {final_output_html.replace('\\n','<br>').strip()}
+    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
+    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+    <br>
+    {final_output_html.replace('\\n','<br>').replace('<br><br>','<br>').strip()}
 </div>
 """
             st.markdown(metadata_html, unsafe_allow_html=True)
