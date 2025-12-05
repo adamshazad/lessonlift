@@ -229,7 +229,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (FIXED)
+# Generator (FINAL)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -239,7 +239,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
-
     st.session_state.lesson_count += 1
 
     generation_instructions = (
@@ -257,56 +256,45 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         try:
             attempts = 0
             final_output = None
-
             while attempts < 2:
                 attempts += 1
-
                 response = openai.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt_with_req}],
+                    messages=[{"role":"user","content":prompt_with_req}],
                     temperature=0.3,
                     max_tokens=2200,
                 )
-
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
                 wcount = count_words(formatted)
-
                 if wcount >= 750:
                     final_output = formatted
                     break
-
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
 
-# Convert bold markers (**) to HTML <b> for preview
-final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+            if final_output is None:
+                final_output = formatted
 
-# Remove any leading "Lesson Title: ..." lines that the model may have included
-# (we already show metadata separately so we don't want duplicates)
-final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
-
-# Remove any extra leading blank lines still at the top of the content
-final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
-
-# Ensure a single blank line between metadata and the lesson body in preview
-# Build metadata HTML (bold lines) and then include the cleaned lesson body
-metadata_html = f"""
+            # -------------------------------
+            # Metadata display with bold labels and correct spacing
+            # -------------------------------
+            metadata_html = f"""
 <div class='stCard'>
-    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
-    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
-    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
-    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
-    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
-    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
-    <br>
-    {final_output_html.replace('\\n','<br>').strip()}
+<b>Lesson Plan:</b> {lesson_data.get('topic','')}
+
+<b>Year Group:</b> {lesson_data.get('year_group','')}
+<b>Subject:</b> {lesson_data.get('subject','')}
+<b>Topic:</b> {lesson_data.get('topic','')}
+<b>Learning Objective:</b> {lesson_data.get('learning_objective','')}
+<b>Ability Level:</b> {lesson_data.get('ability_level','')}
+<b>Lesson Duration:</b> {lesson_data.get('lesson_duration','')}
+<b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}
+
+{final_output.replace('\\n','<br>').strip()}
 </div>
 """
-
-st.markdown(metadata_html, unsafe_allow_html=True)
+            st.markdown(metadata_html, unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(final_output)
             docx_buffer = create_docx(final_output)
@@ -315,13 +303,13 @@ st.markdown(metadata_html, unsafe_allow_html=True)
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
     <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
     </a>
     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
 </div>
 """,
@@ -333,12 +321,11 @@ st.markdown(metadata_html, unsafe_allow_html=True)
             return
 
     st.session_state.lesson_history.append({"title": title, "content": final_output})
-
     if regen_message:
         st.info(f"🔄 {regen_message}")
-
     remaining_today = daily_limit - st.session_state.lesson_count
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
+
 
 # -------------------------------
 # Main generator page
@@ -346,12 +333,9 @@ st.markdown(metadata_html, unsafe_allow_html=True)
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
-
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
-
         lesson_data['year_group'] = st.selectbox("Year Group",
             ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level",
