@@ -229,20 +229,13 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (usage box on top)
+# Generator (FIXED)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
         lesson_data = {}
 
     daily_limit = 10
-
-    # -------------------------------
-    # 📊 Usage box (TOP of preview)
-    # -------------------------------
-    remaining_today = daily_limit - st.session_state.lesson_count
-    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
-
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
@@ -291,7 +284,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # Convert bold markers (**) to HTML <b> for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
-            # Fix standalone Learning Objective
+            # -------------------------------
+            # Fix standalone "Learning Objective"
+            # -------------------------------
             final_output_html = re.sub(
                 r'(?i)Learning Objective\s*<br>\s*(.*?)<br>',
                 r'- Learning Objective: \1<br>',
@@ -299,10 +294,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 flags=re.DOTALL
             )
 
-            # Remove extra leading blank lines
+            # Remove extra leading blank lines at top
             final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
 
-            # Metadata + lesson preview
+            # Build metadata HTML (bold lines) and then include lesson body
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -348,6 +343,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     if regen_message:
         st.info(f"🔄 {regen_message}")
+
+    remaining_today = daily_limit - st.session_state.lesson_count
+    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
 # -------------------------------
 # Main generator page
