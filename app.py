@@ -279,13 +279,19 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
 
-            if final_output is None:
-                final_output = formatted
+# Convert bold markers (**) to HTML <b> for preview
+final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
-            final_output = re.sub(r'[\U00010000-\U0010ffff]', '', final_output)
-            final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+# Remove any leading "Lesson Title: ..." lines that the model may have included
+# (we already show metadata separately so we don't want duplicates)
+final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
 
-            metadata_html = f"""
+# Remove any extra leading blank lines still at the top of the content
+final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
+
+# Ensure a single blank line between metadata and the lesson body in preview
+# Build metadata HTML (bold lines) and then include the cleaned lesson body
+metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
     <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
@@ -296,10 +302,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
     <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
     <br>
-    {final_output_html.replace('\\n','<br>')}
+    {final_output_html.replace('\\n','<br>').strip()}
 </div>
 """
-            st.markdown(metadata_html, unsafe_allow_html=True)
+
+st.markdown(metadata_html, unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(final_output)
             docx_buffer = create_docx(final_output)
