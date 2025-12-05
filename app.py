@@ -238,7 +238,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (fixed spacing + aligned bullets)
+# Generator (spacing + aligned bullets)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -256,6 +256,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         "- No emojis.\n"
         "- Section Title (bold), one blank line, then '-' bullet points.\n"
         "- Remove extra blank lines.\n"
+        "- Ensure wrapped lines are indented under the bullet.\n"
         "- 750–1000 words.\n"
     )
 
@@ -274,6 +275,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                     temperature=0.3,
                     max_tokens=2200,
                 )
+
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
@@ -286,14 +288,25 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted
 
-            # Convert bold markers (**) to HTML <b> for preview
+            # Convert bold markers to HTML
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+            # Remove any extra "Lesson Title" lines from model
             final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
             final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
 
-            # -------------------------------
-            # Metadata + Lesson preview (clean spacing)
-            # -------------------------------
+            # Align bullets: ensure wrapped lines are indented 2 spaces
+            def indent_bullets(match):
+                lines = match.group(0).split('\n')
+                out = [lines[0]]  # first line stays
+                for l in lines[1:]:
+                    if l.strip():
+                        out.append("  " + l.strip())  # indent wrapped lines 2 spaces
+                    else:
+                        out.append("")
+                return '\n'.join(out)
+            final_output_html = re.sub(r'^- .+(?:\n.+)*', indent_bullets, final_output_html, flags=re.M)
+
+            # Build metadata HTML
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -305,9 +318,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
     <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
     <br>
-    {final_output_html.replace('\\n','<br>').replace('<br><br>','<br>').strip()}
+    {final_output_html.replace('\\n','<br>').strip()}
 </div>
 """
+
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(final_output)
@@ -326,7 +340,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
 </div>
-""", unsafe_allow_html=True)
+""",
+                unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
