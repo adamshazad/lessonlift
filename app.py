@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fixed + final, bullets aligned)
+# App.py - LessonLift with OpenAI 1.0+ integration (final + bullet fix)
 # -------------------------------
 
 import os
@@ -103,10 +103,10 @@ def format_tight_output(text: str) -> str:
         return ""
 
     header_keywords = [
-        "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
+        "Learning Objective", "Lesson Duration", "Topic",
         "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
-        "Materials Needed", "Resources", "Resources Needed",
-        "Lesson Outline", "Lesson Structure", "Introduction", "Main Activity",
+        "Materials Needed", "Resources Needed",
+        "Lesson Outline", "Introduction", "Main Activity",
         "Direct Instruction", "Guided Practice", "Independent Practice",
         "Closing", "Conclusion", "Assessment", "Differentiation",
         "Extension", "Reflection", "Homework", "Plenary", "Starter"
@@ -125,7 +125,7 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # Fix bullet alignment
+        # Bullets - align wrapped lines
         if re.match(r'^[-*•]\s+', line) or re.match(r'^\d+\.\s+', line):
             content = re.sub(r'^[-*•]?\s*', '', line).strip()
             out_lines.append(f"- {content}")
@@ -238,7 +238,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator
+# Generator (fixed spacing + bullets)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -248,7 +248,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
-
     st.session_state.lesson_count += 1
 
     generation_instructions = (
@@ -275,42 +274,35 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                     temperature=0.3,
                     max_tokens=2200,
                 )
-
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
                 wcount = count_words(formatted)
-
                 if wcount >= 750:
                     final_output = formatted
                     break
-
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
 
             if final_output is None:
                 final_output = formatted
 
-            # Convert bold markers to HTML <b> for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
             final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
             final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
 
-            # Metadata HTML
             metadata_html = f"""
 <div class='stCard'>
-    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
-    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
-    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
-    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
-    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
-    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
-    <br>
+    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div><br><br>
+    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div><br><br>
+    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div><br><br>
+    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div><br><br>
+    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div><br><br>
+    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div><br><br>
+    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div><br><br>
+    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div><br><br>
     {final_output_html.replace('\\n','<br>').strip()}
 </div>
 """
-
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(final_output)
@@ -329,22 +321,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
 </div>
-""",
-                unsafe_allow_html=True
-            )
+""", unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
             return
 
     st.session_state.lesson_history.append({"title": title, "content": final_output})
-
     if regen_message:
         st.info(f"🔄 {regen_message}")
-
     remaining_today = daily_limit - st.session_state.lesson_count
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
-
 
 # -------------------------------
 # Main generator page
@@ -354,10 +341,8 @@ def lesson_generator_page():
     title_and_tagline()
 
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
-
         lesson_data['year_group'] = st.selectbox("Year Group",
             ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level",
@@ -372,7 +357,6 @@ def lesson_generator_page():
             placeholder="e.g. To understand fractions")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)",
             placeholder="e.g. Visual aids, sentence starters")
-
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
@@ -398,12 +382,10 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
                 "📋 More structured with timings",
                 "🧩 Simplify for lower ability",
                 "🚀 Challenge for higher ability"
-            ]
-        )
+            ])
         custom_instruction = st.text_input(
             "Or type your own custom instruction (optional)",
-            placeholder="e.g. Make it more interactive with outdoor activities"
-        )
+            placeholder="e.g. Make it more interactive with outdoor activities")
         if st.button("🔁 Regenerate Lesson Plan"):
             extra_instruction = custom_instruction if custom_instruction else regen_style
             new_prompt = st.session_state.last_prompt + "\n\n" + extra_instruction
