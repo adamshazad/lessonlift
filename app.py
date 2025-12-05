@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift fully sorted + final
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing)
 # -------------------------------
 
 import os
@@ -40,7 +40,7 @@ body {background-color: white; color: black;}
     padding: 12px !important;
     margin-bottom: 12px !important;
     box-shadow: 0px 2px 8px rgba(0,0,0,0.15) !important;
-    line-height: 1.5em;
+    line-height: 1.45em;
     white-space: pre-wrap;
     max-height: 70vh;
     overflow-y: auto;
@@ -82,7 +82,7 @@ openai.api_key = st.secrets.get("OPENAI_API_KEY")
 # CLEAN + FORMAT functions
 # -------------------------------
 def clean_markdown(text) -> str:
-    if not text:
+    if text is None:
         return ""
     text = str(text)
     text = re.sub(r'^\s*#{1,6}\s*', '', text, flags=re.MULTILINE)
@@ -102,54 +102,47 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
     header_keywords = [
-        "Learning Objective", "Lesson Duration", "Classroom Setup",
-        "Introduction", "Main Activity", "Activity Instructions",
-        "Differentiation", "Hands-On Exploration", "Assessment",
-        "Conclusion", "Follow-Up Activities", "Resources Needed"
+        "Learning Objective", "Lesson Duration", "Classroom Setup", "Introduction", 
+        "Discussion Points", "Main Activity", "Sorting Activity", "Hands-On Exploration", 
+        "Practical Application", "Assessment", "Independent Practice", "Conclusion",
+        "Follow-Up Activities", "Extension Activities", "Resources Needed", "Differentiation"
     ]
     lines = text.splitlines()
     out_lines = []
     i = 0
-
     while i < len(lines):
         line = lines[i].strip()
-        if not line:
+        if line == "":
             if len(out_lines) == 0 or out_lines[-1].strip() != "":
                 out_lines.append("")
             i += 1
             continue
-
-        # Bullet normalization
-        if re.match(r'^[\-\*\u2022]\s+', lines[i]) or re.match(r'^\d+\.\s+', lines[i]):
-            content = re.sub(r'^[\-\*\u2022]?\s*', '', lines[i]).strip()
-            out_lines.append(f"- {content}")
-            i += 1
-            continue
-
-        # Headers
+        # Detect header
         is_header = False
         for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I):
-                is_header = True
-                header_text = kw
-                break
-            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) and len(line.split()) <= 12:
+            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
                 is_header = True
                 header_text = line
                 break
         if is_header:
-            out_lines.append(f"**{header_text.strip()}**")
+            out_lines.append(f"**{header_text}**")
+            # indent subsequent bullets under this header
             j = i + 1
-            while j < len(lines) and not lines[j].strip():
+            while j < len(lines) and lines[j].strip() == "":
                 j += 1
             i = j
+            # insert single blank line after header
             if i < len(lines):
                 out_lines.append("")
             continue
-
-        out_lines.append(line)
+        # Handle bullet indentation: if line starts with -, add two spaces before content
+        if line.startswith("-"):
+            content = line[1:].strip()
+            out_lines.append(f"- {content}")
+        else:
+            out_lines.append(line)
         i += 1
-
+    # Remove multiple blank lines
     final_text = []
     for ln in out_lines:
         if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
@@ -158,7 +151,9 @@ def format_tight_output(text: str) -> str:
     return "\n".join(final_text).strip()
 
 def count_words(text: str) -> int:
-    return len(re.findall(r'\w+', text)) if text else 0
+    if not text:
+        return 0
+    return len(re.findall(r'\w+', text))
 
 # -------------------------------
 # Logo + title
@@ -234,16 +229,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
-
     st.session_state.lesson_count += 1
-    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit-st.session_state.lesson_count} left")
+
+    # Show daily usage on top
+    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
 
     generation_instructions = (
         "\n\nImportant instructions:\n"
-        "- British English only.\n"
+        "- Use British English only.\n"
         "- No emojis.\n"
-        "- Section Title (bold), one blank line, then '-' bullet points.\n"
-        "- Remove extra blank lines.\n"
+        "- Section headers bold, bullets indented 2 spaces under header.\n"
+        "- Keep exactly one blank line between sections.\n"
         "- 750–1000 words.\n"
     )
     prompt_with_req = prompt + generation_instructions
@@ -267,13 +263,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                     final_output = formatted
                     break
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
-
             if final_output is None:
                 final_output = formatted
 
-            # Convert **bold** to HTML
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
+            # Build metadata HTML
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -292,7 +287,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             pdf_buffer = create_pdf(final_output)
             docx_buffer = create_docx(final_output)
-
             st.markdown(
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
@@ -306,16 +300,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
 </div>
-""", unsafe_allow_html=True)
-
-            st.session_state.lesson_history.append({"title": title, "content": final_output})
-
-            if regen_message:
-                st.info(f"🔄 {regen_message}")
-
+""",
+                unsafe_allow_html=True
+            )
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
             return
+
+    st.session_state.lesson_history.append({"title": title, "content": final_output})
+    if regen_message:
+        st.info(f"🔄 {regen_message}")
 
 # -------------------------------
 # Main generator page
@@ -323,19 +317,24 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
-
     lesson_data = {}
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
-        lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
-        lesson_data['ability_level'] = st.selectbox("Ability Level", ["Mixed ability","Lower ability","Higher ability"])
-        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration", ["30 min","45 min","60 min"])
-        lesson_data['subject'] = st.text_input("Subject", placeholder="e.g. English, Maths, Science")
-        lesson_data['topic'] = st.text_input("Topic", placeholder="e.g. Fractions, The Romans, Plant Growth")
-        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)", placeholder="e.g. To understand fractions")
-        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)", placeholder="e.g. Visual aids, sentence starters")
+        lesson_data['year_group'] = st.selectbox("Year Group",
+            ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
+        lesson_data['ability_level'] = st.selectbox("Ability Level",
+            ["Mixed ability","Lower ability","Higher ability"])
+        lesson_data['lesson_duration'] = st.selectbox("Lesson Duration",
+            ["30 min","45 min","60 min"])
+        lesson_data['subject'] = st.text_input("Subject",
+            placeholder="e.g. English, Maths, Science")
+        lesson_data['topic'] = st.text_input("Topic",
+            placeholder="e.g. Fractions, The Romans, Plant Growth")
+        lesson_data['learning_objective'] = st.text_area("Learning Objective (optional)",
+            placeholder="e.g. To understand fractions")
+        lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)",
+            placeholder="e.g. Visual aids, sentence starters")
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
-
     if submitted:
         prompt = f"""
 Year Group: {lesson_data['year_group']}
@@ -348,7 +347,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)
-
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
