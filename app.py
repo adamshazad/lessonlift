@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing + duplicate LO)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing and duplicate titles)
 # -------------------------------
 
 import os
@@ -85,18 +85,33 @@ def clean_markdown(text) -> str:
     if text is None:
         return ""
     text = str(text)
+    # Remove markdown headings
     text = re.sub(r'^\s*#{1,6}\s*', '', text, flags=re.MULTILINE)
+    # Remove bold/italic markers
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
+    # Replace bullets with dash
     text = text.replace("•", "-")
     text = re.sub(r'^[\t\s]*[\*\u2022]\s+', '- ', text, flags=re.MULTILINE)
     text = re.sub(r'^[\t\s]*[-–—•]\s+', '- ', text, flags=re.MULTILINE)
+    # Remove repeated long dashes
     text = re.sub(r'\-{3,}', '', text)
+    # Collapse multiple blank lines
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     text = re.sub(r'\n{2,}', '\n\n', text)
     lines = [line.rstrip() for line in text.splitlines()]
-    return "\n".join(lines).strip()
+    text = "\n".join(lines).strip()
+    
+    # -------------------------------
+    # REMOVE DUPLICATE LESSON TITLE / LEARNING OBJECTIVE
+    # -------------------------------
+    # Remove leading "Lesson Plan: ..." lines
+    text = re.sub(r'^\s*Lesson Plan:.*\n?', '', text, flags=re.I)
+    # Remove repeated "Learning Objective" line immediately after
+    text = re.sub(r'^\s*Learning Objective\s*\n?', '', text, flags=re.I)
+    
+    return text
 
 def format_tight_output(text: str) -> str:
     if not text:
@@ -135,7 +150,7 @@ def format_tight_output(text: str) -> str:
             if i < len(lines):
                 out_lines.append("")
             continue
-        # Handle bullet indentation
+        # Handle bullet indentation: if line starts with -, add two spaces before content
         if line.startswith("-"):
             content = line[1:].strip()
             out_lines.append(f"- {content}")
@@ -259,8 +274,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
-                # Remove duplicate Learning Objective at the top if metadata exists
-                formatted = re.sub(r'(?i)^\s*learning objective\s*\n+', '', formatted.strip())
                 if count_words(formatted) >= 750:
                     final_output = formatted
                     break
@@ -296,10 +309,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
     </a>
     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
 </div>
 """,
