@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing and duplicate titles)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing + duplicate header removal)
 # -------------------------------
 
 import os
@@ -85,85 +85,107 @@ def clean_markdown(text) -> str:
     if text is None:
         return ""
     text = str(text)
-    # Remove markdown headings
     text = re.sub(r'^\s*#{1,6}\s*', '', text, flags=re.MULTILINE)
-    # Remove bold/italic markers
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
-    # Replace bullets with dash
     text = text.replace("•", "-")
     text = re.sub(r'^[\t\s]*[\*\u2022]\s+', '- ', text, flags=re.MULTILINE)
     text = re.sub(r'^[\t\s]*[-–—•]\s+', '- ', text, flags=re.MULTILINE)
-    # Remove repeated long dashes
     text = re.sub(r'\-{3,}', '', text)
-    # Collapse multiple blank lines
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     text = re.sub(r'\n{2,}', '\n\n', text)
     lines = [line.rstrip() for line in text.splitlines()]
-    text = "\n".join(lines).strip()
-    
-    # -------------------------------
-    # REMOVE DUPLICATE LESSON TITLE / LEARNING OBJECTIVE
-    # -------------------------------
-    # Remove leading "Lesson Plan: ..." lines
-    text = re.sub(r'^\s*Lesson Plan:.*\n?', '', text, flags=re.I)
-    # Remove repeated "Learning Objective" line immediately after
-    text = re.sub(r'^\s*Learning Objective\s*\n?', '', text, flags=re.I)
-    
-    return text
+    return "\n".join(lines).strip()
+
+# -------------------------------
+# 🔥 NEW FIX → Remove duplicate header lines + stray titles
+# -------------------------------
+def remove_duplicate_and_stray_headers(text: str) -> str:
+    lines = text.splitlines()
+    cleaned = []
+    seen_headers = set()
+
+    header_pattern = re.compile(r'^(Learning Objective|Introduction|Main Activity|Assessment|Differentiation|Conclusion|Extension Activities|Resources Needed)\b', re.I)
+    title_pattern = re.compile(r'^(Year\s*\d.*Lesson Plan|Lesson Plan:|Year \d+ Maths Lesson Plan)', re.I)
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Remove random inserted lesson titles
+        if title_pattern.match(stripped):
+            continue
+
+        # Remove duplicate headers
+        match = header_pattern.match(stripped)
+        if match:
+            header = match.group(1).lower()
+            if header in seen_headers:
+                continue
+            seen_headers.add(header)
+
+        cleaned.append(line)
+
+    return "\n".join(cleaned).strip()
+
 
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
+
+    # FIX APPLIED
+    text = remove_duplicate_and_stray_headers(text)
+
     header_keywords = [
-        "Learning Objective", "Lesson Duration", "Classroom Setup", "Introduction", 
-        "Discussion Points", "Main Activity", "Sorting Activity", "Hands-On Exploration", 
+        "Learning Objective", "Lesson Duration", "Classroom Setup", "Introduction",
+        "Discussion Points", "Main Activity", "Sorting Activity", "Hands-On Exploration",
         "Practical Application", "Assessment", "Independent Practice", "Conclusion",
         "Follow-Up Activities", "Extension Activities", "Resources Needed", "Differentiation"
     ]
+
     lines = text.splitlines()
     out_lines = []
     i = 0
+
     while i < len(lines):
         line = lines[i].strip()
+
         if line == "":
             if len(out_lines) == 0 or out_lines[-1].strip() != "":
                 out_lines.append("")
             i += 1
             continue
-        # Detect header
+
+        # Detect headers
         is_header = False
         for kw in header_keywords:
             if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
+                out_lines.append(f"**{line}**")
+                out_lines.append("")  # one blank line after header
                 is_header = True
-                header_text = line
                 break
+
         if is_header:
-            out_lines.append(f"**{header_text}**")
-            # indent subsequent bullets under this header
-            j = i + 1
-            while j < len(lines) and lines[j].strip() == "":
-                j += 1
-            i = j
-            # insert single blank line after header
-            if i < len(lines):
-                out_lines.append("")
+            i += 1
             continue
-        # Handle bullet indentation: if line starts with -, add two spaces before content
+
+        # Normal bullet
         if line.startswith("-"):
             content = line[1:].strip()
             out_lines.append(f"- {content}")
         else:
             out_lines.append(line)
+
         i += 1
-    # Remove multiple blank lines
-    final_text = []
+
+    # Remove excessive blanks
+    final = []
     for ln in out_lines:
-        if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
+        if ln == "" and (len(final) == 0 or final[-1] == ""):
             continue
-        final_text.append(ln)
-    return "\n".join(final_text).strip()
+        final.append(ln)
+
+    return "\n".join(final).strip()
 
 def count_words(text: str) -> int:
     if not text:
@@ -246,17 +268,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         return
     st.session_state.lesson_count += 1
 
-    # Show daily usage on top
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
 
     generation_instructions = (
         "\n\nImportant instructions:\n"
         "- Use British English only.\n"
         "- No emojis.\n"
-        "- Section headers bold, bullets indented 2 spaces under header.\n"
+        "- Section headers bold, bullets indented 2 spaces.\n"
         "- Keep exactly one blank line between sections.\n"
         "- 750–1000 words.\n"
     )
+
     prompt_with_req = prompt + generation_instructions
 
     with st.spinner("✨ Creating lesson plan..."):
@@ -273,17 +295,22 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 )
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
+
+                # FIX APPLY HERE
+                cleaned = remove_duplicate_and_stray_headers(cleaned)
+
                 formatted = format_tight_output(cleaned)
+
                 if count_words(formatted) >= 750:
                     final_output = formatted
                     break
-                prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
+                prompt_with_req += "\n\nExpand with more detail."
+
             if final_output is None:
                 final_output = formatted
 
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
-            # Build metadata HTML
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -302,6 +329,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             pdf_buffer = create_pdf(final_output)
             docx_buffer = create_docx(final_output)
+
             st.markdown(
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
@@ -309,10 +337,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
     </a>
     <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-        <button style="padding:16px 16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
 </div>
 """,
@@ -362,6 +390,7 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)
+
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
