@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing and title)
 # -------------------------------
 
 import os
@@ -126,7 +126,6 @@ def format_tight_output(text: str) -> str:
                 break
         if is_header:
             out_lines.append(f"**{header_text}**")
-            # insert single blank line after header
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
@@ -134,7 +133,7 @@ def format_tight_output(text: str) -> str:
             if i < len(lines):
                 out_lines.append("")
             continue
-        # Handle bullet indentation: if line starts with -, keep two-space alignment
+        # Handle bullet indentation: if line starts with -, add two spaces before content
         if line.startswith("-"):
             content = line[1:].strip()
             out_lines.append(f"- {content}")
@@ -228,15 +227,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
+    st.session_state.lesson_count += 1
 
-    # Daily usage on top
-    st.info(f"📊 {st.session_state.lesson_count+1}/{daily_limit} used — {daily_limit - st.session_state.lesson_count-1} left")
+    # Show daily usage on top
+    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
 
     generation_instructions = (
         "\n\nImportant instructions:\n"
-        "- British English only.\n"
+        "- Use British English only.\n"
         "- No emojis.\n"
-        "- Section headers bold, bullets aligned properly.\n"
+        "- Section headers bold, bullets indented 2 spaces under header.\n"
         "- Keep exactly one blank line between sections.\n"
         "- 750–1000 words.\n"
     )
@@ -264,8 +264,18 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted
 
+            # Remove redundant "Lesson Plan: ..." at the top if present
+            final_output = re.sub(r'(?i)^lesson plan\s*:.*\n+', '', final_output.strip())
+            final_output = re.sub(r'^\s*\n+', '', final_output)
+
+            # Convert bold markers for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
+            # Prepend a proper title line for downloads
+            title_line = f"Lesson Plan: {lesson_data.get('topic','')}\n\n"
+            final_output_for_download = title_line + final_output
+
+            # Build metadata HTML
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -282,12 +292,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 """
             st.markdown(metadata_html, unsafe_allow_html=True)
 
-            pdf_buffer = create_pdf(final_output)
-            docx_buffer = create_docx(final_output)
+            pdf_buffer = create_pdf(final_output_for_download)
+            docx_buffer = create_docx(final_output_for_download)
+
             st.markdown(
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-    <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
+    <a href="data:text/plain;base64,{base64.b64encode(final_output_for_download.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
