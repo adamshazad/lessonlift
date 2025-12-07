@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed)
 # -------------------------------
 
 import os
@@ -126,16 +126,15 @@ def format_tight_output(text: str) -> str:
                 break
         if is_header:
             out_lines.append(f"**{header_text}**")
-            # indent subsequent bullets under this header
+            # insert single blank line after header
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
             i = j
-            # insert single blank line after header
             if i < len(lines):
                 out_lines.append("")
             continue
-        # Handle bullet indentation: if line starts with -, add two spaces before content
+        # Handle bullet indentation: if line starts with -, keep two-space alignment
         if line.startswith("-"):
             content = line[1:].strip()
             out_lines.append(f"- {content}")
@@ -229,16 +228,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
-    st.session_state.lesson_count += 1
 
-    # Show daily usage on top
-    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
+    # Daily usage on top
+    st.info(f"📊 {st.session_state.lesson_count+1}/{daily_limit} used — {daily_limit - st.session_state.lesson_count-1} left")
 
     generation_instructions = (
         "\n\nImportant instructions:\n"
-        "- Use British English only.\n"
+        "- British English only.\n"
         "- No emojis.\n"
-        "- Section headers bold, bullets indented 2 spaces under header.\n"
+        "- Section headers bold, bullets aligned properly.\n"
         "- Keep exactly one blank line between sections.\n"
         "- 750–1000 words.\n"
     )
@@ -268,7 +266,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
-            # Build metadata HTML
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
