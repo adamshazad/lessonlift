@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing + duplicate headers)
 # -------------------------------
 
 import os
@@ -109,7 +109,6 @@ def format_tight_output(text: str) -> str:
         "Direct Instruction", "Guided Practice", "Independent Practice",
         "Closing", "Conclusion", "Assessment", "Differentiation",
         "Extension", "Reflection", "Homework", "Plenary", "Starter",
-        # Additional headers you sometimes use
         "Classroom Setup", "Discussion Points", "Hands-On Exploration",
         "Shape Hunt", "Shape Sorting", "Shape Exploration", "Learning Objective"
     ]
@@ -129,7 +128,7 @@ def format_tight_output(text: str) -> str:
             out_lines.append(f"- {content}")
             i += 1
             continue
-        # Header detection (match known keywords or lines ending with (5 minutes) etc.)
+        # Header detection
         is_header = False
         header_text = line
         for kw in header_keywords:
@@ -137,7 +136,6 @@ def format_tight_output(text: str) -> str:
                 is_header = True
                 header_text = line
                 break
-        # Also detect lines ending with "(5 minutes)" or "(10 minutes)" or "(20 minutes)"
         if not is_header and re.search(r'\(\d+\s*minutes\)$', line, flags=re.I):
             is_header = True
             header_text = line
@@ -148,7 +146,6 @@ def format_tight_output(text: str) -> str:
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
             i = j
-            # Ensure exactly one blank line after header (so paragraph separation preserved)
             if i < len(lines):
                 out_lines.append("")
             continue
@@ -232,6 +229,26 @@ def create_docx(text):
     return bio
 
 # -------------------------------
+# Helper: remove duplicate leading headers/title lines
+# -------------------------------
+def tidy_leading_duplicates_html(html: str) -> str:
+    """
+    Remove model-inserted leading title lines like "Lesson Plan: ..." and
+    remove duplicate immediate headers like "Learning Objective" that appear twice at top.
+    """
+    if not html:
+        return html
+    s = html.strip()
+    # Remove leading "Lesson Plan:" or "Lesson Plan - ..." lines (case-insensitive), plus following breaks
+    s = re.sub(r'(?i)^(lesson\s*plan[:\-–—].*?)(?:<br>\s*)+', '', s, flags=re.M)
+    # Remove repeated 'Learning Objective' header if duplicated at top:
+    # If **Learning Objective** followed quickly by **Learning Objective** (or plain) remove the second instance
+    s = re.sub(r'(?i)(?:<b>)?learning objective(?:</b>)?(?:<br><br>\s*)+(?:<b>)?learning objective(?:</b>)?', '<b>Learning Objective</b>', s, count=1)
+    # Also collapse multiple <br><br> at start
+    s = re.sub(r'^(?:<br>\s*)+', '', s)
+    return s
+
+# -------------------------------
 # Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
@@ -281,18 +298,19 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # Convert bold markers (**) to HTML <b> for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
-            # Preserve paragraph breaks: convert double newlines to <br><br>, single newlines to <br>
+            # Convert paragraphs and preserve one blank line between paragraphs
             final_output_html = final_output_html.replace('\r\n', '\n')
-            # collapse multiple blank lines into exactly two newlines
             final_output_html = re.sub(r'\n{2,}', '\n\n', final_output_html)
             final_output_html = final_output_html.replace('\n\n', '<br><br>')
             final_output_html = final_output_html.replace('\n', '<br>')
+
+            # Tidy leading duplicate headings/titles
+            final_output_html = tidy_leading_duplicates_html(final_output_html)
 
             # Remove any leading "Lesson Title: ..." lines the model may have included (we show metadata separately)
             final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
 
             # Ensure a single blank line between metadata and the lesson body in preview
-            # Build metadata HTML (bold lines) and then include the cleaned lesson body
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -310,11 +328,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             # Prepare export text (ensure title is at top of downloaded files)
-            export_text = f"Lesson Title: {lesson_data.get('topic','')}\n\n{final_output}"
+            export_text_body = final_output
+            # Remove duplicate leading plain "Lesson Plan:" or "Lesson Plan - ..." from export_text_body too
+            export_text_body = re.sub(r'(?im)^(lesson\s*plan[:\-–—].*?)\s*', '', export_text_body)
+            # Remove duplicate initial "Learning Objective" if present twice
+            export_text_body = re.sub(r'(?im)^\s*Learning Objective\s*(?:\n\s*)+Learning Objective\s*', 'Learning Objective\n\n', export_text_body)
+            export_text = f"Lesson Title: {lesson_data.get('topic','')}\n\n{export_text_body}"
 
             pdf_buffer = create_pdf(export_text)
             docx_buffer = create_docx(export_text)
-
             st.markdown(
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
