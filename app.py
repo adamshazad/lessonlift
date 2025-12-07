@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing and title)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing + duplicate LO)
 # -------------------------------
 
 import os
@@ -126,14 +126,16 @@ def format_tight_output(text: str) -> str:
                 break
         if is_header:
             out_lines.append(f"**{header_text}**")
+            # indent subsequent bullets under this header
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
             i = j
+            # insert single blank line after header
             if i < len(lines):
                 out_lines.append("")
             continue
-        # Handle bullet indentation: if line starts with -, add two spaces before content
+        # Handle bullet indentation
         if line.startswith("-"):
             content = line[1:].strip()
             out_lines.append(f"- {content}")
@@ -257,6 +259,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
+                # Remove duplicate Learning Objective at the top if metadata exists
+                formatted = re.sub(r'(?i)^\s*learning objective\s*\n+', '', formatted.strip())
                 if count_words(formatted) >= 750:
                     final_output = formatted
                     break
@@ -264,16 +268,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted
 
-            # Remove redundant "Lesson Plan: ..." at the top if present
-            final_output = re.sub(r'(?i)^lesson plan\s*:.*\n+', '', final_output.strip())
-            final_output = re.sub(r'^\s*\n+', '', final_output)
-
-            # Convert bold markers for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
-
-            # Prepend a proper title line for downloads
-            title_line = f"Lesson Plan: {lesson_data.get('topic','')}\n\n"
-            final_output_for_download = title_line + final_output
 
             # Build metadata HTML
             metadata_html = f"""
@@ -292,13 +287,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 """
             st.markdown(metadata_html, unsafe_allow_html=True)
 
-            pdf_buffer = create_pdf(final_output_for_download)
-            docx_buffer = create_docx(final_output_for_download)
-
+            pdf_buffer = create_pdf(final_output)
+            docx_buffer = create_docx(final_output)
             st.markdown(
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-    <a href="data:text/plain;base64,{base64.b64encode(final_output_for_download.encode()).decode()}" download="lesson_plan.txt">
+    <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
