@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing + duplicate headers)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed: spacing + duplicates)
 # -------------------------------
 
 import os
@@ -85,14 +85,19 @@ def clean_markdown(text) -> str:
     if text is None:
         return ""
     text = str(text)
+    # Remove markdown headers
     text = re.sub(r'^\s*#{1,6}\s*', '', text, flags=re.MULTILINE)
+    # Remove bold/italic/backticks
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
+    # Standardize bullets
     text = text.replace("•", "-")
     text = re.sub(r'^[\t\s]*[\*\u2022]\s+', '- ', text, flags=re.MULTILINE)
     text = re.sub(r'^[\t\s]*[-–—•]\s+', '- ', text, flags=re.MULTILINE)
+    # Remove horizontal rules
     text = re.sub(r'\-{3,}', '', text)
+    # Remove multiple blank lines
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     text = re.sub(r'\n{2,}', '\n\n', text)
     lines = [line.rstrip() for line in text.splitlines()]
@@ -102,15 +107,11 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
     header_keywords = [
-        "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
-        "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
-        "Materials Needed", "Resources", "Resources Needed",
-        "Lesson Outline", "Lesson Structure", "Introduction", "Main Activity",
-        "Direct Instruction", "Guided Practice", "Independent Practice",
-        "Closing", "Conclusion", "Assessment", "Differentiation",
-        "Extension", "Reflection", "Homework", "Plenary", "Starter",
-        "Classroom Setup", "Discussion Points", "Hands-On Exploration",
-        "Shape Hunt", "Shape Sorting", "Shape Exploration", "Learning Objective"
+        "Learning Objective", "Lesson Duration", "Classroom Setup", "Introduction", 
+        "Discussion Points", "Main Activity", "Shape Hunt", "Shape Sorting", 
+        "Hands-On Exploration", "Practical Application", "Assessment", "Independent Practice", 
+        "Conclusion", "Follow-Up Activities", "Extension Activities", "Resources Needed", 
+        "Differentiation", "Reflection"
     ]
     lines = text.splitlines()
     out_lines = []
@@ -122,36 +123,35 @@ def format_tight_output(text: str) -> str:
                 out_lines.append("")
             i += 1
             continue
-        # Normalize bullets
-        if re.match(r'^[\-\*\u2022]\s+', lines[i]) or re.match(r'^\d+\.\s+', lines[i]):
-            content = re.sub(r'^[\-\*\u2022]?\s*', '', lines[i]).strip()
-            out_lines.append(f"- {content}")
-            i += 1
-            continue
-        # Header detection
+        # Detect header
         is_header = False
-        header_text = line
         for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I) or re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
+            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
                 is_header = True
                 header_text = line
                 break
-        if not is_header and re.search(r'\(\d+\s*minutes\)$', line, flags=re.I):
-            is_header = True
-            header_text = line
         if is_header:
-            out_lines.append(f"**{header_text.strip()}**")
-            # Skip following empty lines in source
+            # Remove any duplicate top header
+            if len(out_lines) >= 2 and out_lines[-1].strip() == header_text:
+                i += 1
+                continue
+            out_lines.append(f"**{header_text}**")
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
             i = j
+            # insert single blank line after header
             if i < len(lines):
                 out_lines.append("")
             continue
-        out_lines.append(line)
+        # Handle bullets
+        if line.startswith("-"):
+            content = line[1:].strip()
+            out_lines.append(f"- {content}")
+        else:
+            out_lines.append(line)
         i += 1
-    # Final collapse of multiple blank lines
+    # Collapse multiple blank lines
     final_text = []
     for ln in out_lines:
         if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
@@ -229,26 +229,6 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Helper: remove duplicate leading headers/title lines
-# -------------------------------
-def tidy_leading_duplicates_html(html: str) -> str:
-    """
-    Remove model-inserted leading title lines like "Lesson Plan: ..." and
-    remove duplicate immediate headers like "Learning Objective" that appear twice at top.
-    """
-    if not html:
-        return html
-    s = html.strip()
-    # Remove leading "Lesson Plan:" or "Lesson Plan - ..." lines (case-insensitive), plus following breaks
-    s = re.sub(r'(?i)^(lesson\s*plan[:\-–—].*?)(?:<br>\s*)+', '', s, flags=re.M)
-    # Remove repeated 'Learning Objective' header if duplicated at top:
-    # If **Learning Objective** followed quickly by **Learning Objective** (or plain) remove the second instance
-    s = re.sub(r'(?i)(?:<b>)?learning objective(?:</b>)?(?:<br><br>\s*)+(?:<b>)?learning objective(?:</b>)?', '<b>Learning Objective</b>', s, count=1)
-    # Also collapse multiple <br><br> at start
-    s = re.sub(r'^(?:<br>\s*)+', '', s)
-    return s
-
-# -------------------------------
 # Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
@@ -260,14 +240,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         return
     st.session_state.lesson_count += 1
 
-    # Show daily usage on top (keeps it above preview)
+    # Show usage at top
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
 
     generation_instructions = (
         "\n\nImportant instructions:\n"
         "- Use British English only.\n"
         "- No emojis.\n"
-        "- Section headers bold, one blank line after header, bullets aligned under header.\n"
+        "- Section headers bold, bullets indented 2 spaces.\n"
+        "- Remove duplicate headers.\n"
         "- Keep exactly one blank line between sections.\n"
         "- 750–1000 words.\n"
     )
@@ -288,6 +269,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
+                # Remove any duplicate Learning Objective or top headers
+                formatted = re.sub(
+                    r'(?is)^\s*(learning objective[:\s]*)\s*(<br>\s*)*(learning objective[:\s]*)',
+                    r'Learning Objective\n\n',
+                    formatted
+                )
                 if count_words(formatted) >= 750:
                     final_output = formatted
                     break
@@ -295,22 +282,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted
 
-            # Convert bold markers (**) to HTML <b> for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
-            # Convert paragraphs and preserve one blank line between paragraphs
-            final_output_html = final_output_html.replace('\r\n', '\n')
-            final_output_html = re.sub(r'\n{2,}', '\n\n', final_output_html)
-            final_output_html = final_output_html.replace('\n\n', '<br><br>')
-            final_output_html = final_output_html.replace('\n', '<br>')
-
-            # Tidy leading duplicate headings/titles
-            final_output_html = tidy_leading_duplicates_html(final_output_html)
-
-            # Remove any leading "Lesson Title: ..." lines the model may have included (we show metadata separately)
-            final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
-
-            # Ensure a single blank line between metadata and the lesson body in preview
+            # Build metadata HTML
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -322,25 +296,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
     <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
     <br>
-    {final_output_html}
+    {final_output_html.replace('\\n','<br>').strip()}
 </div>
 """
             st.markdown(metadata_html, unsafe_allow_html=True)
 
-            # Prepare export text (ensure title is at top of downloaded files)
-            export_text_body = final_output
-            # Remove duplicate leading plain "Lesson Plan:" or "Lesson Plan - ..." from export_text_body too
-            export_text_body = re.sub(r'(?im)^(lesson\s*plan[:\-–—].*?)\s*', '', export_text_body)
-            # Remove duplicate initial "Learning Objective" if present twice
-            export_text_body = re.sub(r'(?im)^\s*Learning Objective\s*(?:\n\s*)+Learning Objective\s*', 'Learning Objective\n\n', export_text_body)
-            export_text = f"Lesson Title: {lesson_data.get('topic','')}\n\n{export_text_body}"
-
-            pdf_buffer = create_pdf(export_text)
-            docx_buffer = create_docx(export_text)
+            pdf_buffer = create_pdf(final_output)
+            docx_buffer = create_docx(final_output)
             st.markdown(
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-    <a href="data:text/plain;base64,{base64.b64encode(export_text.encode()).decode()}" download="lesson_plan.txt">
+    <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
@@ -358,8 +324,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             return
 
     st.session_state.lesson_history.append({"title": title, "content": final_output})
-    if regen_message:
-        st.info(f"🔄 {regen_message}")
 
 # -------------------------------
 # Main generator page
