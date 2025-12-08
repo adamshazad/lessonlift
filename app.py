@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift (Titles + Duplication Fully Fixed)
+# App.py - LessonLift (Titles + Duplication Fully Fixed + Proper Downloads)
 # -------------------------------
 
 import os
@@ -79,51 +79,38 @@ if st.session_state.last_reset_date != today:
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
 # -------------------------------
-# TEXT CLEANING — THE IMPORTANT FIX
+# TEXT CLEANING
 # -------------------------------
-
 def clean_markdown(text) -> str:
     if text is None:
         return ""
     text = str(text)
 
-    # 🛑 REMOVE ALL AI-GENERATED TITLE LINES
-    # These always ruin spacing and cause duplicates
     text = re.sub(
         r"^(lesson plan|year \d.*lesson|lesson\s*plan.*|.*?shapes.*?)$",
         "",
         text,
         flags=re.I | re.M
     )
-
-    # Remove markdown marks
     text = re.sub(r'^\s*#{1,6}\s*', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
 
-    # Bullets → standard dash
     text = text.replace("•", "-")
     text = re.sub(r'^[\t\s]*[\*\u2022]\s+', '- ', text, flags=re.MULTILINE)
     text = re.sub(r'^[\t\s]*[-–—•]\s+', '- ', text, flags=re.MULTILINE)
-
-    # Remove accidental multiple dashes
     text = re.sub(r'\-{3,}', '', text)
-
-    # Clean empty lines
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     text = re.sub(r'\n{2,}', '\n\n', text)
 
     lines = [line.rstrip() for line in text.splitlines()]
     return "\n".join(lines).strip()
 
-
-# FINAL SPACING FIX — ensures no duplicates & perfect layout
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
 
-    # STANDARD HEADERS DETECTED
     header_keywords = [
         "Learning Objective", "Lesson Duration", "Classroom Setup",
         "Introduction", "Main Activity", "Differentiation", "Assessment",
@@ -138,8 +125,6 @@ def format_tight_output(text: str) -> str:
 
     while i < len(lines):
         line = lines[i].strip()
-
-        # Skip empty duplicates
         if line == "":
             if len(result) == 0 or result[-1] == "":
                 i += 1
@@ -148,20 +133,16 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # Detect header
         is_header = False
         for kw in header_keywords:
             if re.match(rf"^{re.escape(kw)}\b", line, flags=re.I):
                 header_clean = kw
-
-                # 🛑 Remove duplicate headers
                 if header_clean.lower() in seen_headers:
                     i += 1
                     continue
-
                 seen_headers.add(header_clean.lower())
                 result.append(f"**{header_clean}**")
-                result.append("")  # spacing
+                result.append("")
                 is_header = True
                 break
 
@@ -169,7 +150,6 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # Bullet points normalized
         if line.startswith("-"):
             result.append(f"- {line[1:].strip()}")
         else:
@@ -177,7 +157,6 @@ def format_tight_output(text: str) -> str:
 
         i += 1
 
-    # Clean final accidental empty lines
     final = []
     for ln in result:
         if ln == "" and (len(final) == 0 or final[-1] == ""):
@@ -185,9 +164,7 @@ def format_tight_output(text: str) -> str:
         final.append(ln)
 
     return "\n".join(final).strip()
-    # -------------------------------
-# Word counter
-# -------------------------------
+
 def count_words(text: str) -> int:
     if not text:
         return 0
@@ -241,11 +218,7 @@ def create_pdf(text):
         if not line.strip():
             story.append(Spacer(1, 6))
         else:
-            safe = (
-                line.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-            )
+            safe = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             safe = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', safe)
             story.append(Paragraph(safe, normal))
 
@@ -288,13 +261,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     st.session_state.lesson_count += 1
 
-    # Daily limit counter at top
     st.info(
         f"📊 {st.session_state.lesson_count}/{daily_limit} used — "
         f"{daily_limit - st.session_state.lesson_count} left"
     )
 
-    # AI instructions
     ai_rules = """
 Important instructions for the AI:
 - Use British English only.
@@ -305,7 +276,6 @@ Important instructions for the AI:
 - Ensure perfect spacing: exactly one blank line after every header.
 - 750–1000 words.
 """
-
     full_prompt = prompt + ai_rules
 
     with st.spinner("✨ Creating lesson plan..."):
@@ -315,7 +285,6 @@ Important instructions for the AI:
 
             while retries < 2:
                 retries += 1
-
                 response = openai.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": full_prompt}],
@@ -338,9 +307,6 @@ Important instructions for the AI:
 
             html_output = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
-            # --------------------------
-            # DISPLAY METADATA + PLAN
-            # --------------------------
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -358,29 +324,16 @@ Important instructions for the AI:
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             # --------------------------
-            # DOWNLOAD FILES
+            # STREAMLIT DOWNLOAD BUTTONS
             # --------------------------
             pdf_file = create_pdf(final_output)
             docx_file = create_docx(final_output)
+            txt_data = final_output.encode()
 
-            st.markdown(
-                f"""
-<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-    <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
-    </a>
-
-    <a href="data:application/pdf;base64,{base64.b64encode(pdf_file.read()).decode()}" download="lesson_plan.pdf">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
-    </a>
-
-    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_file.read()).decode()}" download="lesson_plan.docx">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
-    </a>
-</div>
-""",
-                unsafe_allow_html=True
-            )
+            st.download_button("⬇ Download TXT", txt_data, file_name="lesson_plan.txt")
+            st.download_button("⬇ Download PDF", pdf_file, file_name="lesson_plan.pdf", mime="application/pdf")
+            st.download_button("⬇ Download DOCX", docx_file, file_name="lesson_plan.docx",
+                               mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
@@ -425,7 +378,6 @@ def lesson_generator_page():
 
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
-    # Generate
     if submitted:
         prompt = f"""
 Year Group: {lesson_data['year_group']}
@@ -439,7 +391,6 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)
 
-    # Regenerate section
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
 
