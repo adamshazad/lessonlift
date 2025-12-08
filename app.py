@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed: spacing + duplicates)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing + no duplicates)
 # -------------------------------
 
 import os
@@ -85,19 +85,14 @@ def clean_markdown(text) -> str:
     if text is None:
         return ""
     text = str(text)
-    # Remove markdown headers
     text = re.sub(r'^\s*#{1,6}\s*', '', text, flags=re.MULTILINE)
-    # Remove bold/italic/backticks
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
-    # Standardize bullets
     text = text.replace("•", "-")
     text = re.sub(r'^[\t\s]*[\*\u2022]\s+', '- ', text, flags=re.MULTILINE)
     text = re.sub(r'^[\t\s]*[-–—•]\s+', '- ', text, flags=re.MULTILINE)
-    # Remove horizontal rules
     text = re.sub(r'\-{3,}', '', text)
-    # Remove multiple blank lines
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     text = re.sub(r'\n{2,}', '\n\n', text)
     lines = [line.rstrip() for line in text.splitlines()]
@@ -108,11 +103,12 @@ def format_tight_output(text: str) -> str:
         return ""
     header_keywords = [
         "Learning Objective", "Lesson Duration", "Classroom Setup", "Introduction", 
-        "Discussion Points", "Main Activity", "Shape Hunt", "Shape Sorting", 
-        "Hands-On Exploration", "Practical Application", "Assessment", "Independent Practice", 
-        "Conclusion", "Follow-Up Activities", "Extension Activities", "Resources Needed", 
-        "Differentiation", "Reflection"
+        "Discussion Points", "Main Activity", "Sorting Activity", "Hands-On Exploration", 
+        "Practical Application", "Assessment", "Independent Practice", "Conclusion",
+        "Follow-Up Activities", "Extension Activities", "Resources Needed", "Differentiation",
+        "Exploring 2D Shapes", "Shape Hunt", "Shape Sorting", "Closure", "Reflection"
     ]
+    seen_headers = set()
     lines = text.splitlines()
     out_lines = []
     i = 0
@@ -131,27 +127,27 @@ def format_tight_output(text: str) -> str:
                 header_text = line
                 break
         if is_header:
-            # Remove any duplicate top header
-            if len(out_lines) >= 2 and out_lines[-1].strip() == header_text:
+            # Skip duplicate headers
+            if header_text.lower() in seen_headers:
                 i += 1
                 continue
+            seen_headers.add(header_text.lower())
             out_lines.append(f"**{header_text}**")
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
             i = j
-            # insert single blank line after header
             if i < len(lines):
-                out_lines.append("")
+                out_lines.append("")  # blank line after header
             continue
-        # Handle bullets
+        # Handle bullet indentation: if line starts with -, keep it formatted
         if line.startswith("-"):
             content = line[1:].strip()
             out_lines.append(f"- {content}")
         else:
             out_lines.append(line)
         i += 1
-    # Collapse multiple blank lines
+    # Remove multiple blank lines
     final_text = []
     for ln in out_lines:
         if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
@@ -240,15 +236,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         return
     st.session_state.lesson_count += 1
 
-    # Show usage at top
+    # Show daily usage on top
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
 
     generation_instructions = (
         "\n\nImportant instructions:\n"
         "- Use British English only.\n"
         "- No emojis.\n"
-        "- Section headers bold, bullets indented 2 spaces.\n"
-        "- Remove duplicate headers.\n"
+        "- Section headers bold, bullets indented 2 spaces under header.\n"
         "- Keep exactly one blank line between sections.\n"
         "- 750–1000 words.\n"
     )
@@ -269,12 +264,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
-                # Remove any duplicate Learning Objective or top headers
-                formatted = re.sub(
-                    r'(?is)^\s*(learning objective[:\s]*)\s*(<br>\s*)*(learning objective[:\s]*)',
-                    r'Learning Objective\n\n',
-                    formatted
-                )
                 if count_words(formatted) >= 750:
                     final_output = formatted
                     break
@@ -324,6 +313,8 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             return
 
     st.session_state.lesson_history.append({"title": title, "content": final_output})
+    if regen_message:
+        st.info(f"🔄 {regen_message}")
 
 # -------------------------------
 # Main generator page
