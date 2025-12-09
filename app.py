@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing, headers, duplicates, and detailed content)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing)
 # -------------------------------
 
 import os
@@ -102,13 +102,14 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
     header_keywords = [
-        "Learning Objective", "Lesson Duration", "Classroom Setup", "Introduction", 
-        "Discussion Points", "Main Activity", "Sorting Activity", "Hands-On Exploration", 
-        "Practical Application", "Assessment", "Independent Practice", "Conclusion",
-        "Follow-Up Activities", "Extension Activities", "Resources Needed", "Differentiation",
-        "Exploring 2D Shapes", "Shape Hunt", "Shape Sorting", "Closure", "Reflection"
+        "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
+        "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
+        "Materials Needed", "Resources", "Resources Needed",
+        "Lesson Outline", "Lesson Structure", "Introduction", "Main Activity",
+        "Direct Instruction", "Guided Practice", "Independent Practice",
+        "Closing", "Conclusion", "Assessment", "Differentiation",
+        "Extension", "Reflection", "Homework", "Plenary", "Starter"
     ]
-    seen_headers = set()
     lines = text.splitlines()
     out_lines = []
     i = 0
@@ -119,35 +120,36 @@ def format_tight_output(text: str) -> str:
                 out_lines.append("")
             i += 1
             continue
-        # Detect header
+        if re.match(r'^[\-\*\u2022]\s+', lines[i]) or re.match(r'^\d+\.\s+', lines[i]):
+            content = re.sub(r'^[\-\*\u2022]?\s*', '', lines[i]).strip()
+            out_lines.append(f"- {content}")
+            i += 1
+            continue
+
         is_header = False
         for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
+            if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I):
+                is_header = True
+                header_text = kw
+                break
+            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) and len(line.split()) <= 10:
                 is_header = True
                 header_text = line
                 break
+
         if is_header:
-            # Skip duplicate headers
-            if header_text.lower() in seen_headers:
-                i += 1
-                continue
-            seen_headers.add(header_text.lower())
-            out_lines.append(f"**{header_text}**")
+            out_lines.append(f"**{header_text.strip()}**")
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
             i = j
             if i < len(lines):
-                out_lines.append("")  # single blank line after header
+                out_lines.append("")
             continue
-        # Handle bullet indentation: if line starts with -, keep it formatted
-        if line.startswith("-"):
-            content = line[1:].strip()
-            out_lines.append(f"- {content}")
-        else:
-            out_lines.append(line)
+
+        out_lines.append(line)
         i += 1
-    # Remove multiple blank lines
+
     final_text = []
     for ln in out_lines:
         if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
@@ -182,7 +184,7 @@ def show_logo(path="logo.png", width=200):
 
 def title_and_tagline():
     st.title("📚 LessonLift - AI Lesson Planner")
-    st.write("Generate fully detailed UK primary school lesson plans!")
+    st.write("Generate tailored UK primary school lesson plans in seconds!")
 
 # -------------------------------
 # Exporters
@@ -225,60 +227,71 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator (same as previous but now ensures spacing + no duplicates + detailed content)
-# -------------------------------
-# [Omitted rest for brevity — same structure as previous app.py]
-
-# -------------------------------
-# Generator
+# Generator (FIXED)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
         lesson_data = {}
+
     daily_limit = 10
     if st.session_state.lesson_count >= daily_limit:
         st.error(f"🚫 Daily limit reached. {daily_limit} lessons allowed per day.")
         return
-    st.session_state.lesson_count += 1
 
-    # Show daily usage on top
-    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
+    st.session_state.lesson_count += 1
 
     generation_instructions = (
         "\n\nImportant instructions:\n"
-        "- Use British English only.\n"
+        "- British English only.\n"
         "- No emojis.\n"
-        "- Section headers bold, bullets indented 2 spaces under header.\n"
-        "- Keep exactly one blank line between sections.\n"
+        "- Section Title (bold), one blank line, then '-' bullet points.\n"
+        "- Remove extra blank lines.\n"
         "- 750–1000 words.\n"
     )
+
     prompt_with_req = prompt + generation_instructions
 
     with st.spinner("✨ Creating lesson plan..."):
         try:
             attempts = 0
             final_output = None
+
             while attempts < 2:
                 attempts += 1
+
                 response = openai.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt_with_req}],
                     temperature=0.3,
                     max_tokens=2200,
                 )
+
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
-                if count_words(formatted) >= 750:
+                wcount = count_words(formatted)
+
+                if wcount >= 750:
                     final_output = formatted
                     break
+
                 prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
+
             if final_output is None:
                 final_output = formatted
 
+            # Convert bold markers (**) to HTML <b> for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
 
-            # Build metadata HTML
+            # Remove any leading "Lesson Title: ..." lines that the model may have included
+            # (we already show metadata separately so we don't want duplicates)
+            final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
+
+            # Remove any extra leading blank lines still at the top of the content
+            final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
+
+            # Ensure a single blank line between metadata and the lesson body in preview
+            # Build metadata HTML (bold lines) and then include the cleaned lesson body
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -293,10 +306,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     {final_output_html.replace('\\n','<br>').strip()}
 </div>
 """
+
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             pdf_buffer = create_pdf(final_output)
             docx_buffer = create_docx(final_output)
+
             st.markdown(
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
@@ -313,13 +328,18 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 """,
                 unsafe_allow_html=True
             )
+
         except Exception as e:
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
             return
 
     st.session_state.lesson_history.append({"title": title, "content": final_output})
+
     if regen_message:
         st.info(f"🔄 {regen_message}")
+
+    remaining_today = daily_limit - st.session_state.lesson_count
+    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
 # -------------------------------
 # Main generator page
@@ -327,9 +347,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 def lesson_generator_page():
     show_logo()
     title_and_tagline()
+
     lesson_data = {}
+
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
+
         lesson_data['year_group'] = st.selectbox("Year Group",
             ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level",
@@ -344,7 +367,9 @@ def lesson_generator_page():
             placeholder="e.g. To understand fractions")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)",
             placeholder="e.g. Visual aids, sentence starters")
+
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
+
     if submitted:
         prompt = f"""
 Year Group: {lesson_data['year_group']}
@@ -357,6 +382,8 @@ SEN/EAL Notes: {lesson_data['sen_notes'] or 'None'}
 """
         st.session_state.last_prompt = prompt
         generate_and_display_plan(prompt, title="Original", lesson_data=lesson_data)
+
+    # Regeneration options
     if st.session_state.last_prompt:
         st.markdown("### 🔄 Not happy with the plan?")
         regen_style = st.selectbox(
