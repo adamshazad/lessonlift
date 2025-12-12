@@ -15,14 +15,8 @@ from docx import Document
 import datetime
 import openai
 
-# -------------------------------
-# Page config
-# -------------------------------
 st.set_page_config(page_title="LessonLift - AI Lesson Planner", layout="centered")
 
-# -------------------------------
-# CSS (scrollable box)
-# -------------------------------
 st.markdown("""
 <style>
 body {background-color: white; color: black;}
@@ -56,9 +50,6 @@ body {background-color: white; color: black;}
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------
-# Session defaults
-# -------------------------------
 if "lesson_history" not in st.session_state:
     st.session_state.lesson_history = []
 if "last_prompt" not in st.session_state:
@@ -73,45 +64,29 @@ if st.session_state.last_reset_date != today:
     st.session_state.lesson_count = 0
     st.session_state.last_reset_date = today
 
-# -------------------------------
-# OpenAI key
-# -------------------------------
 openai.api_key = st.secrets.get("OPENAI_API_KEY")
 
-# -------------------------------
-# CLEAN + FORMAT functions
-# -------------------------------
 def clean_markdown(text) -> str:
     if text is None:
         return ""
     text = str(text)
-
-    # Remove heading markers
     text = re.sub(r'^\s*#{1,6}\s*', '', text, flags=re.MULTILINE)
-
-    # Remove bold/italic markers but keep content
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
-
-    # Standardise bullets
     text = text.replace("•", "-")
     text = re.sub(r'^[\t\s]*[\*\u2022]\s+', '- ', text, flags=re.MULTILINE)
     text = re.sub(r'^[\t\s]*[-–—•]\s+', '- ', text, flags=re.MULTILINE)
-
-    # Remove long dash separators
     text = re.sub(r'\-{3,}', '', text)
-
-    # Collapse excessive blank lines
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     text = re.sub(r'\n{2,}', '\n\n', text)
-
     lines = [line.rstrip() for line in text.splitlines()]
     return "\n".join(lines).strip()
 
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
+
     header_keywords = [
         "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
         "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
@@ -121,55 +96,53 @@ def format_tight_output(text: str) -> str:
         "Closing", "Conclusion", "Assessment", "Differentiation",
         "Extension", "Reflection", "Homework", "Plenary", "Starter"
     ]
+
     lines = text.splitlines()
     out_lines = []
     i = 0
+
     while i < len(lines):
         line = lines[i].strip()
+
         if line == "":
             if len(out_lines) == 0 or out_lines[-1].strip() != "":
                 out_lines.append("")
             i += 1
             continue
 
-        # Normalize bullets
         if re.match(r'^[\-\*\u2022]\s+', lines[i]) or re.match(r'^\d+\.\s+', lines[i]):
             content = re.sub(r'^[\-\*\u2022]?\s*', '', lines[i]).strip()
             out_lines.append(f"- {content}")
             i += 1
             continue
 
-        # Header detection
         is_header = False
         for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I):
+            if re.match(rf'^{re.escape(kw)}\s*:?', line, flags=re.I):
                 is_header = True
                 header_text = kw
-                break
-            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) and len(line.split()) <= 10:
-                is_header = True
-                header_text = line
                 break
 
         if is_header:
             out_lines.append(f"**{header_text.strip()}**")
+            out_lines.append("")  # *** FIXED: always 1 blank line ***
+
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
+
             i = j
-            if i < len(lines):
-                out_lines.append("")
             continue
 
         out_lines.append(line)
         i += 1
 
-    # Final pass remove duplicate blank lines
     final_text = []
     for ln in out_lines:
         if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
             continue
         final_text.append(ln)
+
     return "\n".join(final_text).strip()
 
 def count_words(text: str) -> int:
@@ -177,23 +150,17 @@ def count_words(text: str) -> int:
         return 0
     return len(re.findall(r'\w+', text))
 
-# -------------------------------
-# Logo + title
-# -------------------------------
 def show_logo(path="logo.png", width=200):
     try:
         with open(path, "rb") as f:
             data = f.read()
         b64 = base64.b64encode(data).decode()
-        st.markdown(
-            f"""
-            <div style="display:flex; justify-content:center; align-items:center; margin-bottom:12px;">
-                <div style="box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;">
-                    <img src="data:image/png;base64,{b64}" width="{width}" style="border-radius:12px;" />
+        st.markdown(f"""
+            <div style='display:flex; justify-content:center; align-items:center; margin-bottom:12px;'>
+                <div style='box-shadow:0 8px 24px rgba(0,0,0,0.25); border-radius:12px; padding:8px;'>
+                    <img src='data:image/png;base64,{b64}' width='{width}' style='border-radius:12px;' />
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True)
+            </div>""", unsafe_allow_html=True)
     except FileNotFoundError:
         st.warning("Logo file not found. Please upload 'logo.png'.")
 
