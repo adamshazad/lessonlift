@@ -102,6 +102,7 @@ def clean_markdown(text) -> str:
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
+
     header_keywords = [
         "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
         "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
@@ -109,51 +110,62 @@ def format_tight_output(text: str) -> str:
         "Lesson Outline", "Lesson Structure", "Introduction", "Main Activity",
         "Direct Instruction", "Guided Practice", "Independent Practice",
         "Closing", "Conclusion", "Assessment", "Differentiation",
-        "Extension", "Reflection", "Homework", "Plenary", "Starter"
+        "Extension", "Reflection", "Homework", "Plenary", "Starter",
+        "Shape Hunt Activity", "Shape Sorting Activity", "Reflection and Assessment"
     ]
+
     lines = text.splitlines()
-    out_lines = []
+    out = []
     i = 0
+    last_was_header = False
+
     while i < len(lines):
-        line = lines[i].strip()
+        raw = lines[i]
+        line = raw.strip()
+
+        # Skip extra blank lines
         if line == "":
-            if len(out_lines) == 0 or out_lines[-1].strip() != "":
-                out_lines.append("")
+            if out and out[-1] != "":
+                out.append("")
             i += 1
             continue
-        if re.match(r'^[\-\*\u2022]\s+', lines[i]) or re.match(r'^\d+\.\s+', lines[i]):
-            content = re.sub(r'^[\-\*\u2022]?\s*', '', lines[i]).strip()
-            out_lines.append(f"- {content}")
-            i += 1
-            continue
+
+        # Detect headers
         is_header = False
         for kw in header_keywords:
             if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I):
                 is_header = True
                 header_text = kw
                 break
-            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
-                if len(line.split()) <= 10:
-                    is_header = True
-                    header_text = line
-                    break
+
         if is_header:
-            out_lines.append(f"**{header_text.strip()}**")
-            j = i + 1
-            while j < len(lines) and lines[j].strip() == "":
-                j += 1
-            i = j
-            if i < len(lines):
-                out_lines.append("")
+            out.append(f"**{header_text}**")
+            out.append("")  # exactly ONE blank line
+            last_was_header = True
+            i += 1
             continue
-        out_lines.append(line)
+
+        # Existing bullet → normalise
+        if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
+            content = re.sub(r'^[-•*\d\.]+\s*', '', line)
+            out.append(f"- {content}")
+            last_was_header = False
+            i += 1
+            continue
+
+        # Plain sentence → FORCE bullet
+        out.append(f"- {line}")
+        last_was_header = False
         i += 1
-    final_text = []
-    for ln in out_lines:
-        if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
+
+    # Clean duplicate blank lines
+    final = []
+    for ln in out:
+        if ln == "" and (not final or final[-1] == ""):
             continue
-        final_text.append(ln)
-    return "\n".join(final_text).strip()
+        final.append(ln)
+
+    return "\n".join(final).strip()
 
 
 def count_words(text: str) -> int:
@@ -382,9 +394,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     if regen_message:
         st.info(f"🔄 {regen_message}")
-
-    remaining_today = daily_limit - st.session_state.lesson_count
-    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {remaining_today} left")
 
 # -------------------------------
 # Main generator page
