@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing, no duplication)
+# App.py - LessonLift with OpenAI 1.0+ integration (fully fixed for spacing + stronger generation guard)
 # -------------------------------
 
 import os
@@ -85,16 +85,27 @@ def clean_markdown(text) -> str:
     if text is None:
         return ""
     text = str(text)
+
+    # Remove heading markers
     text = re.sub(r'^\s*#{1,6}\s*', '', text, flags=re.MULTILINE)
+
+    # Remove bold/italic markers but keep content
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     text = re.sub(r'`(.*?)`', r'\1', text)
+
+    # Standardise bullets
     text = text.replace("•", "-")
     text = re.sub(r'^[\t\s]*[\*\u2022]\s+', '- ', text, flags=re.MULTILINE)
     text = re.sub(r'^[\t\s]*[-–—•]\s+', '- ', text, flags=re.MULTILINE)
+
+    # Remove long dash separators
     text = re.sub(r'\-{3,}', '', text)
+
+    # Collapse excessive blank lines
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     text = re.sub(r'\n{2,}', '\n\n', text)
+
     lines = [line.rstrip() for line in text.splitlines()]
     return "\n".join(lines).strip()
 
@@ -120,12 +131,15 @@ def format_tight_output(text: str) -> str:
                 out_lines.append("")
             i += 1
             continue
+
+        # Normalize bullets
         if re.match(r'^[\-\*\u2022]\s+', lines[i]) or re.match(r'^\d+\.\s+', lines[i]):
             content = re.sub(r'^[\-\*\u2022]?\s*', '', lines[i]).strip()
             out_lines.append(f"- {content}")
             i += 1
             continue
 
+        # Header detection
         is_header = False
         for kw in header_keywords:
             if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I):
@@ -139,16 +153,18 @@ def format_tight_output(text: str) -> str:
 
         if is_header:
             out_lines.append(f"**{header_text.strip()}**")
-            out_lines.append("")  # Space after header before bullets
             j = i + 1
             while j < len(lines) and lines[j].strip() == "":
                 j += 1
             i = j
+            if i < len(lines):
+                out_lines.append("")
             continue
 
         out_lines.append(line)
         i += 1
 
+    # Final pass remove duplicate blank lines
     final_text = []
     for ln in out_lines:
         if ln == "" and (len(final_text) == 0 or final_text[-1] == ""):
@@ -226,7 +242,7 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Generator
+# Generator (STRONGER INSTRUCTIONS + CLEANUP)
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -239,13 +255,29 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     st.session_state.lesson_count += 1
 
+    # Determine min words by lesson duration
+    duration_map = {
+        "30 min": 750,
+        "45 min": 850,
+        "60 min": 1000
+    }
+    min_words = duration_map.get(lesson_data.get('lesson_duration','30 min'), 750)
+
+    # Show daily usage on top (keeps user expectation consistent)
+    st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
+
+    # Strong generation instructions (prevents internal duplicated titles & repeated metadata)
     generation_instructions = (
-        "\n\nImportant instructions:\n"
-        "- British English only.\n"
-        "- No emojis.\n"
-        "- Section Title (bold), one blank line, then '-' bullet points.\n"
-        "- Remove extra blank lines.\n"
-        "- 750–1000 words depending on lesson duration.\n"
+        "\n\nImportant instructions for generation (must follow exactly):\n"
+        "- Use British English only (e.g., 'colour', 'favour', 'maths').\n"
+        "- Do NOT include emojis or emoji characters anywhere.\n"
+        "- DO NOT output any internal lesson title lines such as 'Lesson Plan', 'Year 1 Maths Lesson Plan', 'Lesson Plan: ...' or similar anywhere inside the generated body.\n"
+        "- DO NOT repeat the metadata fields (Lesson Title, Subject, Topic, Year Group, Duration, Ability Level, SEN/EAL Notes, Learning Objective) inside the body. Metadata is displayed separately in the app.\n"
+        "- Start the generated content with the first section header (for example: 'Introduction'). Do NOT prepend a second title or metadata block.\n"
+        "- Format headings as a single line header, followed by one blank line, then '-' bullet points or tight paragraph lines.\n"
+        "- Collapse extra blank lines so there is at most one blank line between sections.\n"
+        f"- Minimum length: {min_words} words. Maximum length: 1000 words.\n"
+        "- Include clear timings, detailed activities, differentiation, assessment and resources.\n"
     )
 
     prompt_with_req = prompt + generation_instructions
@@ -255,13 +287,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             attempts = 0
             final_output = None
 
-            while attempts < 2:
+            while attempts < 3:
                 attempts += 1
 
                 response = openai.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt_with_req}],
-                    temperature=0.3,
+                    temperature=0.25,
                     max_tokens=2200,
                 )
 
@@ -270,19 +302,57 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 formatted = format_tight_output(cleaned)
                 wcount = count_words(formatted)
 
-                if wcount >= 750:
+                if wcount >= min_words:
                     final_output = formatted
                     break
-
-                prompt_with_req += "\n\nPlease expand with more detail, differentiation, examples, and assessment."
+                else:
+                    # If too short, request expansion (keeps the same guard rails)
+                    prompt_with_req += (
+                        "\n\nPlease expand the lesson plan with more detail, step-by-step examples, timings, differentiation, and assessment to reach the required word count."
+                    )
 
             if final_output is None:
-                final_output = formatted
+                final_output = formatted or ""
 
+            # --- POST-PROCESSING CLEANUP (remove duplicates / stray titles) ---
+
+            # 1) Remove any internal title lines (common patterns)
+            final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+            final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+            final_output = re.sub(r'(?im)^\s*(lesson\s*plan\s*[:\-].*)\s*$', '', final_output)
+
+            # 2) Remove duplicated heading labels (e.g., multiple "Learning Objective" headers)
+            final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
+
+            # 3) Remove duplicated blank headers like "Introduction" followed immediately by another "Introduction" section
+            final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
+
+            # 4) Normalise header formatting: ensure header lines are a single line and followed by one blank line
+            # (We earlier wrapped headers in **...**; keep that but ensure consistency)
+            final_output = re.sub(r'\*\*(.*?)\*\*', r'\1', final_output)  # remove internal ** markers to standardise first
+            # Re-insert bold markers for preview/exports (create_docx/create_pdf use ** to detect bold)
+            header_candidates = ["Introduction", "Learning Objective", "Main Activity", "Assessment", "Conclusion",
+                                 "Differentiation", "Extension", "Resources Needed", "Lesson Duration", "Ability Level",
+                                 "SEN/EAL Notes", "Independent Practice", "Guided Practice", "Plenary", "Starter"]
+            for hc in header_candidates:
+                # replace any line that is exactly the header text (case-insensitive) with **Header**
+                final_output = re.sub(rf'(?im)^\s*{re.escape(hc)}\s*$', f"**{hc}**", final_output, flags=re.M)
+
+            # Collapse any runs of more than two blank lines to exactly two
+            final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
+
+            # Finally, ensure the content starts with a header (not an empty line)
+            final_output = final_output.lstrip()
+
+            # Convert bold markers to HTML <b> for preview
             final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
-            final_output_html = re.sub(r'(?i)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
-            final_output_html = re.sub(r'^\s*(?:<br>\s*)+', '', final_output_html)
 
+            # Remove any leading "Lesson Title: ..." lines that the model may have included earlier (extra safety)
+            final_output_html = re.sub(r'(?im)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
+
+            # -------------------------------
+            # Metadata + Lesson preview
+            # -------------------------------
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -299,6 +369,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 """
             st.markdown(metadata_html, unsafe_allow_html=True)
 
+            # Exports
             pdf_buffer = create_pdf(final_output)
             docx_buffer = create_docx(final_output)
 
@@ -323,6 +394,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
             return
 
+    # Save to history
     st.session_state.lesson_history.append({"title": title, "content": final_output})
 
     if regen_message:
@@ -342,7 +414,6 @@ def lesson_generator_page():
 
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
-
         lesson_data['year_group'] = st.selectbox("Year Group",
             ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
         lesson_data['ability_level'] = st.selectbox("Ability Level",
@@ -357,7 +428,6 @@ def lesson_generator_page():
             placeholder="e.g. To understand fractions")
         lesson_data['sen_notes'] = st.text_area("SEN/EAL Notes (optional)",
             placeholder="e.g. Visual aids, sentence starters")
-
         submitted = st.form_submit_button("🚀 Generate Lesson Plan")
 
     if submitted:
