@@ -151,15 +151,14 @@ def format_tight_output(text: str) -> str:
                 is_header = True
                 header_text = line.rstrip(":")
 
-if is_header:
-    # Ensure header is visually separated
-    if out and out[-1] != "":
-        out.append("")
-    out.append(f"**{header_text}**")
-    out.append("")  # exactly ONE blank line after header
-    last_was_header = True
-    i += 1
-    continue
+        # If header, format it properly
+        if is_header:
+            if out and out[-1] != "":
+                out.append("")  # blank line before header
+            out.append(f"**{header_text}**")
+            out.append("")      # blank line after header
+            i += 1
+            continue
 
         # ----------------------------
         # BULLET NORMALISATION
@@ -181,13 +180,12 @@ if is_header:
             continue
         final.append(ln)
 
-    return "\n".join(final).strip()
+    # Ensure **Main Activity** exists
+    final_text = "\n".join(final).strip()
+    if "**Main Activity**" not in final_text:
+        final_text = "**Main Activity**\n\n" + final_text
 
-
-def count_words(text: str) -> int:
-    if not text:
-        return 0
-    return len(re.findall(r'\w+', text))
+    return final_text
 
 # -------------------------------
 # Logo + title
