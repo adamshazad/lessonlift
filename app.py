@@ -180,15 +180,12 @@ def format_tight_output(text: str) -> str:
             continue
         final.append(ln)
 
-    # Ensure **Main Activity** exists
     final_text = "\n".join(final).strip()
+
+    # Ensure Main Activity always exists
     if "**Main Activity**" not in final_text:
         final_text = "**Main Activity**\n\n" + final_text
 
-    return final_text
-    
-def format_tight_output(text: str) -> str:
-    ...
     return final_text
 
 
@@ -196,7 +193,6 @@ def count_words(text: str) -> int:
     if not text:
         return 0
     return len(re.findall(r'\w+', text))
-
 
 # -------------------------------
 # Logo + title
