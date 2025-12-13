@@ -152,10 +152,13 @@ def format_tight_output(text: str) -> str:
                 header_text = line.rstrip(":")
 
         if is_header:
-            out.append(f"**{header_text}**")
-            out.append("")
-            i += 1
-            continue
+    # Ensure header is visually separated
+    if out and out[-1] != "":
+        out.append("")
+    out.append(f"**{header_text}**")
+    out.append("")
+    i += 1
+    continue
 
         # ----------------------------
         # BULLET NORMALISATION
