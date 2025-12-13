@@ -130,13 +130,25 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # Detect headers
-        is_header = False
-        for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\s*:?\s*$', line, flags=re.I):
-                is_header = True
-                header_text = kw
-                break
+        # Detect headers (explicit keywords OR short subtitle-style lines)
+is_header = False
+
+# 1. Known header keywords
+for kw in header_keywords:
+    if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
+        is_header = True
+        header_text = line
+        break
+
+# 2. Generic subtitle detection (e.g. "Warm-Up Activity (5 minutes):")
+if not is_header:
+    if (
+        len(line) <= 60
+        and not line.endswith(".")
+        and not line.startswith("-")
+    ):
+        is_header = True
+        header_text = line.rstrip(":")
 
         if is_header:
             out.append(f"**{header_text}**")
