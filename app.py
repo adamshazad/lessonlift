@@ -186,6 +186,11 @@ def format_tight_output(text: str) -> str:
         final_text = "**Main Activity**\n\n" + final_text
 
     return final_text
+    
+    def count_words(text: str) -> int:
+    if not text:
+        return 0
+    return len(re.findall(r'\w+', text))
 
 # -------------------------------
 # Logo + title
