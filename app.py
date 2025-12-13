@@ -110,64 +110,64 @@ def format_tight_output(text: str) -> str:
         "Lesson Outline", "Lesson Structure", "Introduction", "Main Activity",
         "Direct Instruction", "Guided Practice", "Independent Practice",
         "Closing", "Conclusion", "Assessment", "Differentiation",
-        "Extension", "Reflection", "Homework", "Plenary", "Starter",
-        "Shape Hunt Activity", "Shape Sorting Activity", "Reflection and Assessment"
+        "Extension", "Reflection", "Homework", "Plenary", "Starter"
     ]
 
     lines = text.splitlines()
     out = []
     i = 0
-    last_was_header = False
 
     while i < len(lines):
         raw = lines[i]
         line = raw.strip()
 
-        # Skip extra blank lines
+        # Handle blank lines
         if line == "":
             if out and out[-1] != "":
                 out.append("")
             i += 1
             continue
 
-        # Detect headers (explicit keywords OR short subtitle-style lines)
-is_header = False
+        # ----------------------------
+        # HEADER DETECTION
+        # ----------------------------
+        is_header = False
+        header_text = ""
 
-# 1. Known header keywords
-for kw in header_keywords:
-    if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
-        is_header = True
-        header_text = line
-        break
+        # 1) Known header keywords
+        for kw in header_keywords:
+            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
+                is_header = True
+                header_text = line
+                break
 
-# 2. Generic subtitle detection (e.g. "Warm-Up Activity (5 minutes):")
-if not is_header:
-    if (
-        len(line) <= 60
-        and not line.endswith(".")
-        and not line.startswith("-")
-    ):
-        is_header = True
-        header_text = line.rstrip(":")
+        # 2) Generic subtitle detection (e.g. "Warm-Up Activity (5 minutes):")
+        if not is_header:
+            if (
+                len(line) <= 60
+                and not line.endswith(".")
+                and not line.startswith("-")
+            ):
+                is_header = True
+                header_text = line.rstrip(":")
 
         if is_header:
             out.append(f"**{header_text}**")
-            out.append("")  # exactly ONE blank line
-            last_was_header = True
+            out.append("")
             i += 1
             continue
 
-        # Existing bullet → normalise
+        # ----------------------------
+        # BULLET NORMALISATION
+        # ----------------------------
         if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
             content = re.sub(r'^[-•*\d\.]+\s*', '', line)
             out.append(f"- {content}")
-            last_was_header = False
             i += 1
             continue
 
-        # Plain sentence → FORCE bullet
+        # Plain sentence → bullet
         out.append(f"- {line}")
-        last_was_header = False
         i += 1
 
     # Clean duplicate blank lines
