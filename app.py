@@ -151,12 +151,13 @@ def format_tight_output(text: str) -> str:
                 is_header = True
                 header_text = line.rstrip(":")
 
-        if is_header:
+if is_header:
     # Ensure header is visually separated
     if out and out[-1] != "":
         out.append("")
     out.append(f"**{header_text}**")
-    out.append("")
+    out.append("")  # exactly ONE blank line after header
+    last_was_header = True
     i += 1
     continue
 
