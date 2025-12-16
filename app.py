@@ -172,14 +172,14 @@ else:
 
 i += 1
 
-    # Clean duplicate blank lines
+    # ----------------------------
+    # CLEAN DUPLICATE BLANK LINES
+    # ----------------------------
     final = []
     for ln in out:
         if ln == "" and (not final or final[-1] == ""):
             continue
         final.append(ln)
-
-    final_text = "\n".join(final).strip()
 
     final_text = "\n".join(final).strip()
     return final_text
