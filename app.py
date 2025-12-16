@@ -155,7 +155,7 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # ----------------------------
+            # ----------------------------
         # BULLET NORMALISATION
         # ----------------------------
         if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
@@ -164,8 +164,13 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # Plain sentence → bullet
-        out.append(f"- {line}")
+        # Plain sentence handling
+        # Only bullet short instructional lines
+        if len(line) <= 160:
+            out.append(f"- {line}")
+        else:
+            out.append(line)
+
         i += 1
 
     # Clean duplicate blank lines
