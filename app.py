@@ -182,10 +182,7 @@ def format_tight_output(text: str) -> str:
 
     final_text = "\n".join(final).strip()
 
-    # Ensure Main Activity always exists
-    if "**Main Activity**" not in final_text:
-        final_text = "**Main Activity**\n\n" + final_text
-
+    final_text = "\n".join(final).strip()
     return final_text
 
 
