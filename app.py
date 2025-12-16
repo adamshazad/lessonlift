@@ -118,8 +118,7 @@ def format_tight_output(text: str) -> str:
     i = 0
 
     while i < len(lines):
-        raw = lines[i]
-        line = raw.strip()
+        line = lines[i].strip()
 
         # Handle blank lines
         if line == "":
@@ -134,14 +133,12 @@ def format_tight_output(text: str) -> str:
         is_header = False
         header_text = ""
 
-        # 1) Known header keywords
         for kw in header_keywords:
             if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
                 is_header = True
-                header_text = line
+                header_text = line.rstrip(":")
                 break
 
-        # 2) Generic subtitle detection (e.g. "Warm-Up Activity (5 minutes):")
         if not is_header:
             if (
                 len(line) <= 60
@@ -151,12 +148,11 @@ def format_tight_output(text: str) -> str:
                 is_header = True
                 header_text = line.rstrip(":")
 
-        # If header, format it properly
         if is_header:
             if out and out[-1] != "":
-                out.append("")  # blank line before header
+                out.append("")
             out.append(f"**{header_text}**")
-            out.append("")      # blank line after header
+            out.append("")
             i += 1
             continue
 
