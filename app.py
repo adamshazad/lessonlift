@@ -127,51 +127,50 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # ----------------------------
-        # HEADER DETECTION
-        # ----------------------------
-        is_header = False
-        header_text = ""
+# ----------------------------
+# HEADER DETECTION
+# ----------------------------
+is_header = False
+header_text = ""
 
-        for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
-                is_header = True
-                header_text = line.rstrip(":")
-                break
-        if not is_header:
-            # Only treat as header if it clearly looks like one
-            if (
-                line.endswith(":")
-                and not line.lower().startswith("timing")
-            ):
-                is_header = True
-                header_text = line.rstrip(":")
+for kw in header_keywords:
+    if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
+        is_header = True
+        header_text = line.rstrip(":")
+        break
 
-        if is_header:
-            if out and out[-1] != "":
-                out.append("")
-            out.append(f"**{header_text}**")
-            out.append("")
-            i += 1
-            continue
+if not is_header:
+    if line.endswith(":") and not line.lower().startswith("timing"):
+        is_header = True
+        header_text = line.rstrip(":")
 
-            # ----------------------------
-        # BULLET NORMALISATION
-        # ----------------------------
-        if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
-            content = re.sub(r'^[-•*\d\.]+\s*', '', line)
-            out.append(f"- {content}")
-            i += 1
-            continue
+if is_header:
+    # ensure space before header
+    if out and out[-1] != "":
+        out.append("")
+    out.append(f"**{header_text}**")
+    out.append("")   # ← THIS is the critical separator
+    i += 1
+    continue
 
-        # Plain sentence handling
-        # Only bullet short instructional lines
-        if len(line) <= 160:
-            out.append(f"- {line}")
-        else:
-            out.append(line)
+# ----------------------------
+# BULLET NORMALISATION
+# ----------------------------
+# Existing bullets → normalise
+if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
+    content = re.sub(r'^[-•*\d\.]+\s*', '', line)
+    out.append(f"- {content}")
+    i += 1
+    continue
 
-        i += 1
+# Short instructional lines → bullet
+if len(line) <= 140:
+    out.append(f"- {line}")
+else:
+    # Long paragraphs stay as paragraphs
+    out.append(line)
+
+i += 1
 
     # Clean duplicate blank lines
     final = []
