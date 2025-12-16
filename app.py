@@ -138,12 +138,11 @@ def format_tight_output(text: str) -> str:
                 is_header = True
                 header_text = line.rstrip(":")
                 break
-
         if not is_header:
+            # Only treat as header if it clearly looks like one
             if (
-                len(line) <= 60
-                and not line.endswith(".")
-                and not line.startswith("-")
+                line.endswith(":")
+                and not line.lower().startswith("timing")
             ):
                 is_header = True
                 header_text = line.rstrip(":")
