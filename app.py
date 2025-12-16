@@ -172,23 +172,36 @@ else:
 
 i += 1
 
-    # ----------------------------
-    # CLEAN DUPLICATE BLANK LINES
-    # ----------------------------
-    final = []
-    for ln in out:
-        if ln == "" and (not final or final[-1] == ""):
-            continue
-        final.append(ln)
+# ----------------------------
+# CLEAN DUPLICATE BLANK LINES
+# ----------------------------
+final = []
+for ln in out:
+    if ln == "" and (not final or final[-1] == ""):
+        continue
+    final.append(ln)
 
-    final_text = "\n".join(final).strip()
-    return final_text
+final_text = "\n".join(final).strip()
 
+# ----------------------------
+# FINAL SAFETY FIXES
+# ----------------------------
 
-def count_words(text: str) -> int:
-    if not text:
-        return 0
-    return len(re.findall(r'\w+', text))
+# Ensure Main Activity exists and is not glued to Introduction
+if "**Main Activity**" in final_text and "**Introduction**" in final_text:
+    final_text = final_text.replace(
+        "**Main Activity**\n**Introduction**",
+        "**Main Activity**\n\n**Introduction**"
+    )
+
+# Ensure spacing after every header
+final_text = re.sub(
+    r'(\*\*.+?\*\*)\n(?!\n)',
+    r'\1\n\n',
+    final_text
+)
+
+return final_text
 
 # -------------------------------
 # Logo + title
