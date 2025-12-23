@@ -168,13 +168,6 @@ def format_tight_output(text: str) -> str:
         final.append(ln)
 
     return "\n".join(final).strip()
-    
-# Existing bullets → normalise
-if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
-    content = re.sub(r'^[-•*\d\.]+\s*', '', line)
-    out.append(f"- {content}")
-    i += 1
-    continue
 
 # Short instructional lines → bullet
 if len(line) <= 140:
