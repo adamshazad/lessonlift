@@ -169,18 +169,10 @@ def format_tight_output(text: str) -> str:
 
     return "\n".join(final).strip()
 
-# Short instructional lines → bullet
-if len(line) <= 140:
-    out.append(f"- {line}")
-else:
-    # Long paragraphs stay as paragraphs
-    out.append(line)
-
-i += 1
-
 # ----------------------------
 # CLEAN DUPLICATE BLANK LINES
 # ----------------------------
+
 final = []
 for ln in out:
     if ln == "" and (not final or final[-1] == ""):
