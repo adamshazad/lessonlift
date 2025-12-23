@@ -115,47 +115,60 @@ def format_tight_output(text: str) -> str:
 
     lines = text.splitlines()
     out = []
-    i = 0
 
+    i = 0
     while i < len(lines):
         line = lines[i].strip()
 
-        # Handle blank lines
         if line == "":
             if out and out[-1] != "":
                 out.append("")
             i += 1
             continue
 
-# ----------------------------
-# HEADER DETECTION
-# ----------------------------
-is_header = False
-header_text = ""
+        is_header = False
+        header_text = ""
 
-for kw in header_keywords:
-    if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
-        is_header = True
-        header_text = line.rstrip(":")
-        break
+        for kw in header_keywords:
+            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
+                is_header = True
+                header_text = line.rstrip(":")
+                break
 
-if not is_header:
-    if line.endswith(":") and not line.lower().startswith("timing"):
-        is_header = True
-        header_text = line.rstrip(":")
+        if not is_header:
+            if line.endswith(":") and not line.lower().startswith("timing"):
+                is_header = True
+                header_text = line.rstrip(":")
 
-if is_header:
-    # ensure space before header
-    if out and out[-1] != "":
-        out.append("")
-    out.append(f"**{header_text}**")
-    out.append("")   # ← THIS is the critical separator
-    i += 1
-    continue
+        if is_header:
+            if out and out[-1] != "":
+                out.append("")
+            out.append(f"**{header_text}**")
+            out.append("")
+            i += 1
+            continue
 
-# ----------------------------
-# BULLET NORMALISATION
-# ----------------------------
+        if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
+            content = re.sub(r'^[-•*\d\.]+\s*', '', line)
+            out.append(f"- {content}")
+            i += 1
+            continue
+
+        if len(line) <= 140:
+            out.append(f"- {line}")
+        else:
+            out.append(line)
+
+        i += 1
+
+    final = []
+    for ln in out:
+        if ln == "" and (not final or final[-1] == ""):
+            continue
+        final.append(ln)
+
+    return "\n".join(final).strip()
+    
 # Existing bullets → normalise
 if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
     content = re.sub(r'^[-•*\d\.]+\s*', '', line)
