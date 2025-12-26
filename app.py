@@ -122,7 +122,7 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # Detect headers
+        # --- HEADER DETECTION ---
         is_header = False
         header_text = ""
         for kw in header_keywords:
@@ -135,25 +135,31 @@ def format_tight_output(text: str) -> str:
             header_text = line.rstrip(":")
 
         if is_header:
+            if out and out[-1] != "":
+                out.append("")  # blank line before header
             out.append(f"**{header_text}**")
             out.append("")  # blank line after header
             i += 1
             continue
 
-        # Bullet logic: short lines or continuation of previous bullet
+        # --- BULLET POINT LOGIC ---
+        # If line starts with bullet symbol or number
         if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
             content = re.sub(r'^[-•*\d\.]+\s*', '', line)
             out.append(f"- {content}")
+        # Short lines after a bullet → continue bullet
         elif out and out[-1].startswith("- "):
             out.append(f"- {line}")
+        # Short line → new bullet
         elif len(line) <= 140:
             out.append(f"- {line}")
+        # Long paragraph → keep as paragraph
         else:
             out.append(line)
 
         i += 1
 
-    # Remove multiple blank lines
+    # --- CLEAN DUPLICATE BLANK LINES ---
     final = []
     for ln in out:
         if ln == "" and (not final or final[-1] == ""):
@@ -162,17 +168,17 @@ def format_tight_output(text: str) -> str:
 
     final_text = "\n".join(final).strip()
 
-    # Ensure headers are always followed by a blank line
+    # --- ENSURE HEADER SPACING ---
     final_text = re.sub(r'(\*\*.+?\*\*)\n(?!\n)', r'\1\n\n', final_text)
 
-    # Ensure Main Activity + Introduction are not glued
+    # Fix Main Activity + Introduction glued together
     final_text = final_text.replace(
         "**Main Activity**\n**Introduction**",
         "**Main Activity**\n\n**Introduction**"
     )
 
     return final_text
-
+    
 def count_words(text: str) -> int:
     if not text:
         return 0
