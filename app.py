@@ -147,13 +147,13 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
-            content = re.sub(r'^[-•*\d\.]+\s*', '', line)
-            out.append(f"- {content}")
-        elif len(line) <= 140:
-            out.append(f"- {line}")
-        else:
-            out.append(line)
+if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
+    content = re.sub(r'^[-•*\d\.]+\s*', '', line)
+    out.append(f"- {content}")
+elif out and out[-1].startswith("- "):
+    out.append(f"- {line}")
+else:
+    out.append(line)
 
         i += 1
 
