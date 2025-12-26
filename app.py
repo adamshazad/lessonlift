@@ -115,14 +115,16 @@ def format_tight_output(text: str) -> str:
 
     lines = text.splitlines()
     out = []
+    buffer = []  # accumulate paragraph lines
     i = 0
+
     while i < len(lines):
         line = lines[i].strip()
+        i += 1
         if not line:
-            i += 1
             continue
 
-        # --- HEADER DETECTION ---
+        # Check if line is a header
         is_header = False
         header_text = ""
         for kw in header_keywords:
@@ -135,31 +137,46 @@ def format_tight_output(text: str) -> str:
             header_text = line.rstrip(":")
 
         if is_header:
+            # Flush buffered paragraph lines first
+            if buffer:
+                para = " ".join(buffer).strip()
+                if para:
+                    out.append(para)
+                buffer = []
+
+            # Add header with spacing
             if out and out[-1] != "":
-                out.append("")  # blank line before header
+                out.append("")
             out.append(f"**{header_text}**")
-            out.append("")  # blank line after header
-            i += 1
+            out.append("")
             continue
 
-        # --- BULLET POINT LOGIC ---
-        # If line starts with bullet symbol or number
+        # Bullet logic
         if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
+            # flush buffer before bullets
+            if buffer:
+                para = " ".join(buffer).strip()
+                if para:
+                    out.append(para)
+                buffer = []
+
             content = re.sub(r'^[-•*\d\.]+\s*', '', line)
             out.append(f"- {content}")
-        # Short lines after a bullet → continue bullet
-        elif out and out[-1].startswith("- "):
+            continue
+
+        # Short line after bullet → continue bullet
+        if out and out[-1].startswith("- "):
             out.append(f"- {line}")
-        # Short line → new bullet
-        elif len(line) <= 140:
-            out.append(f"- {line}")
-        # Long paragraph → keep as paragraph
         else:
-            out.append(line)
+            buffer.append(line)
 
-        i += 1
+    # Flush any remaining buffer
+    if buffer:
+        para = " ".join(buffer).strip()
+        if para:
+            out.append(para)
 
-    # --- CLEAN DUPLICATE BLANK LINES ---
+    # Collapse duplicate blank lines
     final = []
     for ln in out:
         if ln == "" and (not final or final[-1] == ""):
@@ -168,10 +185,10 @@ def format_tight_output(text: str) -> str:
 
     final_text = "\n".join(final).strip()
 
-    # --- ENSURE HEADER SPACING ---
+    # Ensure spacing after headers
     final_text = re.sub(r'(\*\*.+?\*\*)\n(?!\n)', r'\1\n\n', final_text)
 
-    # Fix Main Activity + Introduction glued together
+    # Prevent Main Activity + Introduction sticking together
     final_text = final_text.replace(
         "**Main Activity**\n**Introduction**",
         "**Main Activity**\n\n**Introduction**"
