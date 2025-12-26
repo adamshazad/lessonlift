@@ -175,37 +175,6 @@ def format_tight_output(text: str) -> str:
     )
 
     return final_text
-# ----------------------------
-# CLEAN DUPLICATE BLANK LINES
-# ----------------------------
-
-final = []
-for ln in out:
-    if ln == "" and (not final or final[-1] == ""):
-        continue
-    final.append(ln)
-
-final_text = "\n".join(final).strip()
-
-# ----------------------------
-# FINAL SAFETY FIXES
-# ----------------------------
-
-# Ensure Main Activity exists and is not glued to Introduction
-if "**Main Activity**" in final_text and "**Introduction**" in final_text:
-    final_text = final_text.replace(
-        "**Main Activity**\n**Introduction**",
-        "**Main Activity**\n\n**Introduction**"
-    )
-
-# Ensure spacing after every header
-final_text = re.sub(
-    r'(\*\*.+?\*\*)\n(?!\n)',
-    r'\1\n\n',
-    final_text
-)
-
-return final_text
 
 # -------------------------------
 # Logo + title
