@@ -115,50 +115,45 @@ def format_tight_output(text: str) -> str:
 
     lines = text.splitlines()
     out = []
-
     i = 0
     while i < len(lines):
         line = lines[i].strip()
-
-        if line == "":
-            if out and out[-1] != "":
-                out.append("")
+        if not line:
             i += 1
             continue
 
+        # Detect headers
         is_header = False
         header_text = ""
-
         for kw in header_keywords:
             if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
                 is_header = True
                 header_text = line.rstrip(":")
                 break
-
         if not is_header and line.endswith(":") and not line.lower().startswith("timing"):
             is_header = True
             header_text = line.rstrip(":")
 
         if is_header:
-            if out and out[-1] != "":
-                out.append("")
             out.append(f"**{header_text}**")
-            out.append("")
+            out.append("")  # blank line after header
             i += 1
             continue
 
-        # Bullet logic
+        # Bullet logic: short lines or continuation of previous bullet
         if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
             content = re.sub(r'^[-•*\d\.]+\s*', '', line)
             out.append(f"- {content}")
         elif out and out[-1].startswith("- "):
+            out.append(f"- {line}")
+        elif len(line) <= 140:
             out.append(f"- {line}")
         else:
             out.append(line)
 
         i += 1
 
-    # Clean duplicate blank lines
+    # Remove multiple blank lines
     final = []
     for ln in out:
         if ln == "" and (not final or final[-1] == ""):
@@ -167,10 +162,10 @@ def format_tight_output(text: str) -> str:
 
     final_text = "\n".join(final).strip()
 
-    # Ensure spacing after headers
+    # Ensure headers are always followed by a blank line
     final_text = re.sub(r'(\*\*.+?\*\*)\n(?!\n)', r'\1\n\n', final_text)
 
-    # Prevent Main Activity + Introduction sticking together
+    # Ensure Main Activity + Introduction are not glued
     final_text = final_text.replace(
         "**Main Activity**\n**Introduction**",
         "**Main Activity**\n\n**Introduction**"
