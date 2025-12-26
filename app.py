@@ -154,13 +154,6 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        if len(line) <= 140:
-            out.append(f"- {line}")
-        else:
-            out.append(line)
-
-        i += 1
-
     final = []
     for ln in out:
         if ln == "" and (not final or final[-1] == ""):
