@@ -176,6 +176,11 @@ def format_tight_output(text: str) -> str:
 
     return final_text
 
+def count_words(text: str) -> int:
+    if not text:
+        return 0
+    return len(text.split())
+
 # -------------------------------
 # Logo + title
 # -------------------------------
