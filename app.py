@@ -119,7 +119,6 @@ def format_tight_output(text: str) -> str:
     while i < len(lines):
         line = lines[i].strip()
         if not line:
-            # Skip multiple blank lines
             if formatted_lines and formatted_lines[-1] != "":
                 formatted_lines.append("")
             i += 1
@@ -127,6 +126,7 @@ def format_tight_output(text: str) -> str:
 
         # Detect headers
         is_header = False
+        header_text = ""
         for kw in header_keywords:
             if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) or (line.endswith(":") and not line.lower().startswith("timing")):
                 is_header = True
@@ -134,11 +134,13 @@ def format_tight_output(text: str) -> str:
                 break
 
         if is_header:
-            # Add blank line before header if needed
+            # Ensure blank line above header
             if formatted_lines and formatted_lines[-1] != "":
                 formatted_lines.append("")
+            # Header itself
             formatted_lines.append(f"**{header_text}**")
-            formatted_lines.append("")  # blank line after header
+            # Blank line below header
+            formatted_lines.append("")
             i += 1
             continue
 
@@ -149,7 +151,7 @@ def format_tight_output(text: str) -> str:
             i += 1
             continue
 
-        # Check if previous line is a bullet → continuation
+        # Continuation line for bullet
         if formatted_lines and formatted_lines[-1].startswith("- "):
             formatted_lines.append(f"- {line}")
         else:
@@ -157,14 +159,14 @@ def format_tight_output(text: str) -> str:
 
         i += 1
 
-    # Collapse multiple blank lines
+    # Collapse multiple blank lines to max 1
     final_lines = []
     for ln in formatted_lines:
         if ln == "" and final_lines and final_lines[-1] == "":
             continue
         final_lines.append(ln)
 
-    final_text = "\n".join(final_lines).strip()
+    return "\n".join(final_lines).strip()
 
     return final_text
     
