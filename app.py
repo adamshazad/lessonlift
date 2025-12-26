@@ -115,48 +115,42 @@ def format_tight_output(text: str) -> str:
 
     lines = text.splitlines()
     formatted_lines = []
-    i = 0
-
-    while i < len(lines):
-        line = lines[i].strip()
+    
+    for line in lines:
+        line = line.strip()
         if not line:
+            # avoid multiple blank lines
             if formatted_lines and formatted_lines[-1] != "":
                 formatted_lines.append("")
-            i += 1
             continue
 
-        # Detect headers
-        is_header = False
-        header_text = ""
+        # Check if line contains a header glued to text
+        header_found = None
         for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) or (line.endswith(":") and not line.lower().startswith("timing")):
-                is_header = True
-                header_text = line.rstrip(":").strip()
+            if line.startswith(kw):
+                header_found = kw
                 break
 
-        if is_header:
-            # Ensure blank line above
+        if header_found:
+            # Split header from the rest if needed
+            rest = line[len(header_found):].strip()
             if formatted_lines and formatted_lines[-1] != "":
                 formatted_lines.append("")
-            # Add bold header
-            formatted_lines.append(f"**{header_text}**")
-            # Ensure blank line below
-            formatted_lines.append("")
-            i += 1
+            formatted_lines.append(f"**{header_found}**")
+            formatted_lines.append("")  # blank line after header
+            if rest:
+                formatted_lines.append(rest)
             continue
 
-        # Detect bullets
+        # Bullet detection
         if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
             content = re.sub(r'^[-•*\d\.]+\s*', '', line)
             formatted_lines.append(f"- {content}")
-        # Continuation line for previous bullet
         elif formatted_lines and formatted_lines[-1].startswith("- "):
+            # continuation of previous bullet
             formatted_lines.append(f"- {line}")
         else:
-            # Treat as paragraph
             formatted_lines.append(line)
-
-        i += 1
 
     # Collapse multiple blank lines to max 1
     final_lines = []
@@ -166,7 +160,6 @@ def format_tight_output(text: str) -> str:
         final_lines.append(ln)
 
     return "\n".join(final_lines).strip()
-
     return final_text
     
 def count_words(text: str) -> int:
