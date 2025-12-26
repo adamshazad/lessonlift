@@ -116,46 +116,47 @@ def format_tight_output(text: str) -> str:
     lines = text.splitlines()
     out = []
 
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
+i = 0
+while i < len(lines):
+    line = lines[i].strip()
 
-        if line == "":
-            if out and out[-1] != "":
-                out.append("")
-            i += 1
-            continue
+    if line == "":
+        if out and out[-1] != "":
+            out.append("")
+        i += 1
+        continue
 
-        is_header = False
-        header_text = ""
+    is_header = False
+    header_text = ""
 
-        for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
-                is_header = True
-                header_text = line.rstrip(":")
-                break
-
-        if not is_header and line.endswith(":") and not line.lower().startswith("timing"):
+    for kw in header_keywords:
+        if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
             is_header = True
             header_text = line.rstrip(":")
+            break
 
-        if is_header:
-            if out and out[-1] != "":
-                out.append("")
-            out.append(f"**{header_text}**")
+    if not is_header and line.endswith(":") and not line.lower().startswith("timing"):
+        is_header = True
+        header_text = line.rstrip(":")
+
+    if is_header:
+        if out and out[-1] != "":
             out.append("")
-            i += 1
-            continue
-
-if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
-    content = re.sub(r'^[-•*\d\.]+\s*', '', line)
-    out.append(f"- {content}")
-elif out and out[-1].startswith("- "):
-    out.append(f"- {line}")
-else:
-    out.append(line)
-
+        out.append(f"**{header_text}**")
+        out.append("")
         i += 1
+        continue
+
+    # THIS IS THE FIXED BULLET LOGIC - INDENTATION MUST MATCH WHILE LOOP
+    if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
+        content = re.sub(r'^[-•*\d\.]+\s*', '', line)
+        out.append(f"- {content}")
+    elif out and out[-1].startswith("- "):
+        out.append(f"- {line}")
+    else:
+        out.append(line)
+
+    i += 1
 
     final = []
     for ln in out:
