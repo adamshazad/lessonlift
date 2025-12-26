@@ -103,7 +103,6 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
 
-    # Header keywords we want to detect
     header_keywords = [
         "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
         "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
@@ -121,7 +120,6 @@ def format_tight_output(text: str) -> str:
     while i < len(lines):
         line = lines[i].strip()
         if not line:
-            # Keep only a single blank line
             if formatted_lines and formatted_lines[-1] != "":
                 formatted_lines.append("")
             i += 1
@@ -133,16 +131,16 @@ def format_tight_output(text: str) -> str:
         for kw in header_keywords:
             if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) or (line.endswith(":") and not line.lower().startswith("timing")):
                 is_header = True
-                header_text = line.rstrip(":")
+                header_text = line.rstrip(":").strip()
                 break
 
         if is_header:
-            # Ensure a blank line above header
+            # Ensure blank line above
             if formatted_lines and formatted_lines[-1] != "":
                 formatted_lines.append("")
-            # Add bolded header
+            # Add bold header
             formatted_lines.append(f"**{header_text}**")
-            # Ensure a blank line below header
+            # Ensure blank line below
             formatted_lines.append("")
             i += 1
             continue
