@@ -103,6 +103,7 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
 
+    # Header keywords we want to detect
     header_keywords = [
         "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
         "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
@@ -116,9 +117,11 @@ def format_tight_output(text: str) -> str:
     lines = text.splitlines()
     formatted_lines = []
     i = 0
+
     while i < len(lines):
         line = lines[i].strip()
         if not line:
+            # Keep only a single blank line
             if formatted_lines and formatted_lines[-1] != "":
                 formatted_lines.append("")
             i += 1
@@ -134,27 +137,25 @@ def format_tight_output(text: str) -> str:
                 break
 
         if is_header:
-            # Ensure blank line above header
+            # Ensure a blank line above header
             if formatted_lines and formatted_lines[-1] != "":
                 formatted_lines.append("")
-            # Header itself
+            # Add bolded header
             formatted_lines.append(f"**{header_text}**")
-            # Blank line below header
+            # Ensure a blank line below header
             formatted_lines.append("")
             i += 1
             continue
 
-        # Handle bullets
+        # Detect bullets
         if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
             content = re.sub(r'^[-•*\d\.]+\s*', '', line)
             formatted_lines.append(f"- {content}")
-            i += 1
-            continue
-
-        # Continuation line for bullet
-        if formatted_lines and formatted_lines[-1].startswith("- "):
+        # Continuation line for previous bullet
+        elif formatted_lines and formatted_lines[-1].startswith("- "):
             formatted_lines.append(f"- {line}")
         else:
+            # Treat as paragraph
             formatted_lines.append(line)
 
         i += 1
