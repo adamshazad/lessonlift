@@ -114,85 +114,57 @@ def format_tight_output(text: str) -> str:
     ]
 
     lines = text.splitlines()
-    out = []
-    buffer = []  # accumulate paragraph lines
+    formatted_lines = []
     i = 0
-
     while i < len(lines):
         line = lines[i].strip()
-        i += 1
         if not line:
+            # Skip multiple blank lines
+            if formatted_lines and formatted_lines[-1] != "":
+                formatted_lines.append("")
+            i += 1
             continue
 
-        # Check if line is a header
+        # Detect headers
         is_header = False
-        header_text = ""
         for kw in header_keywords:
-            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I):
+            if re.match(rf'^{re.escape(kw)}\b', line, flags=re.I) or (line.endswith(":") and not line.lower().startswith("timing")):
                 is_header = True
                 header_text = line.rstrip(":")
                 break
-        if not is_header and line.endswith(":") and not line.lower().startswith("timing"):
-            is_header = True
-            header_text = line.rstrip(":")
 
         if is_header:
-            # Flush buffered paragraph lines first
-            if buffer:
-                para = " ".join(buffer).strip()
-                if para:
-                    out.append(para)
-                buffer = []
-
-            # Add header with spacing
-            if out and out[-1] != "":
-                out.append("")
-            out.append(f"**{header_text}**")
-            out.append("")
+            # Add blank line before header if needed
+            if formatted_lines and formatted_lines[-1] != "":
+                formatted_lines.append("")
+            formatted_lines.append(f"**{header_text}**")
+            formatted_lines.append("")  # blank line after header
+            i += 1
             continue
 
-        # Bullet logic
+        # Handle bullets
         if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
-            # flush buffer before bullets
-            if buffer:
-                para = " ".join(buffer).strip()
-                if para:
-                    out.append(para)
-                buffer = []
-
             content = re.sub(r'^[-•*\d\.]+\s*', '', line)
-            out.append(f"- {content}")
+            formatted_lines.append(f"- {content}")
+            i += 1
             continue
 
-        # Short line after bullet → continue bullet
-        if out and out[-1].startswith("- "):
-            out.append(f"- {line}")
+        # Check if previous line is a bullet → continuation
+        if formatted_lines and formatted_lines[-1].startswith("- "):
+            formatted_lines.append(f"- {line}")
         else:
-            buffer.append(line)
+            formatted_lines.append(line)
 
-    # Flush any remaining buffer
-    if buffer:
-        para = " ".join(buffer).strip()
-        if para:
-            out.append(para)
+        i += 1
 
-    # Collapse duplicate blank lines
-    final = []
-    for ln in out:
-        if ln == "" and (not final or final[-1] == ""):
+    # Collapse multiple blank lines
+    final_lines = []
+    for ln in formatted_lines:
+        if ln == "" and final_lines and final_lines[-1] == "":
             continue
-        final.append(ln)
+        final_lines.append(ln)
 
-    final_text = "\n".join(final).strip()
-
-    # Ensure spacing after headers
-    final_text = re.sub(r'(\*\*.+?\*\*)\n(?!\n)', r'\1\n\n', final_text)
-
-    # Prevent Main Activity + Introduction sticking together
-    final_text = final_text.replace(
-        "**Main Activity**\n**Introduction**",
-        "**Main Activity**\n\n**Introduction**"
-    )
+    final_text = "\n".join(final_lines).strip()
 
     return final_text
     
