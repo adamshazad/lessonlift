@@ -165,17 +165,16 @@ def format_tight_output(text: str) -> str:
 
     final_text = "\n".join(final).strip()
 
-    # Safety spacing fixes
+    # Ensure spacing after headers
     final_text = re.sub(r'(\*\*.+?\*\*)\n(?!\n)', r'\1\n\n', final_text)
 
-    if "**Main Activity**\n**Introduction**" in final_text:
-        final_text = final_text.replace(
-            "**Main Activity**\n**Introduction**",
-            "**Main Activity**\n\n**Introduction**"
-        )
+    # Prevent Main Activity + Introduction sticking together
+    final_text = final_text.replace(
+        "**Main Activity**\n**Introduction**",
+        "**Main Activity**\n\n**Introduction**"
+    )
 
     return final_text
-
 # ----------------------------
 # CLEAN DUPLICATE BLANK LINES
 # ----------------------------
