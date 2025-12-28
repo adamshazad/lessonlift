@@ -338,17 +338,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # Finally, ensure the content starts with a header (not an empty line)
             final_output = final_output.lstrip()
 
-final_output_html = final_output
+            final_output_html = final_output
 
-# Render headers as real HTML blocks (prevents sticking forever)
-final_output_html = re.sub(
-    r'@@HEADER@@(.+?)@@',
-    r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div>',
-    final_output_html
-)
+            # Render headers as real HTML blocks (prevents sticking forever)
+            final_output_html = re.sub(
+                r'@@HEADER@@(.+?)@@',
+                r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div>',
+                final_output_html
+            )
 
-# Convert remaining line breaks ONCE
-final_output_html = final_output_html.replace('\n', '<br>')
+            # Convert remaining line breaks ONCE
+            final_output_html = final_output_html.replace('\n', '<br>')
 
             # -------------------------------
             # Metadata + Lesson preview
@@ -364,8 +364,7 @@ final_output_html = final_output_html.replace('\n', '<br>')
     <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
     <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
     <br>
-    {final_output_html.replace('\\n','<br>').strip()}
-</div>
+    {final_output_html.strip()}
 """
             st.markdown(metadata_html, unsafe_allow_html=True)
 
