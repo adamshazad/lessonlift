@@ -260,130 +260,102 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     st.session_state.lesson_count += 1
 
-    # Determine min words by lesson duration
-    duration_map = {
-        "30 min": 750,
-        "45 min": 850,
-        "60 min": 1000
-    }
+    duration_map = {"30 min": 750, "45 min": 850, "60 min": 1000}
     min_words = duration_map.get(lesson_data.get('lesson_duration','30 min'), 750)
 
-    # Show daily usage on top (keeps user expectation consistent)
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
 
-    # Strong generation instructions (prevents internal duplicated titles & repeated metadata)
     generation_instructions = (
         "\n\nImportant instructions for generation (must follow exactly):\n"
         "- Use British English only (e.g., 'colour', 'favour', 'maths').\n"
         "- Do NOT include emojis or emoji characters anywhere.\n"
-        "- DO NOT output any internal lesson title lines such as 'Lesson Plan', 'Year 1 Maths Lesson Plan', 'Lesson Plan: ...' or similar anywhere inside the generated body.\n"
-        "- DO NOT repeat the metadata fields (Lesson Title, Subject, Topic, Year Group, Duration, Ability Level, SEN/EAL Notes, Learning Objective) inside the body. Metadata is displayed separately in the app.\n"
-        "- Start the generated content with the first section header (for example: 'Introduction'). Do NOT prepend a second title or metadata block.\n"
-        "- Format headings as a single line header, followed by one blank line, then '-' bullet points or tight paragraph lines.\n"
-        "- Collapse extra blank lines so there is at most one blank line between sections.\n"
+        "- DO NOT output internal lesson title lines.\n"
+        "- DO NOT repeat metadata fields inside the body.\n"
+        "- Start with the first section header.\n"
+        "- Format headings as a single line header, then one blank line, then bullets or tight paragraphs.\n"
         f"- Minimum length: {min_words} words. Maximum length: 1000 words.\n"
-        "- Include clear timings, detailed activities, differentiation, assessment and resources.\n"
+        "- Include clear timings, detailed activities, differentiation, assessment, and resources.\n"
     )
 
     prompt_with_req = prompt + generation_instructions
 
-with st.spinner("✨ Creating lesson plan..."):
-    try:
-        attempts = 0
-        final_output = None
+    # --- THIS try/except must be INSIDE the function ---
+    with st.spinner("✨ Creating lesson plan..."):
+        try:
+            attempts = 0
+            final_output = None
 
-        while attempts < 3:
-            attempts += 1
+            while attempts < 3:
+                attempts += 1
 
-            response = openai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt_with_req}],
-                temperature=0.25,
-                max_tokens=2200,
-            )
-
-            raw = response.choices[0].message.content
-            cleaned = clean_markdown(raw)
-            formatted = format_tight_output(cleaned)
-            wcount = count_words(formatted)
-
-            if wcount >= min_words:
-                final_output = formatted
-                break
-            else:
-                prompt_with_req += (
-                    "\n\nPlease expand the lesson plan with more detail, step-by-step examples, timings, differentiation, and assessment to reach the required word count."
+                response = openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt_with_req}],
+                    temperature=0.25,
+                    max_tokens=2200,
                 )
 
-        if final_output is None:
-            final_output = formatted or ""
+                raw = response.choices[0].message.content
+                cleaned = clean_markdown(raw)
+                formatted = format_tight_output(cleaned)
+                wcount = count_words(formatted)
 
-        # --- POST-PROCESSING CLEANUP ---
-        final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-        final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-        final_output = re.sub(r'(?im)^\s*(lesson\s*plan\s*[:\-].*)\s*$', '', final_output)
-        final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
-        final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
-        final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
-        final_output = final_output.lstrip()
+                if wcount >= min_words:
+                    final_output = formatted
+                    break
+                else:
+                    prompt_with_req += "\n\nPlease expand the lesson plan to reach the required word count."
 
-        # Correct indentation here
-        final_output_html = final_output
+            if final_output is None:
+                final_output = formatted or ""
 
-        # Render headers as HTML
-        final_output_html = re.sub(
-            r'@@HEADER@@(.+?)@@',
-            r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div><br>',
-            final_output_html
-        )
+            # --- Post-processing ---
+            final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+            final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+            final_output = re.sub(r'(?im)^\s*(lesson\s*plan\s*[:\-].*)\s*$', '', final_output)
+            final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
+            final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
+            final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
+            final_output = final_output.lstrip()
 
-        final_output_html = final_output_html.replace('\n', '<br>')
+            final_output_html = re.sub(
+                r'@@HEADER@@(.+?)@@',
+                r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div><br>',
+                final_output
+            )
+            final_output_html = final_output_html.replace('\n', '<br>')
 
-        # -------------------------------
-        # Metadata + Lesson preview
-        # -------------------------------
-        metadata_html = f"""
-<div class='stCard'>
-    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
-    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
-    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
-    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
-    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
-    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
-    <br>
-    {final_output_html.strip()}
-</div>
-"""
-        st.markdown(metadata_html, unsafe_allow_html=True)
+            # --- Metadata & Preview ---
+            metadata_html = f"""<div class='stCard'>
+<div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
+<div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+<div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+<div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+<div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+<div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+<div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
+<div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+<br>
+{final_output_html.strip()}
+</div>"""
+            st.markdown(metadata_html, unsafe_allow_html=True)
 
-        # Exports
-        pdf_buffer = create_pdf(final_output)
-        docx_buffer = create_docx(final_output)
+            pdf_buffer = create_pdf(final_output)
+            docx_buffer = create_docx(final_output)
 
-        st.markdown(
-            f"""
-<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-    <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
-    </a>
-    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
-    </a>
-    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
-    </a>
-</div>
-""",
-            unsafe_allow_html=True
-        )
+            st.markdown(
+                f"""<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+<a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt"><button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button></a>
+<a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf"><button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button></a>
+<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx"><button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button></a>
+</div>""",
+                unsafe_allow_html=True
+            )
 
-    except Exception as e:
-        st.error(f"⚠️ Lesson plan could not be generated: {e}")
-        return
+        except Exception as e:
+            st.error(f"⚠️ Lesson plan could not be generated: {e}")
+            return
 
-    # Save to history
     st.session_state.lesson_history.append({"title": title, "content": final_output})
 
     if regen_message:
