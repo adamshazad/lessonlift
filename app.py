@@ -261,27 +261,24 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     st.session_state.lesson_count += 1
 
     # Determine min words by lesson duration
-    duration_map = {
-        "30 min": 750,
-        "45 min": 850,
-        "60 min": 1000
-    }
+    duration_map = {"30 min": 750, "45 min": 850, "60 min": 1000}
     min_words = duration_map.get(lesson_data.get('lesson_duration','30 min'), 750)
 
-    # Show daily usage on top
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
 
-    # Generation instructions
     generation_instructions = (
         "\n\nImportant instructions for generation (must follow exactly):\n"
-        "- Use British English only.\n"
-        "- Do NOT include emojis.\n"
-        "- Do NOT repeat lesson metadata inside the content.\n"
-        "- Start with the first section header (e.g., 'Introduction').\n"
-        "- Format headings with one blank line, then bullet points or tight paragraphs.\n"
-        f"- Minimum length: {min_words} words. Maximum: 1000 words.\n"
-        "- Include timings, detailed activities, differentiation, assessment and resources.\n"
+        "- Use British English only (e.g., 'colour', 'favour', 'maths').\n"
+        "- Do NOT include emojis or emoji characters anywhere.\n"
+        "- Do NOT output any internal lesson title lines like 'Lesson Plan'.\n"
+        "- Do NOT repeat the metadata fields inside the body.\n"
+        "- Start with the first section header.\n"
+        "- Format headings as single line header followed by one blank line, then bullets or paragraphs.\n"
+        "- Collapse extra blank lines to one between sections.\n"
+        f"- Minimum length: {min_words} words. Maximum length: 1000 words.\n"
+        "- Include clear timings, detailed activities, differentiation, assessment and resources.\n"
     )
+
     prompt_with_req = prompt + generation_instructions
 
     with st.spinner("✨ Creating lesson plan..."):
@@ -291,12 +288,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             while attempts < 3:
                 attempts += 1
+
                 response = openai.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt_with_req}],
                     temperature=0.25,
                     max_tokens=2200,
                 )
+
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
@@ -316,13 +315,24 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # --- POST-PROCESSING CLEANUP ---
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)^\s*(lesson\s*plan\s*[:\-].*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
             final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
             final_output = final_output.lstrip()
 
-            # --- Streamlit Display ---
+            # Add @@HEADER@@ for all headings (if not already)
+            def mark_headers(line):
+                headers = ["Introduction","Warm-Up Activity","Main Activity","Differentiation",
+                           "Assessment","Conclusion","Closure","Extension","Extension Activities",
+                           "Reflection","Plenary","Starter","Guided Practice","Independent Practice","Resources"]
+                stripped = line.strip()
+                if any(stripped.lower().startswith(h.lower()) for h in headers):
+                    return f"@@HEADER@@{stripped}@@"
+                return line
+            final_output_lines = [mark_headers(l) for l in final_output.splitlines()]
+            final_output = "\n".join(final_output_lines)
+
+            # Convert for preview HTML
             final_output_html = re.sub(
                 r'@@HEADER@@(.+?)@@',
                 r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div><br>',
@@ -330,6 +340,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             )
             final_output_html = final_output_html.replace('\n', '<br>')
 
+            # -------------------------------
+            # Metadata + Lesson preview
+            # -------------------------------
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -346,15 +359,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 """
             st.markdown(metadata_html, unsafe_allow_html=True)
 
-            # --- Exports (cleaned for download) ---
-            export_text = re.sub(r'@@HEADER@@(.+?)@@', r'\1', final_output)
-            pdf_buffer = create_pdf(export_text)
-            docx_buffer = create_docx(export_text)
+            # --- Exports ---
+            pdf_buffer = create_pdf(final_output)
+            docx_buffer = create_docx(final_output)
 
             st.markdown(
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-    <a href="data:text/plain;base64,{base64.b64encode(export_text.encode()).decode()}" download="lesson_plan.txt">
+    <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
@@ -374,7 +386,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     # Save to history
     st.session_state.lesson_history.append({"title": title, "content": final_output})
-
     if regen_message:
         st.info(f"🔄 {regen_message}")
 
