@@ -130,32 +130,43 @@ def format_tight_output(text: str) -> str:
     def flush_blank():
         if output and output[-1] != "":
             output.append("")
+for raw in lines:
+    if not raw:
+        continue
 
-    for raw in lines:
-        if not raw:
-            continue
-
-        matched_header = None
-        for h in HEADER_KEYWORDS:
-            if raw.lower().startswith(h.lower()):
-                matched_header = h
-                rest = raw[len(h):].strip(" :")
-                flush_blank()
-                output.append(f"**{h}**")
+    matched_header = None
+    for h in HEADER_KEYWORDS:
+        if raw.lower().startswith(h.lower()):
+            matched_header = h
+            rest = raw[len(h):].strip(" :")
+            
+            # --- FORCE BLANK LINE BEFORE HEADER ---
+            if output and output[-1] != "":
                 output.append("")
-                if rest:
-                    output.append(rest)
-                break
+            
+            # --- ADD HEADER ---
+            output.append(f"**{h}**")
+            
+            # --- FORCE BLANK LINE AFTER HEADER ---
+            output.append("")
+            
+            # --- If there's text right after header, push as separate paragraph ---
+            if rest:
+                output.append(rest)
+                output.append("")
+            break
 
-        if matched_header:
-            continue
+    if matched_header:
+        continue
 
-        if raw.startswith(("-", "•", "*")) or raw[:2].isdigit():
-            bullet = raw.lstrip("-•*0123456789. ").strip()
-            output.append(f"- {bullet}")
-            continue
+    # Bullet handling
+    if raw.startswith(("-", "•", "*")) or raw[:2].isdigit():
+        bullet = raw.lstrip("-•*0123456789. ").strip()
+        output.append(f"- {bullet}")
+        continue
 
-        output.append(raw)
+    # Normal paragraph
+    output.append(raw)
 
     final = []
     for line in output:
