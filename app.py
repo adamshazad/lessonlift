@@ -340,16 +340,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             final_output_html = final_output
 
-            # Render headers as real HTML blocks (prevents sticking forever)
-final_output_html = re.sub(
-    r'@@HEADER@@(.+?)@@',
-    r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div><br>',
-    final_output_html
-)
+                        # Render headers as real HTML blocks (prevents sticking forever)
+            final_output_html = re.sub(
+                r'@@HEADER@@(.+?)@@',
+                r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div><br>',
+                final_output_html
+            )
 
             # Convert remaining line breaks ONCE
             final_output_html = final_output_html.replace('\n', '<br>')
-
+            
             # -------------------------------
             # Metadata + Lesson preview
             # -------------------------------
