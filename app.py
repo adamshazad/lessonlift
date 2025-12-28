@@ -108,7 +108,6 @@ def format_tight_output(text: str) -> str:
         "Main Activity",
         "Differentiation",
         "Assessment",
-        "Resources",
         "Conclusion",
         "Closure",
         "Extension",
@@ -130,39 +129,52 @@ def format_tight_output(text: str) -> str:
             output.append("")
 
     for raw in lines:
-        if not raw.strip():
+        stripped = raw.strip()
+        if not stripped:
             continue
 
-        # Detect headers with optional timing
-        matched_header = None
+        # Combine header + timing if timing is in same line or next line
+        header_match = None
         for h in HEADER_KEYWORDS:
-            pattern = rf'^{h}\s*(?:\([^\)]*\))?\s*$'
-            if re.match(pattern, raw.strip(), flags=re.I):
-                if last_header == h:
-                    # Skip duplicate headers
-                    matched_header = h
-                    break
-                last_header = h
-                matched_header = h
-                flush_blank()
-                # Keep the timing inside parentheses if it exists
-                timing = re.search(r'\([^\)]*\)', raw)
-                header_text = f"{h} {timing.group(0)}" if timing else h
-                output.append(f"**{header_text}**")
-                output.append("")  # Blank line after header
+            if stripped.lower().startswith(h.lower()):
+                header_match = h
                 break
 
-        if matched_header:
+        if header_match:
+            if last_header == header_match:
+                continue  # skip duplicate header
+            last_header = header_match
+
+            # Check if next line is timing like "(5 minutes)" or "5 minutes"
+            timing = ""
+            idx = lines.index(raw)
+            if idx + 1 < len(lines):
+                next_line = lines[idx + 1].strip()
+                if re.match(r'^\(?\d+\s*minutes?\)?$', next_line, re.I):
+                    timing = f" ({next_line.replace('(','').replace(')','')})"
+                    lines[idx + 1] = ""  # remove timing from next line
+
+            flush_blank()
+            output.append(f"**{header_match}{timing}**")
+            output.append("")  # blank line after header
             continue
 
-        # Bullet handling
-        if raw.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', raw):
-            bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', raw)
+        # Detect sub-activities like "Activity 1: Shape Hunt (10 minutes)"
+        if re.match(r'^Activity\s*\d+\s*[:\-]', stripped, re.I):
+            flush_blank()
+            output.append(f"{stripped}")
+            output.append("")
+            continue
+
+        # Bullet handling for actual lists
+        if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
+            bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
             output.append(f"- {bullet}")
             continue
 
         # Normal paragraph
-        output.append(raw.strip())
+        output.append(stripped)
+        output.append("")  # keep paragraph spacing
 
     # Remove duplicate blank lines
     final = []
