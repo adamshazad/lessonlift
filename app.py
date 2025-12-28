@@ -102,15 +102,27 @@ def clean_markdown(text) -> str:
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
+        
+# Remove standalone timing lines like "(5 minutes)"
+text = re.sub(r'^\(\d+\s*minutes?\)$', '', text, flags=re.MULTILINE)
 
-    HEADER_KEYWORDS = [
-        "Lesson Title", "Subject", "Topic", "Year Group", "Duration",
-        "Ability Level", "SEN/EAL Notes", "Learning Objective",
-        "Learning Objectives", "Introduction", "Warm-Up Activity",
-        "Main Activity", "Assessment", "Differentiation",
-        "Resources", "Conclusion", "Plenary", "Starter",
-        "Guided Practice", "Independent Practice"
-    ]
+HEADER_KEYWORDS = [
+    "Introduction",
+    "Warm-Up Activity",
+    "Main Activity",
+    "Differentiation",
+    "Assessment",
+    "Resources",
+    "Conclusion",
+    "Closure",
+    "Extension",
+    "Extension Activities",
+    "Reflection",
+    "Plenary",
+    "Starter",
+    "Guided Practice",
+    "Independent Practice"
+]
 
     lines = [l.strip() for l in text.splitlines()]
     output = []
