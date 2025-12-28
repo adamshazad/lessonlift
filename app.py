@@ -123,6 +123,8 @@ def format_tight_output(text: str) -> str:
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
 
+    last_header = None
+
     def flush_blank():
         if output and output[-1] != "":
             output.append("")
@@ -131,26 +133,26 @@ def format_tight_output(text: str) -> str:
         if not raw.strip():
             continue
 
-        # Detect standard lesson headers only
+        # Detect headers with optional timing
         matched_header = None
         for h in HEADER_KEYWORDS:
-            if raw.strip().lower().startswith(h.lower()):
+            pattern = rf'^{h}\s*(?:\([^\)]*\))?\s*$'
+            if re.match(pattern, raw.strip(), flags=re.I):
+                if last_header == h:
+                    # Skip duplicate headers
+                    matched_header = h
+                    break
+                last_header = h
                 matched_header = h
-                rest = raw[len(h):].strip(" :")
                 flush_blank()
-                output.append(f"**{h}**")  # Bold header
-                output.append("")           # Force blank line after header
-                if rest:
-                    output.append(rest)    # Keep extra text below header
-                    output.append("")
+                # Keep the timing inside parentheses if it exists
+                timing = re.search(r'\([^\)]*\)', raw)
+                header_text = f"{h} {timing.group(0)}" if timing else h
+                output.append(f"**{header_text}**")
+                output.append("")  # Blank line after header
                 break
 
         if matched_header:
-            continue
-
-        # Keep numeric timing lines as **normal text**, not bold
-        if re.match(r'^\d+\s*minutes?$', raw.strip(), flags=re.I):
-            output.append(raw.strip())
             continue
 
         # Bullet handling
@@ -162,25 +164,14 @@ def format_tight_output(text: str) -> str:
         # Normal paragraph
         output.append(raw.strip())
 
-    # FINAL PASS: enforce blank lines before/after headers
-    final = []
-    for line in output:
-        if line.startswith("**") and line.endswith("**"):
-            if final and final[-1] != "":
-                final.append("")
-            final.append(line)
-            final.append("")
-        else:
-            final.append(line)
-
     # Remove duplicate blank lines
-    cleaned = []
-    for ln in final:
-        if ln == "" and cleaned and cleaned[-1] == "":
+    final = []
+    for ln in output:
+        if ln == "" and final and final[-1] == "":
             continue
-        cleaned.append(ln)
+        final.append(ln)
 
-    return "\n".join(cleaned).strip()
+    return "\n".join(final).strip()
     
 def count_words(text: str) -> int:
     if not text:
