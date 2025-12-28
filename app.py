@@ -123,7 +123,6 @@ def format_tight_output(text: str) -> str:
         "Independent Practice"
     ]
 
-    # Split into lines
     lines = [l.strip() for l in text.splitlines()]
     output = []
 
@@ -169,7 +168,7 @@ def format_tight_output(text: str) -> str:
         # Normal paragraph
         output.append(raw)
 
-    # FINAL PASS: enforce blank lines before/after headers
+    # --- FINAL PASS: enforce blank lines before/after headers ---
     final = []
     for line in output:
         if line.startswith("**") and line.endswith("**"):
