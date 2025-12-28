@@ -353,7 +353,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # -------------------------------
             # Metadata + Lesson preview
             # -------------------------------
-metadata_html = f"""
+            metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
     <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
