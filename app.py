@@ -102,27 +102,27 @@ def clean_markdown(text) -> str:
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
-        
-# Remove standalone timing lines like "(5 minutes)"
-text = re.sub(r'^\(\d+\s*minutes?\)$', '', text, flags=re.MULTILINE)
 
-HEADER_KEYWORDS = [
-    "Introduction",
-    "Warm-Up Activity",
-    "Main Activity",
-    "Differentiation",
-    "Assessment",
-    "Resources",
-    "Conclusion",
-    "Closure",
-    "Extension",
-    "Extension Activities",
-    "Reflection",
-    "Plenary",
-    "Starter",
-    "Guided Practice",
-    "Independent Practice"
-]
+    # Remove standalone timing lines like "(5 minutes)"
+    text = re.sub(r'^\(\d+\s*minutes?\)$', '', text, flags=re.MULTILINE)
+
+    HEADER_KEYWORDS = [
+        "Introduction",
+        "Warm-Up Activity",
+        "Main Activity",
+        "Differentiation",
+        "Assessment",
+        "Resources",
+        "Conclusion",
+        "Closure",
+        "Extension",
+        "Extension Activities",
+        "Reflection",
+        "Plenary",
+        "Starter",
+        "Guided Practice",
+        "Independent Practice"
+    ]
 
     lines = [l.strip() for l in text.splitlines()]
     output = []
@@ -135,7 +135,6 @@ HEADER_KEYWORDS = [
         if not raw:
             continue
 
-        # Detect header EVEN IF GLUED TO TEXT
         matched_header = None
         for h in HEADER_KEYWORDS:
             if raw.lower().startswith(h.lower()):
@@ -151,18 +150,15 @@ HEADER_KEYWORDS = [
         if matched_header:
             continue
 
-        # Bullet handling (FORCED)
         if raw.startswith(("-", "•", "*")) or raw[:2].isdigit():
             bullet = raw.lstrip("-•*0123456789. ").strip()
             output.append(f"- {bullet}")
             continue
 
-        # Normal paragraph
         output.append(raw)
 
-    # FINAL PASS: enforce spacing rules
     final = []
-    for i, line in enumerate(output):
+    for line in output:
         if line.startswith("**") and line.endswith("**"):
             if final and final[-1] != "":
                 final.append("")
@@ -171,7 +167,6 @@ HEADER_KEYWORDS = [
         else:
             final.append(line)
 
-    # Remove duplicate blank lines
     cleaned = []
     for ln in final:
         if ln == "" and cleaned and cleaned[-1] == "":
