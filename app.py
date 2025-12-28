@@ -116,7 +116,7 @@ def format_tight_output(text: str) -> str:
         "Plenary",
         "Starter",
         "Guided Practice",
-        "Independent Practice"
+        "Independent Practice",
         "Resources"
     ]
 
