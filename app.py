@@ -287,73 +287,62 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     prompt_with_req = prompt + generation_instructions
 
-    with st.spinner("✨ Creating lesson plan..."):
-        try:
-            attempts = 0
-            final_output = None
+with st.spinner("✨ Creating lesson plan..."):
+    try:
+        attempts = 0
+        final_output = None
 
-            while attempts < 3:
-                attempts += 1
+        while attempts < 3:
+            attempts += 1
 
-                response = openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt_with_req}],
-                    temperature=0.25,
-                    max_tokens=2200,
-                )
-
-                raw = response.choices[0].message.content
-                cleaned = clean_markdown(raw)
-                formatted = format_tight_output(cleaned)
-                wcount = count_words(formatted)
-
-                if wcount >= min_words:
-                    final_output = formatted
-                    break
-                else:
-                    # If too short, request expansion (keeps the same guard rails)
-                    prompt_with_req += (
-                        "\n\nPlease expand the lesson plan with more detail, step-by-step examples, timings, differentiation, and assessment to reach the required word count."
-                    )
-
-            if final_output is None:
-                final_output = formatted or ""
-
-            # --- POST-PROCESSING CLEANUP (remove duplicates / stray titles) ---
-
-            # 1) Remove any internal title lines (common patterns)
-            final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)^\s*(lesson\s*plan\s*[:\-].*)\s*$', '', final_output)
-
-            # 2) Remove duplicated heading labels (e.g., multiple "Learning Objective" headers)
-            final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
-
-            # 3) Remove duplicated blank headers like "Introduction" followed immediately by another "Introduction" section
-            final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
-
-            # Collapse any runs of more than two blank lines to exactly two
-            final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
-
-            # Finally, ensure the content starts with a header (not an empty line)
-            final_output = final_output.lstrip()
-
-              final_output_html = final_output
-
-            # Render headers as real HTML blocks (prevents sticking forever)
-            final_output_html = re.sub(
-                r'@@HEADER@@(.+?)@@',
-                r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div><br>',
-                final_output_html
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt_with_req}],
+                temperature=0.25,
+                max_tokens=2200,
             )
 
-            # Convert remaining line breaks ONCE
-            final_output_html = final_output_html.replace('\n', '<br>')
+            raw = response.choices[0].message.content
+            cleaned = clean_markdown(raw)
+            formatted = format_tight_output(cleaned)
+            wcount = count_words(formatted)
 
-            # -------------------------------
-            # Metadata + Lesson preview
-            # -------------------------------
-            metadata_html = f"""
+            if wcount >= min_words:
+                final_output = formatted
+                break
+            else:
+                prompt_with_req += (
+                    "\n\nPlease expand the lesson plan with more detail, step-by-step examples, timings, differentiation, and assessment to reach the required word count."
+                )
+
+        if final_output is None:
+            final_output = formatted or ""
+
+        # --- POST-PROCESSING CLEANUP ---
+        final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+        final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+        final_output = re.sub(r'(?im)^\s*(lesson\s*plan\s*[:\-].*)\s*$', '', final_output)
+        final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
+        final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
+        final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
+        final_output = final_output.lstrip()
+
+        # Correct indentation here
+        final_output_html = final_output
+
+        # Render headers as HTML
+        final_output_html = re.sub(
+            r'@@HEADER@@(.+?)@@',
+            r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div><br>',
+            final_output_html
+        )
+
+        final_output_html = final_output_html.replace('\n', '<br>')
+
+        # -------------------------------
+        # Metadata + Lesson preview
+        # -------------------------------
+        metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
     <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
@@ -367,14 +356,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     {final_output_html.strip()}
 </div>
 """
-            st.markdown(metadata_html, unsafe_allow_html=True)
-            
-            # Exports
-            pdf_buffer = create_pdf(final_output)
-            docx_buffer = create_docx(final_output)
+        st.markdown(metadata_html, unsafe_allow_html=True)
 
-            st.markdown(
-                f"""
+        # Exports
+        pdf_buffer = create_pdf(final_output)
+        docx_buffer = create_docx(final_output)
+
+        st.markdown(
+            f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
     <a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
@@ -387,12 +376,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     </a>
 </div>
 """,
-                unsafe_allow_html=True
-            )
+            unsafe_allow_html=True
+        )
 
-        except Exception as e:
-            st.error(f"⚠️ Lesson plan could not be generated: {e}")
-            return
+    except Exception as e:
+        st.error(f"⚠️ Lesson plan could not be generated: {e}")
+        return
 
     # Save to history
     st.session_state.lesson_history.append({"title": title, "content": final_output})
