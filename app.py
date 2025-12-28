@@ -117,6 +117,7 @@ def format_tight_output(text: str) -> str:
         "Starter",
         "Guided Practice",
         "Independent Practice"
+        "Resources"
     ]
 
     lines = [l.rstrip() for l in text.splitlines()]
