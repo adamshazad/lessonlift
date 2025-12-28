@@ -168,8 +168,6 @@ def format_tight_output(text: str) -> str:
 
     return "\n".join(cleaned).strip()
     
-    return final_text
-    
 def count_words(text: str) -> int:
     if not text:
         return 0
@@ -324,16 +322,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             # 3) Remove duplicated blank headers like "Introduction" followed immediately by another "Introduction" section
             final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
-
-            # 4) Normalise header formatting: ensure header lines are a single line and followed by one blank line
-            # (We earlier wrapped headers in **...**; keep that but ensure consistency)
-            final_output = re.sub(r'\*\*(.*?)\*\*', r'\1', final_output)  # remove internal ** markers to standardise first
-            # Re-insert bold markers for preview/exports (create_docx/create_pdf use ** to detect bold)
-            header_candidates = ["Introduction", "Learning Objective", "Main Activity", "Assessment", "Conclusion",
-                                 "Differentiation", "Extension", "Resources Needed", "Lesson Duration", "Ability Level",
-                                 "SEN/EAL Notes", "Independent Practice", "Guided Practice", "Plenary", "Starter"]
-            for hc in header_candidates:
-                final_output = re.sub(rf'(?im)^\s*{re.escape(hc)}\s*$', f"**{hc}**", final_output, flags=re.M)
 
             # Collapse any runs of more than two blank lines to exactly two
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
