@@ -140,25 +140,31 @@ def format_tight_output(text: str) -> str:
             if stripped.lower().startswith(h.lower()):
                 header_match = h
                 break
+if header_match:
+    if last_header == header_match:
+        continue  # skip duplicate header
+    last_header = header_match
 
-        if header_match:
-            if last_header == header_match:
-                continue  # skip duplicate header
-            last_header = header_match
+    # Check for timing on the next line
+    timing = ""
+    idx = lines.index(raw)
+    if idx + 1 < len(lines):
+        next_line = lines[idx + 1].strip()
+        if re.match(r'^\(?\d+\s*minutes?\)?$', next_line, re.I):
+            timing = f" ({next_line.replace('(','').replace(')','')})"
+            lines[idx + 1] = ""  # remove timing from next line
 
-            # Check if next line is timing like "(5 minutes)" or "5 minutes"
-            timing = ""
-            idx = lines.index(raw)
-            if idx + 1 < len(lines):
-                next_line = lines[idx + 1].strip()
-                if re.match(r'^\(?\d+\s*minutes?\)?$', next_line, re.I):
-                    timing = f" ({next_line.replace('(','').replace(')','')})"
-                    lines[idx + 1] = ""  # remove timing from next line
+    # --- FORCE BLANK LINE BEFORE HEADER ---
+    if output and output[-1] != "":
+        output.append("")
 
-            flush_blank()
-            output.append(f"**{header_match}{timing}**")
-            output.append("")  # blank line after header
-            continue
+    # --- ADD HEADER WITH TIMING ---
+    output.append(f"**{header_match}{timing}**")
+
+    # --- FORCE BLANK LINE AFTER HEADER ---
+    output.append("")  # this ensures the paragraph below doesn't stick
+
+    continue
 
         # Detect sub-activities like "Activity 1: Shape Hunt (10 minutes)"
         if re.match(r'^Activity\s*\d+\s*[:\-]', stripped, re.I):
