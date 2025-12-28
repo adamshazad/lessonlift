@@ -98,30 +98,18 @@ def clean_markdown(text) -> str:
     lines = [line.rstrip() for line in text.splitlines()]
     return "\n".join(lines).strip()
 
-
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
 
-    # Remove standalone timing lines like "(5 minutes)"
+    # Remove standalone timing lines
     text = re.sub(r'^\(\d+\s*minutes?\)$', '', text, flags=re.MULTILINE)
 
     HEADER_KEYWORDS = [
-        "Introduction",
-        "Warm-Up Activity",
-        "Main Activity",
-        "Differentiation",
-        "Assessment",
-        "Resources",
-        "Conclusion",
-        "Closure",
-        "Extension",
-        "Extension Activities",
-        "Reflection",
-        "Plenary",
-        "Starter",
-        "Guided Practice",
-        "Independent Practice"
+        "Introduction", "Warm-Up Activity", "Main Activity", "Differentiation",
+        "Assessment", "Resources", "Conclusion", "Closure", "Extension",
+        "Extension Activities", "Reflection", "Plenary", "Starter",
+        "Guided Practice", "Independent Practice"
     ]
 
     lines = [l.strip() for l in text.splitlines()]
@@ -130,44 +118,47 @@ def format_tight_output(text: str) -> str:
     def flush_blank():
         if output and output[-1] != "":
             output.append("")
-for raw in lines:
-    if not raw:
-        continue
 
-    matched_header = None
-    for h in HEADER_KEYWORDS:
-        if raw.lower().startswith(h.lower()):
-            matched_header = h
-            rest = raw[len(h):].strip(" :")
-            
-            # --- FORCE BLANK LINE BEFORE HEADER ---
-            if output and output[-1] != "":
+    # ✅ This loop must be indented inside the function
+    for raw in lines:
+        if not raw:
+            continue
+
+        matched_header = None
+        for h in HEADER_KEYWORDS:
+            if raw.lower().startswith(h.lower()):
+                matched_header = h
+                rest = raw[len(h):].strip(" :")
+
+                # Force blank line before header
+                if output and output[-1] != "":
+                    output.append("")
+
+                # Add header
+                output.append(f"**{h}**")
+
+                # Force blank line after header
                 output.append("")
-            
-            # --- ADD HEADER ---
-            output.append(f"**{h}**")
-            
-            # --- FORCE BLANK LINE AFTER HEADER ---
-            output.append("")
-            
-            # --- If there's text right after header, push as separate paragraph ---
-            if rest:
-                output.append(rest)
-                output.append("")
-            break
 
-    if matched_header:
-        continue
+                # Text right after header becomes separate paragraph
+                if rest:
+                    output.append(rest)
+                    output.append("")
+                break
 
-    # Bullet handling
-    if raw.startswith(("-", "•", "*")) or raw[:2].isdigit():
-        bullet = raw.lstrip("-•*0123456789. ").strip()
-        output.append(f"- {bullet}")
-        continue
+        if matched_header:
+            continue
 
-    # Normal paragraph
-    output.append(raw)
+        # Bullet handling
+        if raw.startswith(("-", "•", "*")) or raw[:2].isdigit():
+            bullet = raw.lstrip("-•*0123456789. ").strip()
+            output.append(f"- {bullet}")
+            continue
 
+        # Normal paragraph
+        output.append(raw)
+
+    # Final pass to enforce spacing
     final = []
     for line in output:
         if line.startswith("**") and line.endswith("**"):
