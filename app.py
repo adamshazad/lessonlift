@@ -147,15 +147,13 @@ def format_tight_output(text: str) -> str:
                     timing = f" ({next_line.replace('(','').replace(')','')})"
                     lines[i + 1] = ""
 
-            # blank line before header
             if output and output[-1] != "":
                 output.append("")
 
-output.append(f"@@HEADER@@{header_match}{timing}@@")
-output.append("")
+            output.append(f"@@HEADER@@{header_match}{timing}@@")
+            output.append("")
             continue
 
-        # Activity lines
         if re.match(r'^Activity\s*\d+\s*[:\-]', stripped, re.I):
             if output and output[-1] != "":
                 output.append("")
@@ -163,17 +161,14 @@ output.append("")
             output.append("")
             continue
 
-        # Bullets
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
             output.append(f"- {bullet}")
             continue
 
-        # Normal paragraph
         output.append(stripped)
         output.append("")
 
-    # Remove duplicate blank lines
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
@@ -343,20 +338,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # Finally, ensure the content starts with a header (not an empty line)
             final_output = final_output.lstrip()
 
-            # Convert bold markers to HTML <b> for preview
-     final_output_html = final_output
+final_output_html = final_output
 
-# Convert headers with forced spacing
+# Render headers as real HTML blocks (prevents sticking forever)
 final_output_html = re.sub(
     r'@@HEADER@@(.+?)@@',
-    r'<div style="margin-top:16px; margin-bottom:10px; font-weight:700; font-size:17px;">\1</div>',
+    r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div>',
     final_output_html
 )
 
-# Convert line breaks AFTER header rendering
+# Convert remaining line breaks ONCE
 final_output_html = final_output_html.replace('\n', '<br>')
-            # Remove any leading "Lesson Title: ..." lines that the model may have included earlier (extra safety)
-            final_output_html = re.sub(r'(?im)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
 
             # -------------------------------
             # Metadata + Lesson preview
