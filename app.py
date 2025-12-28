@@ -260,26 +260,30 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     st.session_state.lesson_count += 1
 
-    duration_map = {"30 min": 750, "45 min": 850, "60 min": 1000}
+    # Determine min words by lesson duration
+    duration_map = {
+        "30 min": 750,
+        "45 min": 850,
+        "60 min": 1000
+    }
     min_words = duration_map.get(lesson_data.get('lesson_duration','30 min'), 750)
 
+    # Show daily usage on top
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
 
+    # Generation instructions
     generation_instructions = (
         "\n\nImportant instructions for generation (must follow exactly):\n"
-        "- Use British English only (e.g., 'colour', 'favour', 'maths').\n"
-        "- Do NOT include emojis or emoji characters anywhere.\n"
-        "- DO NOT output internal lesson title lines.\n"
-        "- DO NOT repeat metadata fields inside the body.\n"
-        "- Start with the first section header.\n"
-        "- Format headings as a single line header, then one blank line, then bullets or tight paragraphs.\n"
-        f"- Minimum length: {min_words} words. Maximum length: 1000 words.\n"
-        "- Include clear timings, detailed activities, differentiation, assessment, and resources.\n"
+        "- Use British English only.\n"
+        "- Do NOT include emojis.\n"
+        "- Do NOT repeat lesson metadata inside the content.\n"
+        "- Start with the first section header (e.g., 'Introduction').\n"
+        "- Format headings with one blank line, then bullet points or tight paragraphs.\n"
+        f"- Minimum length: {min_words} words. Maximum: 1000 words.\n"
+        "- Include timings, detailed activities, differentiation, assessment and resources.\n"
     )
-
     prompt_with_req = prompt + generation_instructions
 
-    # --- THIS try/except must be INSIDE the function ---
     with st.spinner("✨ Creating lesson plan..."):
         try:
             attempts = 0
@@ -287,14 +291,12 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             while attempts < 3:
                 attempts += 1
-
                 response = openai.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt_with_req}],
                     temperature=0.25,
                     max_tokens=2200,
                 )
-
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
                 formatted = format_tight_output(cleaned)
@@ -304,12 +306,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                     final_output = formatted
                     break
                 else:
-                    prompt_with_req += "\n\nPlease expand the lesson plan to reach the required word count."
+                    prompt_with_req += (
+                        "\n\nPlease expand the lesson plan with more detail, step-by-step examples, timings, differentiation, and assessment to reach the required word count."
+                    )
 
             if final_output is None:
                 final_output = formatted or ""
 
-            # --- Post-processing ---
+            # --- POST-PROCESSING CLEANUP ---
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan\s*[:\-].*)\s*$', '', final_output)
@@ -318,6 +322,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
             final_output = final_output.lstrip()
 
+            # --- Streamlit Display ---
             final_output_html = re.sub(
                 r'@@HEADER@@(.+?)@@',
                 r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div><br>',
@@ -325,30 +330,41 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             )
             final_output_html = final_output_html.replace('\n', '<br>')
 
-            # --- Metadata & Preview ---
-            metadata_html = f"""<div class='stCard'>
-<div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
-<div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
-<div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
-<div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
-<div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
-<div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
-<div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
-<div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
-<br>
-{final_output_html.strip()}
-</div>"""
+            metadata_html = f"""
+<div class='stCard'>
+    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
+    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+    <br>
+    {final_output_html.strip()}
+</div>
+"""
             st.markdown(metadata_html, unsafe_allow_html=True)
 
-            pdf_buffer = create_pdf(final_output)
-            docx_buffer = create_docx(final_output)
+            # --- Exports (cleaned for download) ---
+            export_text = re.sub(r'@@HEADER@@(.+?)@@', r'\1', final_output)
+            pdf_buffer = create_pdf(export_text)
+            docx_buffer = create_docx(export_text)
 
             st.markdown(
-                f"""<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-<a href="data:text/plain;base64,{base64.b64encode(final_output.encode()).decode()}" download="lesson_plan.txt"><button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button></a>
-<a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf"><button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button></a>
-<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx"><button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button></a>
-</div>""",
+                f"""
+<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+    <a href="data:text/plain;base64,{base64.b64encode(export_text.encode()).decode()}" download="lesson_plan.txt">
+        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
+    </a>
+    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+    </a>
+    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+    </a>
+</div>
+""",
                 unsafe_allow_html=True
             )
 
@@ -356,6 +372,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
             return
 
+    # Save to history
     st.session_state.lesson_history.append({"title": title, "content": final_output})
 
     if regen_message:
