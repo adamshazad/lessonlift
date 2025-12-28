@@ -122,64 +122,58 @@ def format_tight_output(text: str) -> str:
 
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
-
     last_header = None
 
-    def flush_blank():
-        if output and output[-1] != "":
-            output.append("")
-
-for i, raw in enumerate(lines):
-    stripped = raw.strip()
-    if not stripped:
-        continue
-
-    header_match = None
-    for h in HEADER_KEYWORDS:
-        if stripped.lower().startswith(h.lower()):
-            header_match = h
-            break
-
-    if header_match:
-        if last_header == header_match:
+    for i, raw in enumerate(lines):
+        stripped = raw.strip()
+        if not stripped:
             continue
-        last_header = header_match
 
-        timing = ""
-        if i + 1 < len(lines):
-            next_line = lines[i + 1].strip()
-            if re.match(r'^\(?\d+\s*minutes?\)?$', next_line, re.I):
-                timing = f" ({next_line.replace('(','').replace(')','')})"
-                lines[i + 1] = ""
+        header_match = None
+        for h in HEADER_KEYWORDS:
+            if stripped.lower().startswith(h.lower()):
+                header_match = h
+                break
 
-        # FORCE SPACE BEFORE HEADER
-        if output and output[-1] != "":
+        if header_match:
+            if last_header == header_match:
+                continue
+            last_header = header_match
+
+            timing = ""
+            if i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                if re.match(r'^\(?\d+\s*minutes?\)?$', next_line, re.I):
+                    timing = f" ({next_line.replace('(','').replace(')','')})"
+                    lines[i + 1] = ""
+
+            # blank line before header
+            if output and output[-1] != "":
+                output.append("")
+
+            output.append(f"**{header_match}{timing}**")
+
+            # blank line after header (THIS FIXES INTRO STICKING)
             output.append("")
+            continue
 
-        output.append(f"**{header_match}{timing}**")
-
-        # FORCE SPACE AFTER HEADER (THIS FIXES YOUR ISSUE)
-        output.append("")
-
-        continue
-
-    # Sub-activities
-    if re.match(r'^Activity\s*\d+\s*[:\-]', stripped, re.I):
-        if output and output[-1] != "":
+        # Activity lines
+        if re.match(r'^Activity\s*\d+\s*[:\-]', stripped, re.I):
+            if output and output[-1] != "":
+                output.append("")
+            output.append(stripped)
             output.append("")
+            continue
+
+        # Bullets
+        if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
+            bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
+            output.append(f"- {bullet}")
+            continue
+
+        # Normal paragraph
         output.append(stripped)
         output.append("")
-        continue
-
-    # Bullets
-    if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
-        bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
-        output.append(f"- {bullet}")
-        continue
-
-    # Normal paragraph
-    output.append(stripped)
-    output.append("")
 
     # Remove duplicate blank lines
     final = []
