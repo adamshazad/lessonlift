@@ -338,7 +338,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # Finally, ensure the content starts with a header (not an empty line)
             final_output = final_output.lstrip()
 
-                        final_output_html = final_output
+              final_output_html = final_output
 
             # Render headers as real HTML blocks (prevents sticking forever)
             final_output_html = re.sub(
