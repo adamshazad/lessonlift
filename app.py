@@ -103,63 +103,71 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
 
-    header_keywords = [
-        "Learning Objective", "Learning Objectives", "Lesson Duration", "Topic",
-        "Year Group", "Subject", "Ability Level", "SEN/EAL Notes",
-        "Materials Needed", "Resources", "Resources Needed",
-        "Lesson Outline", "Lesson Structure", "Introduction", "Main Activity",
-        "Direct Instruction", "Guided Practice", "Independent Practice",
-        "Closing", "Conclusion", "Assessment", "Differentiation",
-        "Extension", "Reflection", "Homework", "Plenary", "Starter"
+    HEADER_KEYWORDS = [
+        "Lesson Title", "Subject", "Topic", "Year Group", "Duration",
+        "Ability Level", "SEN/EAL Notes", "Learning Objective",
+        "Learning Objectives", "Introduction", "Warm-Up Activity",
+        "Main Activity", "Assessment", "Differentiation",
+        "Resources", "Conclusion", "Plenary", "Starter",
+        "Guided Practice", "Independent Practice"
     ]
 
-    lines = text.splitlines()
-    formatted_lines = []
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            # avoid multiple blank lines
-            if formatted_lines and formatted_lines[-1] != "":
-                formatted_lines.append("")
+    lines = [l.strip() for l in text.splitlines()]
+    output = []
+
+    def flush_blank():
+        if output and output[-1] != "":
+            output.append("")
+
+    for raw in lines:
+        if not raw:
             continue
 
-        # Check if line contains a header glued to text
-        header_found = None
-        for kw in header_keywords:
-            if line.startswith(kw):
-                header_found = kw
+        # Detect header EVEN IF GLUED TO TEXT
+        matched_header = None
+        for h in HEADER_KEYWORDS:
+            if raw.lower().startswith(h.lower()):
+                matched_header = h
+                rest = raw[len(h):].strip(" :")
+                flush_blank()
+                output.append(f"**{h}**")
+                output.append("")
+                if rest:
+                    output.append(rest)
                 break
 
-        if header_found:
-            # Split header from the rest if needed
-            rest = line[len(header_found):].strip()
-            if formatted_lines and formatted_lines[-1] != "":
-                formatted_lines.append("")
-            formatted_lines.append(f"**{header_found}**")
-            formatted_lines.append("")  # blank line after header
-            if rest:
-                formatted_lines.append(rest)
+        if matched_header:
             continue
 
-        # Bullet detection
-        if re.match(r'^[-•*]\s+', line) or re.match(r'^\d+\.\s+', line):
-            content = re.sub(r'^[-•*\d\.]+\s*', '', line)
-            formatted_lines.append(f"- {content}")
-        elif formatted_lines and formatted_lines[-1].startswith("- "):
-            # continuation of previous bullet
-            formatted_lines.append(f"- {line}")
+        # Bullet handling (FORCED)
+        if raw.startswith(("-", "•", "*")) or raw[:2].isdigit():
+            bullet = raw.lstrip("-•*0123456789. ").strip()
+            output.append(f"- {bullet}")
+            continue
+
+        # Normal paragraph
+        output.append(raw)
+
+    # FINAL PASS: enforce spacing rules
+    final = []
+    for i, line in enumerate(output):
+        if line.startswith("**") and line.endswith("**"):
+            if final and final[-1] != "":
+                final.append("")
+            final.append(line)
+            final.append("")
         else:
-            formatted_lines.append(line)
+            final.append(line)
 
-    # Collapse multiple blank lines to max 1
-    final_lines = []
-    for ln in formatted_lines:
-        if ln == "" and final_lines and final_lines[-1] == "":
+    # Remove duplicate blank lines
+    cleaned = []
+    for ln in final:
+        if ln == "" and cleaned and cleaned[-1] == "":
             continue
-        final_lines.append(ln)
+        cleaned.append(ln)
 
-    return "\n".join(final_lines).strip()
+    return "\n".join(cleaned).strip()
+    
     return final_text
     
 def count_words(text: str) -> int:
