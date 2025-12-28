@@ -151,10 +151,8 @@ def format_tight_output(text: str) -> str:
             if output and output[-1] != "":
                 output.append("")
 
-            output.append(f"**{header_match}{timing}**")
-
-            # blank line after header (THIS FIXES INTRO STICKING)
-            output.append("")
+output.append(f"@@HEADER@@{header_match}{timing}@@")
+output.append("")
             continue
 
         # Activity lines
@@ -346,8 +344,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             final_output = final_output.lstrip()
 
             # Convert bold markers to HTML <b> for preview
-            final_output_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', final_output)
+     final_output_html = final_output
 
+# Convert headers with forced spacing
+final_output_html = re.sub(
+    r'@@HEADER@@(.+?)@@',
+    r'<div style="margin-top:16px; margin-bottom:10px; font-weight:700; font-size:17px;">\1</div>',
+    final_output_html
+)
+
+# Convert line breaks AFTER header rendering
+final_output_html = final_output_html.replace('\n', '<br>')
             # Remove any leading "Lesson Title: ..." lines that the model may have included earlier (extra safety)
             final_output_html = re.sub(r'(?im)^\s*lesson\s*title:.*(?:<br>)?\s*', '', final_output_html.strip(), flags=re.M)
 
