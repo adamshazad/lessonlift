@@ -102,9 +102,6 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
 
-    # Remove standalone timing lines like "(5 minutes)"
-    text = re.sub(r'^\(\d+\s*minutes?\)$', '', text, flags=re.MULTILINE)
-
     HEADER_KEYWORDS = [
         "Introduction",
         "Warm-Up Activity",
@@ -123,7 +120,7 @@ def format_tight_output(text: str) -> str:
         "Independent Practice"
     ]
 
-    lines = [l.strip() for l in text.splitlines()]
+    lines = [l.rstrip() for l in text.splitlines()]
     output = []
 
     def flush_blank():
@@ -131,32 +128,29 @@ def format_tight_output(text: str) -> str:
             output.append("")
 
     for raw in lines:
-        if not raw:
+        if not raw.strip():
             continue
 
-        # Normalize "minutes:" or "Timing:" lines as headers
-        if re.match(r'^(minutes|timing)\s*[:\-]', raw.lower()):
-            header_text = re.sub(r'^(minutes|timing)\s*[:\-]\s*', '', raw, flags=re.I).strip()
-            flush_blank()
-            output.append(f"**{header_text}**")
-            output.append("")
-            continue
-
-        # Detect standard headers
+        # Detect standard lesson headers only
         matched_header = None
         for h in HEADER_KEYWORDS:
-            if raw.lower().startswith(h.lower()):
+            if raw.strip().lower().startswith(h.lower()):
                 matched_header = h
                 rest = raw[len(h):].strip(" :")
                 flush_blank()
-                output.append(f"**{h}**")
-                output.append("")
+                output.append(f"**{h}**")  # Bold header
+                output.append("")           # Force blank line after header
                 if rest:
-                    output.append(rest)
+                    output.append(rest)    # Keep extra text below header
                     output.append("")
                 break
 
         if matched_header:
+            continue
+
+        # Keep numeric timing lines as **normal text**, not bold
+        if re.match(r'^\d+\s*minutes?$', raw.strip(), flags=re.I):
+            output.append(raw.strip())
             continue
 
         # Bullet handling
@@ -166,9 +160,9 @@ def format_tight_output(text: str) -> str:
             continue
 
         # Normal paragraph
-        output.append(raw)
+        output.append(raw.strip())
 
-    # --- FINAL PASS: enforce blank lines before/after headers ---
+    # FINAL PASS: enforce blank lines before/after headers
     final = []
     for line in output:
         if line.startswith("**") and line.endswith("**"):
