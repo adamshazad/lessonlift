@@ -102,16 +102,28 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
 
-    # Remove standalone timing lines
+    # Remove standalone timing lines like "(5 minutes)"
     text = re.sub(r'^\(\d+\s*minutes?\)$', '', text, flags=re.MULTILINE)
 
     HEADER_KEYWORDS = [
-        "Introduction", "Warm-Up Activity", "Main Activity", "Differentiation",
-        "Assessment", "Resources", "Conclusion", "Closure", "Extension",
-        "Extension Activities", "Reflection", "Plenary", "Starter",
-        "Guided Practice", "Independent Practice"
+        "Introduction",
+        "Warm-Up Activity",
+        "Main Activity",
+        "Differentiation",
+        "Assessment",
+        "Resources",
+        "Conclusion",
+        "Closure",
+        "Extension",
+        "Extension Activities",
+        "Reflection",
+        "Plenary",
+        "Starter",
+        "Guided Practice",
+        "Independent Practice"
     ]
 
+    # Split into lines
     lines = [l.strip() for l in text.splitlines()]
     output = []
 
@@ -119,28 +131,27 @@ def format_tight_output(text: str) -> str:
         if output and output[-1] != "":
             output.append("")
 
-    # ✅ This loop must be indented inside the function
     for raw in lines:
         if not raw:
             continue
 
+        # Normalize "minutes:" or "Timing:" lines as headers
+        if re.match(r'^(minutes|timing)\s*[:\-]', raw.lower()):
+            header_text = re.sub(r'^(minutes|timing)\s*[:\-]\s*', '', raw, flags=re.I).strip()
+            flush_blank()
+            output.append(f"**{header_text}**")
+            output.append("")
+            continue
+
+        # Detect standard headers
         matched_header = None
         for h in HEADER_KEYWORDS:
             if raw.lower().startswith(h.lower()):
                 matched_header = h
                 rest = raw[len(h):].strip(" :")
-
-                # Force blank line before header
-                if output and output[-1] != "":
-                    output.append("")
-
-                # Add header
+                flush_blank()
                 output.append(f"**{h}**")
-
-                # Force blank line after header
                 output.append("")
-
-                # Text right after header becomes separate paragraph
                 if rest:
                     output.append(rest)
                     output.append("")
@@ -150,15 +161,15 @@ def format_tight_output(text: str) -> str:
             continue
 
         # Bullet handling
-        if raw.startswith(("-", "•", "*")) or raw[:2].isdigit():
-            bullet = raw.lstrip("-•*0123456789. ").strip()
+        if raw.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', raw):
+            bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', raw)
             output.append(f"- {bullet}")
             continue
 
         # Normal paragraph
         output.append(raw)
 
-    # Final pass to enforce spacing
+    # FINAL PASS: enforce blank lines before/after headers
     final = []
     for line in output:
         if line.startswith("**") and line.endswith("**"):
@@ -169,6 +180,7 @@ def format_tight_output(text: str) -> str:
         else:
             final.append(line)
 
+    # Remove duplicate blank lines
     cleaned = []
     for ln in final:
         if ln == "" and cleaned and cleaned[-1] == "":
