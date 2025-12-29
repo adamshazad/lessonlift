@@ -235,11 +235,10 @@ def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
+    first_header_done = False
 
     for line in lines:
         line = line.strip()
-
-        # Empty line
         if not line:
             if in_list:
                 html_lines.append("</ul>")
@@ -252,38 +251,27 @@ def generate_html_preview(text: str) -> str:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-
+            # No margin-top for the first header
+            margin_top = "0px" if not first_header_done else "6px"
+            first_header_done = True
             html_lines.append(
-                "<div style='margin-top:26px; margin-bottom:14px; "
-                "font-weight:700; font-size:16px; line-height:1.4;'>"
-                + header_match.group(1) +
-                "</div>"
+                f"<div style='margin-top:{margin_top}; margin-bottom:4px; font-weight:700; font-size:16px; line-height:1.2;'>{header_match.group(1)}</div>"
             )
             continue
 
-        # BULLET
+        # BULLETS
         if line.startswith("- "):
             if not in_list:
-                html_lines.append(
-                    "<ul style='margin-top:4px; margin-bottom:6px; padding-left:18px;'>"
-                )
+                html_lines.append("<ul style='margin-top:0; margin-bottom:2px; padding-left:18px;'>")
                 in_list = True
-
-            html_lines.append(
-                "<li style='margin-bottom:2px;'>" + line[2:] + "</li>"
-            )
+            html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
 
         # PARAGRAPH
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-
-        html_lines.append(
-            "<div style='margin-top:4px; margin-bottom:6px;'>"
-            + line +
-            "</div>"
-        )
+        html_lines.append(f"<div style='margin-top:2px; margin-bottom:2px;'>{line}</div>")
 
     if in_list:
         html_lines.append("</ul>")
