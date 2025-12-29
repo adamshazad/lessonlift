@@ -306,12 +306,16 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 final_output = formatted or ""
 
             # --- POST-PROCESSING CLEANUP ---
-            final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
-            final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
-            final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
-            final_output = final_output.lstrip()
+final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+
+# 🔒 FIX 2: remove duplicated section headers
+final_output = re.sub(r'(?im)(@@HEADER@@(.+?)@@\n)(\2\s*\n)+', r'\1', final_output)
+
+final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
+final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
+final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
+final_output = final_output.lstrip()
 
             # -------------------------------
             # Prepare bold headers for export
