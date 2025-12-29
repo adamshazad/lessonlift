@@ -229,9 +229,8 @@ def generate_html_preview(text: str) -> str:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-            # Add more space after header
             html_lines.append(
-                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.4;'>{header_match.group(1)}</div>"
+                f"<div style='margin-top:12px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.4;'>{header_match.group(1)}</div>"
             )
             continue
 
@@ -247,7 +246,8 @@ def generate_html_preview(text: str) -> str:
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
+        # Add extra top margin for first paragraph after header
+        html_lines.append(f"<div style='margin-top:6px; margin-bottom:6px;'>{line}</div>")
 
     if in_list:
         html_lines.append("</ul>")
