@@ -50,8 +50,8 @@ body {background-color: white; color: black;}
 .metadata-line {
     font-weight: bold;
     font-size: 16px !important;
-    margin-top: 2px;
-    margin-bottom: 2px;
+    margin-top: 0px;
+    margin-bottom: 0px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -311,20 +311,21 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             final_output_html = generate_html_preview(final_output)
 
             # --- Metadata + Preview ---
-            metadata_html = f"""
-            <div class='stCard'>
-                <div class='metadata-line' style='margin-bottom:4px;'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
-                <div class='metadata-line' style='margin-bottom:4px;'><b>Subject:</b> {lesson_data.get('subject','')}</div>
-                <div class='metadata-line' style='margin-bottom:4px;'><b>Topic:</b> {lesson_data.get('topic','')}</div>
-                <div class='metadata-line' style='margin-bottom:4px;'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
-                <div class='metadata-line' style='margin-bottom:4px;'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
-                <div class='metadata-line' style='margin-bottom:4px;'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
-                <div class='metadata-line' style='margin-bottom:4px;'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','')}</div>
-                <div class='metadata-line' style='margin-bottom:4px;'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
-                <br>
-                {final_output_html.strip()}
-            </div>
-            """
+
+metadata_html = f"""
+<div class='stCard'>
+    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','')}</div>
+    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+    {final_output_html.strip()}
+</div>
+"""
+            
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             # --- Exports ---
