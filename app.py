@@ -280,87 +280,83 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     prompt_with_req = prompt + generation_instructions
 
-    with st.spinner("✨ Creating lesson plan..."):
-        try:
-            attempts = 0
-            final_output = None
-            while attempts < 3:
-                attempts += 1
-                response = openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt_with_req}],
-                    temperature=0.25,
-                    max_tokens=2200,
-                )
-                raw = response.choices[0].message.content
-                cleaned = clean_markdown(raw)
-                formatted = format_tight_output(cleaned)
-                wcount = count_words(formatted)
-                if wcount >= min_words:
-                    final_output = formatted
-                    break
-                else:
-                    prompt_with_req += "\n\nPlease expand the lesson plan with more detail, step-by-step examples, timings, differentiation, and assessment to reach the required word count."
+with st.spinner("✨ Creating lesson plan..."):
+    try:
+        attempts = 0
+        final_output = None
+        while attempts < 3:
+            attempts += 1
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt_with_req}],
+                temperature=0.25,
+                max_tokens=2200,
+            )
+            raw = response.choices[0].message.content
+            cleaned = clean_markdown(raw)
+            formatted = format_tight_output(cleaned)
+            wcount = count_words(formatted)
+            if wcount >= min_words:
+                final_output = formatted
+                break
+            else:
+                prompt_with_req += "\n\nPlease expand the lesson plan with more detail..."
 
-            if final_output is None:
-                final_output = formatted or ""
+        if final_output is None:
+            final_output = formatted or ""
 
-            # Post-processing
-            final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
-            final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
-            final_output = final_output.lstrip()
+        # Post-processing
+        final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+        final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+        final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
+        final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
+        final_output_clean = re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', final_output)
+        final_output_html = generate_html_preview(final_output)
 
-            final_output_clean = re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', final_output)
-            final_output_html = generate_html_preview(final_output)
+        # -------------------------------
+        # Metadata + Preview
+        metadata_html = f"""
+        <div class='stCard'>
+            <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
+            <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+            <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+            <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+            <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+            <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+            <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','')}</div>
+            <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+            <br>
+            {final_output_html.strip()}
+        </div>
+        """
+        st.markdown(metadata_html, unsafe_allow_html=True)
 
-    # -------------------------------
-    # Metadata + Preview
-    # -------------------------------
-    metadata_html = f"""
-    <div class='stCard'>
-        <div class='metadata-line' style='margin-bottom:4px;'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
-        <div class='metadata-line' style='margin-bottom:4px;'><b>Subject:</b> {lesson_data.get('subject','')}</div>
-        <div class='metadata-line' style='margin-bottom:4px;'><b>Topic:</b> {lesson_data.get('topic','')}</div>
-        <div class='metadata-line' style='margin-bottom:4px;'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
-        <div class='metadata-line' style='margin-bottom:4px;'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
-        <div class='metadata-line' style='margin-bottom:4px;'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
-        <div class='metadata-line' style='margin-bottom:4px;'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','')}</div>
-        <div class='metadata-line' style='margin-bottom:4px;'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
-        <br>
-        {final_output_html.strip()}
-    </div>
-    """
-    st.markdown(metadata_html, unsafe_allow_html=True)
+        # Exports
+        pdf_buffer = create_pdf(final_output_clean)
+        docx_buffer = create_docx(final_output_clean)
+        st.markdown(f"""
+        <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+            <a href="data:text/plain;base64,{base64.b64encode(final_output_clean.encode()).decode()}" download="lesson_plan.txt">
+                <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
+            </a>
+            <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
+                <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
+            </a>
+            <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
+                <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
+            </a>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # -------------------------------
-    # Exports
-    pdf_buffer = create_pdf(final_output_clean)
-    docx_buffer = create_docx(final_output_clean)
-    st.markdown(f"""
-<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-    <a href="data:text/plain;base64,{base64.b64encode(final_output_clean.encode()).decode()}" download="lesson_plan.txt">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
-    </a>
-    <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ PDF</button>
-    </a>
-    <a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(docx_buffer.read()).decode()}" download="lesson_plan.docx">
-        <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
-    </a>
-</div>
-""", unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"⚠️ Lesson plan could not be generated: {e}")
+        return
 
-except Exception as e:
-    st.error(f"⚠️ Lesson plan could not be generated: {e}")
-    return
-
-# Save to history
-st.session_state.lesson_history.append({"title": title, "content": final_output})
-if regen_message:
-    st.info(f"🔄 {regen_message}")
-
+    # Save history
+    st.session_state.lesson_history.append({"title": title, "content": final_output})
+    if regen_message:
+        st.info(f"🔄 {regen_message}")
+   
 # -------------------------------
 # Main page
 # -------------------------------
