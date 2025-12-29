@@ -106,7 +106,7 @@ def format_tight_output(text: str) -> str:
         "Introduction", "Lesson Outline", "Main Activity",
         "Shape Sorting Activity", "Creative Shape Art",
         "Conclusion and Assessment", "Differentiation", "Assessment",
-        "Resources", "Objectives", "Activity", "conclusion"
+        "Resources", "Objectives", "Activity", "Conclusion"
     ]
     lines = [line.rstrip() for line in text.splitlines()]
     output = []
