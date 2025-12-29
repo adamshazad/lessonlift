@@ -319,18 +319,18 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 # Metadata + Preview (clean spacing)
 # -------------------------------
 metadata_html = f"""
-<div class='stCard'>
-    <div class='metadata-line' style='margin-bottom:4px;'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line' style='margin-bottom:4px;'><b>Subject:</b> {lesson_data.get('subject','')}</div>
-    <div class='metadata-line' style='margin-bottom:4px;'><b>Topic:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line' style='margin-bottom:4px;'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
-    <div class='metadata-line' style='margin-bottom:4px;'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
-    <div class='metadata-line' style='margin-bottom:4px;'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
-    <div class='metadata-line' style='margin-bottom:4px;'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','')}</div>
-    <div class='metadata-line' style='margin-bottom:4px;'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
-    <br>  <!-- single line before lesson content -->
-    {final_output_html.strip()}
-</div>
+    <div class='stCard'>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+        <br>  <!-- single line before lesson content -->
+        {final_output_html.strip()}
+    </div>
 """
 st.markdown(metadata_html, unsafe_allow_html=True)
 
