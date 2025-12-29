@@ -154,18 +154,17 @@ def format_tight_output(text: str) -> str:
             output.append("")  # blank line after timing
             continue
 
-        # BULLETS
+        # BULLETS - tighter spacing (no extra blank line)
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
-            output.append("")  # blank line after bullet
-            continue
+            continue  # ✅ do NOT add blank line
 
-        # PARAGRAPH
+        # Paragraph
         output.append(stripped)
         output.append("")  # blank line after paragraph
 
-    # collapse multiple blank lines into a single one
+    # Collapse multiple blank lines into a single one
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
