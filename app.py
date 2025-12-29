@@ -114,10 +114,11 @@ def format_tight_output(text: str) -> str:
         "Closure and Reflection",
         "Closing Activity",
         "Resources",
-        "Conclusion"
+        "Conclusion",
+        "Learning Activities"
     ]
 
-    lines = [l.rstrip() for l in text.splitlines()]
+    lines = [line.rstrip() for line in text.splitlines()]
     output = []
     last_header = None
 
@@ -126,10 +127,8 @@ def format_tight_output(text: str) -> str:
         if not stripped:
             continue
 
-        # ---- NORMALISE (remove bullets before checking) ----
-        normalised = re.sub(r'^[-•*\s]+', '', stripped)
-
         # ---- HEADER DETECTION ----
+        normalised = re.sub(r'^[-•*\s]+', '', stripped)
         header_match = None
         for h in HEADER_KEYWORDS:
             if normalised.lower().startswith(h.lower()):
@@ -145,27 +144,27 @@ def format_tight_output(text: str) -> str:
                 output.append("")
 
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")   # EXACTLY ONE LINE after header
+            output.append("")  # ONE LINE after header
             continue
 
         # ---- TIMING LINES ----
-        if stripped.lower().startswith("timing"):
+        if re.match(r'^\d{1,2}-\d{1,2} minutes:', stripped.lower()):
             output.append(stripped)
-            output.append("")  # blank line after Timing
+            output.append("")  # spacing after timing
             continue
 
         # ---- BULLETS ----
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
-            output.append("")  # blank line after bullet
+            output.append("")  # spacing after bullet
             continue
 
         # ---- PARAGRAPHS ----
         output.append(stripped)
-        output.append("")  # blank line after paragraph
+        output.append("")  # spacing after paragraph
 
-    # ---- FINAL COLLAPSE ----
+    # ---- COLLAPSE MULTIPLE BLANK LINES ----
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
