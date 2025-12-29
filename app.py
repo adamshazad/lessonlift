@@ -131,20 +131,21 @@ def format_tight_output(text: str) -> str:
                 header_match = h
                 break
 
-        if header_match:
-            # Avoid duplicate headers
-            if last_header == header_match:
-                continue
-            last_header = header_match
+if header_match:
+    # Avoid duplicate headers
+    if last_header == header_match:
+        continue
+    last_header = header_match
 
-            # Add spacing above header
-            if output and output[-1] != "":
-                output.append("")
+    # Reduce spacing above header: only 1 line if there’s content, otherwise nothing
+    if output and output[-1] != "":
+        output.append("")  # single blank line above
 
-            # Mark headers differently from bullets
-            output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")  # blank line after header
-            continue
+    # Mark headers differently from bullets
+    output.append(f"@@HEADER@@{header_match}@@")
+    # Reduce blank line below header to a single line
+    output.append("")  # just 1 line below instead of 2-3
+    continue
 
         # Treat bullet points
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
