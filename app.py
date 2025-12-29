@@ -321,12 +321,15 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             final_output_clean = format_for_export(final_output)
 
             # Preview for Streamlit
-            final_output_html = re.sub(
+     final_output_html = re.sub(
     r'@@HEADER@@(.+?)@@',
-    r'<div style="margin-top:4px; margin-bottom:4px; font-weight:700; font-size:16px;">\1</div>',
+    r'<div style="margin-top:2px; margin-bottom:2px; font-weight:700; font-size:16px; line-height:1.2;">\1</div>',
     final_output
 )
-            final_output_html = final_output_html.replace('\n', '<br>')
+
+# collapse multiple line breaks BEFORE converting to <br>
+final_output_html = re.sub(r'\n{2,}', '\n', final_output_html)
+final_output_html = final_output_html.replace('\n', '<br>')
 
             # -------------------------------
             # Metadata + Preview
