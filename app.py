@@ -104,19 +104,13 @@ def format_tight_output(text: str) -> str:
 
     HEADER_KEYWORDS = [
         "Introduction",
-        "Warm-Up Activity",
+        "Lesson Outline",
         "Main Activity",
+        "Shape Sorting Activity",
+        "Creative Shape Art",
+        "Conclusion and Assessment",
         "Differentiation",
         "Assessment",
-        "Conclusion",
-        "Closure",
-        "Extension",
-        "Extension Activities",
-        "Reflection",
-        "Plenary",
-        "Starter",
-        "Guided Practice",
-        "Independent Practice",
         "Resources"
     ]
 
@@ -136,36 +130,34 @@ def format_tight_output(text: str) -> str:
                 break
 
         if header_match:
+            # Avoid duplicate headers
             if last_header == header_match:
                 continue
             last_header = header_match
 
-            # Add blank line before header if not first line
+            # Add spacing above header
             if output and output[-1] != "":
                 output.append("")
+
+            # Mark headers differently from bullets
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")
+            output.append("")  # blank line after header
             continue
 
-        if re.match(r'^Activity\s*\d+\s*[:\-]', stripped, re.I):
-            if output and output[-1] != "":
-                output.append("")
-            output.append(stripped)
-            output.append("")
-            continue
-
+        # Treat bullet points
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
-            # Ensure a blank line before each bullet point for spacing
+            # Add spacing above each bullet for clarity
             if output and output[-1] != "":
                 output.append("")
             bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
             output.append(f"- {bullet}")
             continue
 
+        # Normal paragraph lines
         output.append(stripped)
         output.append("")
 
-    # Collapse multiple blank lines to just one
+    # Collapse multiple blank lines to one
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
