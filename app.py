@@ -105,29 +105,33 @@ def format_tight_output(text: str) -> str:
     HEADER_KEYWORDS = [
         "Introduction",
         "Lesson Outline",
+        "Direct Instruction",
         "Main Activity",
-        "Shape Sorting Activity",
-        "Creative Shape Art",
-        "Conclusion and Assessment",
+        "Shape Hunt Activity",
+        "Group Discussion",
+        "Closing Activity",
         "Differentiation",
         "Assessment",
         "Resources",
-        "objectives",
-        "Activity"
+        "Conclusion"
     ]
 
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
     last_header = None
 
-    for i, raw in enumerate(lines):
+    for raw in lines:
         stripped = raw.strip()
         if not stripped:
             continue
 
+        # ---- NORMALISE (remove bullets before checking) ----
+        normalised = re.sub(r'^[-•*\s]+', '', stripped)
+
+        # ---- HEADER DETECTION ----
         header_match = None
         for h in HEADER_KEYWORDS:
-            if stripped.lower().startswith(h.lower()):
+            if normalised.lower().startswith(h.lower()):
                 header_match = h
                 break
 
@@ -138,28 +142,28 @@ def format_tight_output(text: str) -> str:
 
             if output and output[-1] != "":
                 output.append("")
+
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")
+            output.append("")   # EXACTLY ONE LINE after header
             continue
 
+        # ---- BULLETS ----
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
-            if output and output[-1] != "":
-                output.append("")
-            bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
+            bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
             continue
 
+        # ---- PARAGRAPHS ----
         output.append(stripped)
-        output.append("")
 
-    # Collapse multiple blank lines to one
+    # ---- FINAL COLLAPSE ----
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
             continue
         final.append(ln)
 
-    return "\n".join(final).strip()  # ✅ Correctly indented
+    return "\n".join(final).strip()
     
 # -------------------------------
 # Logo + title
