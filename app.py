@@ -224,26 +224,18 @@ def generate_html_preview(text: str) -> str:
             continue
 
         # HEADER
-        header_match = re.match(r'@@HEADER@@(.+?)@@', line)
-        if header_match:
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
-           
-           html_lines.append(
-    f"""
-    <div style="
-        margin-top:22px;
-        margin-bottom:12px;
-        font-weight:700;
-        font-size:16px;
-        line-height:1.4;
-    ">
-        {header_match.group(1)}
-    </div>
-    """
-)
-            continue
+header_match = re.match(r'@@HEADER@@(.+?)@@', line)
+if header_match:
+    if in_list:
+        html_lines.append("</ul>")
+        in_list = False
+
+    html_lines.append(
+        "<div style='margin-top:22px; margin-bottom:12px; "
+        "font-weight:700; font-size:16px; line-height:1.4;'>"
+        f"{header_match.group(1)}</div>"
+    )
+    continue
 
         # BULLETS
         if line.startswith("- "):
