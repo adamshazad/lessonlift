@@ -142,10 +142,10 @@ def format_tight_output(text: str) -> str:
             last_header = header_match
 
             if output and output[-1] != "":
-                output.append("")
+                output.append("")  # blank line before header
 
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")  # one line after header
+            output.append("")  # blank line after header
             continue
 
         # TIMING line
@@ -161,11 +161,11 @@ def format_tight_output(text: str) -> str:
             output.append("")  # blank line after bullet
             continue
 
-        # Paragraph
+        # PARAGRAPH
         output.append(stripped)
-        output.append("")
+        output.append("")  # blank line after paragraph
 
-    # collapse multiple blank lines
+    # collapse multiple blank lines into a single one
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
