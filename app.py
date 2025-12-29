@@ -247,9 +247,8 @@ def count_words(text: str) -> int:
     return len(text.split())
 
 # -------------------------------
-# Generator (STRONGER INSTRUCTIONS + CLEANUP)
+# Generator (STRONGER INSTRUCTIONS + CLEANUP + HTML Preview)
 # -------------------------------
-
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
         lesson_data = {}
@@ -316,54 +315,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             # --- POST-PROCESSING CLEANUP ---
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-
-# -------------------------------
-# HTML Preview generator
-# -------------------------------
-def generate_html_preview(text: str) -> str:
-    lines = text.splitlines()
-    html_lines = []
-    in_list = False
-
-    for line in lines:
-        line = line.strip()
-        if not line:
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
-            html_lines.append("<br>")
-            continue
-
-        # HEADER
-        header_match = re.match(r'@@HEADER@@(.+?)@@', line)
-        if header_match:
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
-            html_lines.append(
-                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
-            )
-            continue
-
-        # BULLET
-        if line.startswith("- "):
-            if not in_list:
-                html_lines.append("<ul>")
-                in_list = True
-            html_lines.append(f"<li>{line[2:]}</li>")
-            continue
-
-        # PARAGRAPH
-        if in_list:
-            html_lines.append("</ul>")
-            in_list = False
-        html_lines.append(f"<p>{line}</p>")
-
-    if in_list:
-        html_lines.append("</ul>")
-
-    return "\n".join(html_lines)
-
             final_output = re.sub(
                 r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$',
                 '',
@@ -381,26 +332,62 @@ def generate_html_preview(text: str) -> str:
             )
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
             final_output = final_output.lstrip()
-            
+
             # -------------------------------
             # Prepare bold headers for export
-            
             def format_for_export(text):
                 return re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', text)
 
             final_output_clean = format_for_export(final_output)
 
-            # Preview for Streamlit
-            
-            final_output_html = re.sub(
-                r'@@HEADER@@(.+?)@@',
-                r'<div style="margin-top:2px; margin-bottom:2px; font-weight:700; font-size:16px; line-height:1.2;">\1</div>',
-                final_output
-            )
+            # -------------------------------
+            # Generate HTML preview with proper spacing and bullets
+            def generate_html_preview(text: str) -> str:
+                lines = text.splitlines()
+                html_lines = []
+                in_list = False
 
-            final_output_html = re.sub(r'\n{2,}', '\n', final_output_html)
-            final_output_html = final_output_html.replace('\n', '<br>')
-            
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        if in_list:
+                            html_lines.append("</ul>")
+                            in_list = False
+                        html_lines.append("<br>")
+                        continue
+
+                    # HEADER
+                    header_match = re.match(r'@@HEADER@@(.+?)@@', line)
+                    if header_match:
+                        if in_list:
+                            html_lines.append("</ul>")
+                            in_list = False
+                        html_lines.append(
+                            f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
+                        )
+                        continue
+
+                    # BULLET
+                    if line.startswith("- "):
+                        if not in_list:
+                            html_lines.append("<ul>")
+                            in_list = True
+                        html_lines.append(f"<li>{line[2:]}</li>")
+                        continue
+
+                    # PARAGRAPH
+                    if in_list:
+                        html_lines.append("</ul>")
+                        in_list = False
+                    html_lines.append(f"<p>{line}</p>")
+
+                if in_list:
+                    html_lines.append("</ul>")
+
+                return "\n".join(html_lines)
+
+            final_output_html = generate_html_preview(final_output)
+
             # -------------------------------
             # Metadata + Preview
             metadata_lines = []
@@ -416,7 +403,7 @@ def generate_html_preview(text: str) -> str:
             }
 
             for key, value in metadata_map.items():
-                if value.strip():  # only show non-empty fields
+                if value.strip():
                     metadata_lines.append(f"<div class='metadata-line'><b>{key}:</b> {value}</div>")
 
             metadata_html = f"""
