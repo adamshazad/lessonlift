@@ -140,17 +140,10 @@ def format_tight_output(text: str) -> str:
                 continue
             last_header = header_match
 
-            timing = ""
-            if i + 1 < len(lines):
-                next_line = lines[i + 1].strip()
-                if re.match(r'^\(?\d+\s*minutes?\)?$', next_line, re.I):
-                    timing = f" ({next_line.replace('(','').replace(')','')})"
-                    lines[i + 1] = ""
-
+            # Add blank line before header if not first line
             if output and output[-1] != "":
                 output.append("")
-
-            output.append(f"@@HEADER@@{header_match}{timing}@@")
+            output.append(f"@@HEADER@@{header_match}@@")
             output.append("")
             continue
 
@@ -162,6 +155,9 @@ def format_tight_output(text: str) -> str:
             continue
 
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
+            # Ensure a blank line before each bullet point for spacing
+            if output and output[-1] != "":
+                output.append("")
             bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
             output.append(f"- {bullet}")
             continue
@@ -169,6 +165,7 @@ def format_tight_output(text: str) -> str:
         output.append(stripped)
         output.append("")
 
+    # Collapse multiple blank lines to just one
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
