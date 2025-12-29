@@ -317,7 +317,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # --- POST-PROCESSING CLEANUP ---
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
 
-            def generate_html_preview(text: str) -> str:
+# -------------------------------
+# HTML Preview generator
+# -------------------------------
+def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
