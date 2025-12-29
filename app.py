@@ -165,9 +165,7 @@ for i, raw in enumerate(lines):
         if ln == "" and final and final[-1] == "":
             continue
         final.append(ln)
-
     return "\n".join(final).strip()
-    
 # -------------------------------
 # Logo + title
 # -------------------------------
