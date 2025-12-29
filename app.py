@@ -319,6 +319,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             final_output_html = generate_html_preview(final_output)
 
             # --- Metadata + HTML Preview ---
+            
+            def safe_field(field_value):
+    return field_value if field_value else "None"
+    
             metadata_html = f"""
             <div class='stCard'>
                 <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
