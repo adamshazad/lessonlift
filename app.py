@@ -229,9 +229,20 @@ def generate_html_preview(text: str) -> str:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-            html_lines.append(
-                f"<div style='margin-top:12px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.4;'>{header_match.group(1)}</div>"
-            )
+           
+           html_lines.append(
+    f"""
+    <div style="
+        margin-top:22px;
+        margin-bottom:12px;
+        font-weight:700;
+        font-size:16px;
+        line-height:1.4;
+    ">
+        {header_match.group(1)}
+    </div>
+    """
+)
             continue
 
         # BULLETS
