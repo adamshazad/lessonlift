@@ -103,19 +103,19 @@ def format_tight_output(text: str) -> str:
         return ""
 
     HEADER_KEYWORDS = [
-    "Introduction",
-    "Warm-Up Activity",
-    "Lesson Outline",
-    "Direct Instruction",
-    "Main Activity",
-    "Group Discussion",
-    "Differentiation",
-    "Assessment",
-    "Closure and Reflection",
-    "Closing Activity",
-    "Resources",
-    "Conclusion"
-]
+        "Introduction",
+        "Warm-Up Activity",
+        "Lesson Outline",
+        "Direct Instruction",
+        "Main Activity",
+        "Group Discussion",
+        "Differentiation",
+        "Assessment",
+        "Closure and Reflection",
+        "Closing Activity",
+        "Resources",
+        "Conclusion"
+    ]
 
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
@@ -149,20 +149,21 @@ def format_tight_output(text: str) -> str:
             continue
 
         # ---- TIMING LINES ----
-    if stripped.lower().startswith("timing"):
-    output.append(stripped)
-    output.append("")  # 👈 adds a blank line after Timing
-    continue
+        if stripped.lower().startswith("timing"):
+            output.append(stripped)
+            output.append("")  # blank line after Timing
+            continue
 
         # ---- BULLETS ----
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
-    bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
-    output.append(f"- {bullet}")
-    output.append("")  # 👈 THIS LINE CREATES SPACING
-    continue
+            bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
+            output.append(f"- {bullet}")
+            output.append("")  # blank line after bullet
+            continue
 
         # ---- PARAGRAPHS ----
         output.append(stripped)
+        output.append("")  # blank line after paragraph
 
     # ---- FINAL COLLAPSE ----
     final = []
