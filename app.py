@@ -103,18 +103,19 @@ def format_tight_output(text: str) -> str:
         return ""
 
     HEADER_KEYWORDS = [
-        "Introduction",
-        "Lesson Outline",
-        "Direct Instruction",
-        "Main Activity",
-        "Shape Hunt Activity",
-        "Group Discussion",
-        "Closing Activity",
-        "Differentiation",
-        "Assessment",
-        "Resources",
-        "Conclusion"
-    ]
+    "Introduction",
+    "Warm-Up Activity",
+    "Lesson Outline",
+    "Direct Instruction",
+    "Main Activity",
+    "Group Discussion",
+    "Differentiation",
+    "Assessment",
+    "Closure and Reflection",
+    "Closing Activity",
+    "Resources",
+    "Conclusion"
+]
 
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
@@ -147,11 +148,18 @@ def format_tight_output(text: str) -> str:
             output.append("")   # EXACTLY ONE LINE after header
             continue
 
+        # ---- TIMING LINES ----
+    if stripped.lower().startswith("timing"):
+    output.append(stripped)
+    output.append("")  # 👈 adds a blank line after Timing
+    continue
+
         # ---- BULLETS ----
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
-            bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
-            output.append(f"- {bullet}")
-            continue
+    bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
+    output.append(f"- {bullet}")
+    output.append("")  # 👈 THIS LINE CREATES SPACING
+    continue
 
         # ---- PARAGRAPHS ----
         output.append(stripped)
