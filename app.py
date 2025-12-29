@@ -120,53 +120,46 @@ def format_tight_output(text: str) -> str:
     output = []
     last_header = None
 
-for i, raw in enumerate(lines):
-    stripped = raw.strip()
-    if not stripped:
-        continue
-
-    header_match = None
-    for h in HEADER_KEYWORDS:
-        if stripped.lower().startswith(h.lower()):
-            header_match = h
-            break
-
-    if header_match:
-        # Avoid duplicate headers
-        if last_header == header_match:
+    for i, raw in enumerate(lines):
+        stripped = raw.strip()
+        if not stripped:
             continue
-        last_header = header_match
 
-        # Add spacing above header (just 1 blank line)
-        if output and output[-1] != "":
+        header_match = None
+        for h in HEADER_KEYWORDS:
+            if stripped.lower().startswith(h.lower()):
+                header_match = h
+                break
+
+        if header_match:
+            if last_header == header_match:
+                continue
+            last_header = header_match
+
+            if output and output[-1] != "":
+                output.append("")
+            output.append(f"@@HEADER@@{header_match}@@")
             output.append("")
+            continue
 
-        # Mark headers differently from bullets
-        output.append(f"@@HEADER@@{header_match}@@")
-        output.append("")  # 1 blank line after header
-        continue
+        if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
+            if output and output[-1] != "":
+                output.append("")
+            bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
+            output.append(f"- {bullet}")
+            continue
 
-    # --- BULLETS ---
-    if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
-        # Add spacing above each bullet for clarity
-        if output and output[-1] != "":
-            output.append("")
-        bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
-        output.append(f"- {bullet}")
-        continue
+        output.append(stripped)
+        output.append("")
 
-    # Normal paragraph lines
-    output.append(stripped)
-    output.append("")
-
-        # Collapse multiple blank lines to one
+    # Collapse multiple blank lines to one
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
             continue
         final.append(ln)
 
-    return "\n".join(final).strip()
+    return "\n".join(final).strip()  # ✅ Correctly indented
     
 # -------------------------------
 # Logo + title
