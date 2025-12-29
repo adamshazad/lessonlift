@@ -317,12 +317,49 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # --- POST-PROCESSING CLEANUP ---
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
 
-            # 🔒 FIX 2: remove duplicated section headers
-            final_output = re.sub(
-                r'(?im)(@@HEADER@@(.+?)@@\n)(\2\s*\n)+',
-                r'\1',
-                final_output
+            def generate_html_preview(text: str) -> str:
+    lines = text.splitlines()
+    html_lines = []
+    in_list = False
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            html_lines.append("<br>")
+            continue
+
+        # HEADER
+        header_match = re.match(r'@@HEADER@@(.+?)@@', line)
+        if header_match:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            html_lines.append(
+                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
             )
+            continue
+
+        # BULLET
+        if line.startswith("- "):
+            if not in_list:
+                html_lines.append("<ul>")
+                in_list = True
+            html_lines.append(f"<li>{line[2:]}</li>")
+            continue
+
+        # PARAGRAPH
+        if in_list:
+            html_lines.append("</ul>")
+            in_list = False
+        html_lines.append(f"<p>{line}</p>")
+
+    if in_list:
+        html_lines.append("</ul>")
+
+    return "\n".join(html_lines)
 
             final_output = re.sub(
                 r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$',
