@@ -50,8 +50,8 @@ body {background-color: white; color: black;}
 .metadata-line {
     font-weight: bold;
     font-size: 16px !important;
-    margin-top: 6px;
-    margin-bottom: 6px;
+    margin-top: 2px;
+    margin-bottom: 2px;
 }
 </style>
 """, unsafe_allow_html=True)
