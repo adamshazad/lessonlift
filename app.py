@@ -159,13 +159,15 @@ for i, raw in enumerate(lines):
     output.append(stripped)
     output.append("")
 
-    # Collapse multiple blank lines to one
+        # Collapse multiple blank lines to one
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
             continue
         final.append(ln)
+
     return "\n".join(final).strip()
+    
 # -------------------------------
 # Logo + title
 # -------------------------------
