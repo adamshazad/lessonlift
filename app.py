@@ -100,46 +100,69 @@ def clean_markdown(text) -> str:
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
+
     HEADER_KEYWORDS = [
         "Introduction", "Warm-Up Activity", "Lesson Outline",
         "Direct Instruction", "Main Activity", "Group Discussion",
         "Closure and Reflection", "Closing Activity", "Differentiation",
         "Assessment", "Resources", "Conclusion"
     ]
+
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
     last_header = None
+
     for raw in lines:
         stripped = raw.strip()
         if not stripped:
             continue
+
+        # Normalise for header detection
         normalised = re.sub(r'^[-•*\s]+', '', stripped)
-        header_match = next((h for h in HEADER_KEYWORDS if normalised.lower().startswith(h.lower())), None)
+
+        # HEADER
+        header_match = next(
+            (h for h in HEADER_KEYWORDS if normalised.lower().startswith(h.lower())),
+            None
+        )
+
         if header_match:
             if last_header == header_match:
                 continue
             last_header = header_match
-            if output and output[-1] != "":
+
+            # extra space BEFORE header (except at very top)
+            if output:
                 output.append("")
+
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")
+            output.append("")  # ONE line after header only
             continue
+
+        # TIMING lines (keep readable spacing)
         if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
             output.append(stripped)
             output.append("")
             continue
+
+        # BULLETS — tight spacing
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
-            continue  # tight bullets
+            continue
+
+        # PARAGRAPH — NO forced blank line
         output.append(stripped)
-        output.append("")
+
+    # Collapse accidental multiple blanks (safety net)
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
             continue
         final.append(ln)
+
     return "\n".join(final).strip()
+
 
 def count_words(text: str) -> int:
     if not text:
