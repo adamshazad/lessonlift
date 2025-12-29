@@ -345,7 +345,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             metadata_html = f"""
 <div class='stCard'>
     {"".join(metadata_lines)}
-    <br>
     {final_output_html.strip()}
 </div>
 """
