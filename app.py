@@ -331,23 +331,34 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             final_output_clean = re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', final_output)
             final_output_html = generate_html_preview(final_output)
 
-            # Metadata
-            metadata_lines = []
-            metadata_map = {
-                "Lesson Title": lesson_data.get("topic",""),
-                "Subject": lesson_data.get("subject",""),
-                "Topic": lesson_data.get("topic",""),
-                "Year Group": lesson_data.get("year_group",""),
-                "Duration": lesson_data.get("lesson_duration",""),
-                "Ability Level": lesson_data.get("ability_level",""),
-                "SEN/EAL Notes": lesson_data.get("sen_notes",""),
-                "Learning Objective": lesson_data.get("learning_objective","")
-            }
-            for key,value in metadata_map.items():
-                if value.strip():
-                    metadata_lines.append(f"<div class='metadata-line'><b>{key}:</b> {value}</div>")
-            metadata_html = f"<div class='stCard'>{"".join(metadata_lines)}{final_output_html.strip()}</div>"
-            st.markdown(metadata_html, unsafe_allow_html=True)
+           # Metadata
+metadata_lines = []
+metadata_map = {
+    "Lesson Title": lesson_data.get("topic",""),
+    "Subject": lesson_data.get("subject",""),
+    "Topic": lesson_data.get("topic",""),
+    "Year Group": lesson_data.get("year_group",""),
+    "Duration": lesson_data.get("lesson_duration",""),
+    "Ability Level": lesson_data.get("ability_level",""),
+    "SEN/EAL Notes": lesson_data.get("sen_notes",""),
+    "Learning Objective": lesson_data.get("learning_objective","")
+}
+
+for key, value in metadata_map.items():
+    if value.strip():
+        metadata_lines.append(
+            f"<div class='metadata-line'><b>{key}:</b> {value}</div>"
+        )
+
+metadata_html = f"""
+<div class='stCard'>
+    {"".join(metadata_lines)}
+    <div style="height:16px;"></div>
+    {final_output_html.strip()}
+</div>
+"""
+
+st.markdown(metadata_html, unsafe_allow_html=True)
 
             # Exports
             pdf_buffer = create_pdf(final_output_clean)
