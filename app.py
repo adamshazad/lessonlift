@@ -115,31 +115,26 @@ def format_tight_output(text: str) -> str:
     for raw in lines:
         stripped = raw.strip()
         if not stripped:
-            continue
+            continue  # skip all blank lines
 
-        # Normalise for header detection
         normalised = re.sub(r'^[-•*\s]+', '', stripped)
 
-        # HEADER
-        header_match = next(
-            (h for h in HEADER_KEYWORDS if normalised.lower().startswith(h.lower())),
-            None
-        )
-
+        # HEADER detection
+        header_match = next((h for h in HEADER_KEYWORDS if normalised.lower().startswith(h.lower())), None)
         if header_match:
             if last_header == header_match:
                 continue
             last_header = header_match
 
-            # extra space BEFORE header (except at very top)
+            # Ensure **no extra space above first header**
             if output:
-                output.append("")
+                output.append("")  # ONE line above header, only if not first line
 
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")  # ONE line after header only
+            output.append("")  # ONE line after header
             continue
 
-        # TIMING lines (keep readable spacing)
+        # TIMINGS
         if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
             output.append(stripped)
             output.append("")
@@ -151,18 +146,21 @@ def format_tight_output(text: str) -> str:
             output.append(f"- {bullet}")
             continue
 
-        # PARAGRAPH — NO forced blank line
+        # Paragraph — NO forced blank line
         output.append(stripped)
 
-    # Collapse accidental multiple blanks (safety net)
+    # Collapse multiple blank lines
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
             continue
         final.append(ln)
 
-    return "\n".join(final).strip()
+    # STRIP leading blank lines at the very top
+    while final and final[0] == "":
+        final.pop(0)
 
+    return "\n".join(final).strip()
 
 def count_words(text: str) -> int:
     if not text:
