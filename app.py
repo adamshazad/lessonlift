@@ -249,7 +249,6 @@ def create_docx(text):
 # -------------------------------
 # Generator (STRONGER INSTRUCTIONS + CLEANUP)
 # -------------------------------
-
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
         lesson_data = {}
@@ -261,7 +260,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     st.session_state.lesson_count += 1
 
-    # Determine min words by lesson duration
     duration_map = {
         "30 min": 750,
         "45 min": 850,
@@ -273,15 +271,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
     generation_instructions = (
         "\n\nImportant instructions for generation (must follow exactly):\n"
-        "- Use British English only (e.g., 'colour', 'favour', 'maths').\n"
-        "- Do NOT include emojis or emoji characters anywhere.\n"
-        "- DO NOT output any internal lesson title lines.\n"
-        "- DO NOT repeat metadata fields inside the body.\n"
-        "- Start with the first section header (e.g., 'Introduction').\n"
+        "- Use British English only.\n"
+        "- Do NOT include emojis.\n"
+        "- Do NOT output internal lesson titles or metadata fields.\n"
+        "- Start the content with the first section header.\n"
         "- Format headings as a single line header, followed by one blank line, then '-' bullet points or tight paragraph lines.\n"
-        "- Collapse extra blank lines to at most one blank line between sections.\n"
+        "- Collapse extra blank lines so there is at most one blank line between sections.\n"
         f"- Minimum length: {min_words} words. Maximum length: 1000 words.\n"
-        "- Include clear timings, detailed activities, differentiation, assessment and resources.\n"
+        "- Include timings, detailed activities, differentiation, assessment, and resources.\n"
     )
 
     prompt_with_req = prompt + generation_instructions
@@ -309,7 +306,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                     final_output = formatted
                     break
                 else:
-                    prompt_with_req += "\n\nPlease expand the lesson plan to reach the required word count."
+                    prompt_with_req += (
+                        "\n\nPlease expand the lesson plan with more detail, step-by-step examples, timings, differentiation, and assessment to reach the required word count."
+                    )
 
             if final_output is None:
                 final_output = formatted or ""
@@ -317,23 +316,29 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # --- POST-PROCESSING CLEANUP ---
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)^\s*(lesson\s*plan\s*[:\-].*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
             final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
             final_output = final_output.lstrip()
 
-            # Streamlit preview
-            preview_html = re.sub(
+            # -------------------------------
+            # Prepare bold headers for export
+            def format_for_export(text):
+                text = re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', text)
+                return text
+
+            final_output_clean = format_for_export(final_output)
+
+            # Preview for Streamlit
+            final_output_html = re.sub(
                 r'@@HEADER@@(.+?)@@',
-                r'<div style="margin-top:18px; margin-bottom:12px; font-weight:700; font-size:17px;">\1</div><br>',
+                r'<div style="margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px;">\1</div>',
                 final_output
             )
-            preview_html = preview_html.replace('\n', '<br>')
+            final_output_html = final_output_html.replace('\n', '<br>')
 
             # -------------------------------
-            # Metadata + Lesson preview
-            # -------------------------------
+            # Metadata + Preview
             metadata_html = f"""
 <div class='stCard'>
     <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
@@ -345,21 +350,20 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
     <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
     <br>
-    {preview_html.strip()}
+    {final_output_html.strip()}
 </div>
 """
             st.markdown(metadata_html, unsafe_allow_html=True)
 
-            # --- Prepare clean output for downloads ---
-            download_output = re.sub(r'@@HEADER@@(.+?)@@', r'\1', final_output)
-
-            pdf_buffer = create_pdf(download_output)
-            docx_buffer = create_docx(download_output)
+            # -------------------------------
+            # Exports
+            pdf_buffer = create_pdf(final_output_clean)
+            docx_buffer = create_docx(final_output_clean)
 
             st.markdown(
                 f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-    <a href="data:text/plain;base64,{base64.b64encode(download_output.encode()).decode()}" download="lesson_plan.txt">
+    <a href="data:text/plain;base64,{base64.b64encode(final_output_clean.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
     </a>
     <a href="data:application/pdf;base64,{base64.b64encode(pdf_buffer.read()).decode()}" download="lesson_plan.pdf">
@@ -369,8 +373,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ DOCX</button>
     </a>
 </div>
-""",
-                unsafe_allow_html=True
+""", unsafe_allow_html=True
             )
 
         except Exception as e:
