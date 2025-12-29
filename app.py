@@ -98,8 +98,10 @@ def clean_markdown(text) -> str:
     lines = [line.rstrip() for line in text.splitlines()]
     return "\n".join(lines).strip()
 
-
-    def format_tight_output(text: str) -> str:
+# -------------------------------
+# Format lesson plan output (tight, controlled spacing)
+# -------------------------------
+def format_tight_output(text: str) -> str:
     if not text:
         return ""
 
@@ -113,11 +115,11 @@ def clean_markdown(text) -> str:
         "Differentiation",
         "Assessment",
         "Resources",
-        "objectives",
+        "Objectives",
         "Activity"
     ]
 
-    lines = [l.rstrip() for l in text.splitlines()]
+    lines = [line.rstrip() for line in text.splitlines()]
     output = []
     last_header = None
 
@@ -126,30 +128,33 @@ def clean_markdown(text) -> str:
         if not stripped:
             continue
 
+        # Detect header
         header_match = next((h for h in HEADER_KEYWORDS if stripped.lower().startswith(h.lower())), None)
         if header_match:
             if last_header == header_match:
                 continue
             last_header = header_match
-
             if output and output[-1] != "":
-                output.append("")  # spacing above header
-
+                output.append("")  # blank line above header
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")  # spacing after header
+            output.append("")  # blank line after header
             continue
 
-        # Bullets with spacing
+        # Detect timing lines
+        if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
+            output.append(stripped)
+            output.append("")  # blank line after timing
+            continue
+
+        # Detect bullet points (tight, no extra blank line)
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
-            if output and output[-1] != "":
-                output.append("")  # spacing above bullet
-            bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
+            bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
             continue
 
-        # Paragraphs
+        # Normal paragraph lines
         output.append(stripped)
-        output.append("")
+        output.append("")  # single blank line after paragraph
 
     # Collapse multiple blank lines to one
     final = []
@@ -160,6 +165,13 @@ def clean_markdown(text) -> str:
 
     return "\n".join(final).strip()
 
+# -------------------------------
+# Count words helper
+# -------------------------------
+def count_words(text: str) -> int:
+    if not text:
+        return 0
+    return len(text.split())
 
 # Metadata + Preview HTML
 metadata_html = f"""
