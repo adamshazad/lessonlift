@@ -120,45 +120,44 @@ def format_tight_output(text: str) -> str:
     output = []
     last_header = None
 
-    for i, raw in enumerate(lines):
-        stripped = raw.strip()
-        if not stripped:
-            continue
-
-        header_match = None
-        for h in HEADER_KEYWORDS:
-            if stripped.lower().startswith(h.lower()):
-                header_match = h
-                break
-
-if header_match:
-    # Avoid duplicate headers
-    if last_header == header_match:
+for i, raw in enumerate(lines):
+    stripped = raw.strip()
+    if not stripped:
         continue
-    last_header = header_match
 
-    # Reduce spacing above header: only 1 line if there’s content, otherwise nothing
-    if output and output[-1] != "":
-        output.append("")  # single blank line above
+    header_match = None
+    for h in HEADER_KEYWORDS:
+        if stripped.lower().startswith(h.lower()):
+            header_match = h
+            break
 
-    # Mark headers differently from bullets
-    output.append(f"@@HEADER@@{header_match}@@")
-    # Reduce blank line below header to a single line
-    output.append("")  # just 1 line below instead of 2-3
-    continue
-
-        # Treat bullet points
-        if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
-            # Add spacing above each bullet for clarity
-            if output and output[-1] != "":
-                output.append("")
-            bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
-            output.append(f"- {bullet}")
+    if header_match:
+        # Avoid duplicate headers
+        if last_header == header_match:
             continue
+        last_header = header_match
 
-        # Normal paragraph lines
-        output.append(stripped)
-        output.append("")
+        # Add spacing above header (just 1 blank line)
+        if output and output[-1] != "":
+            output.append("")
+
+        # Mark headers differently from bullets
+        output.append(f"@@HEADER@@{header_match}@@")
+        output.append("")  # 1 blank line after header
+        continue
+
+    # --- BULLETS ---
+    if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
+        # Add spacing above each bullet for clarity
+        if output and output[-1] != "":
+            output.append("")
+        bullet = re.sub(r'^[-•*\d\.\)]*\s*', '', stripped)
+        output.append(f"- {bullet}")
+        continue
+
+    # Normal paragraph lines
+    output.append(stripped)
+    output.append("")
 
     # Collapse multiple blank lines to one
     final = []
