@@ -340,8 +340,9 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             final_output_clean = format_for_export(final_output)
 
             # -------------------------------
-            # Generate HTML preview with proper spacing and bullets
-         def generate_html_preview(text: str) -> str:
+# Generate HTML preview with proper spacing and bullets
+# -------------------------------
+def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
@@ -352,7 +353,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-            continue  # Remove extra <br> for blank lines
+            continue
 
         # HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
@@ -365,7 +366,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             )
             continue
 
-        # BULLETS - no extra spacing
+        # BULLETS
         if line.startswith("- "):
             if not in_list:
                 html_lines.append("<ul style='margin-top:0; margin-bottom:0; padding-left:18px;'>")
