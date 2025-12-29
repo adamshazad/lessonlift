@@ -101,6 +101,7 @@ def clean_markdown(text) -> str:
 # -------------------------------
 # Format lesson plan output (tight, controlled spacing)
 # -------------------------------
+
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
@@ -128,35 +129,32 @@ def format_tight_output(text: str) -> str:
         if not stripped:
             continue
 
-        # Detect header
         header_match = next((h for h in HEADER_KEYWORDS if stripped.lower().startswith(h.lower())), None)
         if header_match:
             if last_header == header_match:
                 continue
             last_header = header_match
+            # Only 1 blank line before header
             if output and output[-1] != "":
-                output.append("")  # blank line above header
+                output.append("")
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")  # blank line after header
+            # NO blank line after header — keeps subtitle closer
             continue
 
-        # Detect timing lines
         if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
             output.append(stripped)
-            output.append("")  # blank line after timing
+            output.append("")
             continue
 
-        # Detect bullet points (tight, no extra blank line)
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
             continue
 
-        # Normal paragraph lines
         output.append(stripped)
-        output.append("")  # single blank line after paragraph
+        output.append("")
 
-    # Collapse multiple blank lines to one
+    # Collapse multiple blank lines into a single one
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
