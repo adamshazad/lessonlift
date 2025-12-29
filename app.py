@@ -50,8 +50,8 @@ body {background-color: white; color: black;}
 .metadata-line {
     font-weight: bold;
     font-size: 16px !important;
-    margin-top: 6px;
-    margin-bottom: 6px;
+    margin-top: 2px;
+    margin-bottom: 2px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -318,10 +318,10 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             # Preview for Streamlit
             final_output_html = re.sub(
-                r'@@HEADER@@(.+?)@@',
-                r'<div style="margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px;">\1</div>',
-                final_output
-            )
+    r'@@HEADER@@(.+?)@@',
+    r'<div style="margin-top:4px; margin-bottom:4px; font-weight:700; font-size:16px;">\1</div>',
+    final_output
+)
             final_output_html = final_output_html.replace('\n', '<br>')
 
             # -------------------------------
