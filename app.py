@@ -306,35 +306,52 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 final_output = formatted or ""
 
             # --- POST-PROCESSING CLEANUP ---
-final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+            final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
 
-# 🔒 FIX 2: remove duplicated section headers
-final_output = re.sub(r'(?im)(@@HEADER@@(.+?)@@\n)(\2\s*\n)+', r'\1', final_output)
+            # 🔒 FIX 2: remove duplicated section headers
+            final_output = re.sub(
+                r'(?im)(@@HEADER@@(.+?)@@\n)(\2\s*\n)+',
+                r'\1',
+                final_output
+            )
 
-final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
-final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
-final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
-final_output = final_output.lstrip()
-
+            final_output = re.sub(
+                r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$',
+                '',
+                final_output
+            )
+            final_output = re.sub(
+                r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+',
+                'Learning Objective\n\n',
+                final_output
+            )
+            final_output = re.sub(
+                r'(?im)^\s*(Introduction\s*)\n\s*\1',
+                r'Introduction',
+                final_output
+            )
+            final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
+            final_output = final_output.lstrip()
+            
             # -------------------------------
             # Prepare bold headers for export
+            
             def format_for_export(text):
                 return re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', text)
 
             final_output_clean = format_for_export(final_output)
 
             # Preview for Streamlit
-     final_output_html = re.sub(
-    r'@@HEADER@@(.+?)@@',
-    r'<div style="margin-top:2px; margin-bottom:2px; font-weight:700; font-size:16px; line-height:1.2;">\1</div>',
-    final_output
-)
+            
+            final_output_html = re.sub(
+                r'@@HEADER@@(.+?)@@',
+                r'<div style="margin-top:2px; margin-bottom:2px; font-weight:700; font-size:16px; line-height:1.2;">\1</div>',
+                final_output
+            )
 
-# collapse multiple line breaks BEFORE converting to <br>
-final_output_html = re.sub(r'\n{2,}', '\n', final_output_html)
-final_output_html = final_output_html.replace('\n', '<br>')
-
+            final_output_html = re.sub(r'\n{2,}', '\n', final_output_html)
+            final_output_html = final_output_html.replace('\n', '<br>')
+            
             # -------------------------------
             # Metadata + Preview
             metadata_lines = []
