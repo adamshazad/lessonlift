@@ -339,7 +339,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             final_output_clean = format_for_export(final_output)
 
-            # -------------------------------
+           # -------------------------------
 # Helper: generate HTML preview
 # -------------------------------
 def generate_html_preview(text: str) -> str:
