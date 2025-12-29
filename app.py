@@ -240,6 +240,7 @@ def create_docx(text):
 # -------------------------------
 # Generator (STRONGER INSTRUCTIONS + CLEANUP)
 # -------------------------------
+
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
         lesson_data = {}
@@ -315,8 +316,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             # -------------------------------
             # Prepare bold headers for export
             def format_for_export(text):
-                text = re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', text)
-                return text
+                return re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', text)
 
             final_output_clean = format_for_export(final_output)
 
@@ -330,16 +330,25 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
 
             # -------------------------------
             # Metadata + Preview
+            metadata_lines = []
+            metadata_map = {
+                "Lesson Title": lesson_data.get("topic", ""),
+                "Subject": lesson_data.get("subject", ""),
+                "Topic": lesson_data.get("topic", ""),
+                "Year Group": lesson_data.get("year_group", ""),
+                "Duration": lesson_data.get("lesson_duration", ""),
+                "Ability Level": lesson_data.get("ability_level", ""),
+                "SEN/EAL Notes": lesson_data.get("sen_notes", ""),
+                "Learning Objective": lesson_data.get("learning_objective", "")
+            }
+
+            for key, value in metadata_map.items():
+                if value.strip():  # only show non-empty fields
+                    metadata_lines.append(f"<div class='metadata-line'><b>{key}:</b> {value}</div>")
+
             metadata_html = f"""
 <div class='stCard'>
-    <div class='metadata-line'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line'><b>Subject:</b> {lesson_data.get('subject','')}</div>
-    <div class='metadata-line'><b>Topic:</b> {lesson_data.get('topic','')}</div>
-    <div class='metadata-line'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
-    <div class='metadata-line'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
-    <div class='metadata-line'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
-    <div class='metadata-line'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','None')}</div>
-    <div class='metadata-line'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+    {"".join(metadata_lines)}
     <br>
     {final_output_html.strip()}
 </div>
