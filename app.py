@@ -304,25 +304,29 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
                 else:
                     prompt_with_req += "\n\nPlease expand the lesson plan with more detail, step-by-step examples, timings, differentiation, and assessment to reach the required word count."
 
-            if final_output is None:
-                final_output = formatted or ""
+if final_output is None:
+    final_output = formatted or ""
 
-        # --- Post-processing cleanup ---
-        final_output = re.sub(
-            r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$',
-            '',
-            final_output
-        )
-        final_output = re.sub(
-            r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$',
-            '',
-            final_output
-        )
-        final_output = re.sub(
-            r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+',
-            'Learning Objective\n\n',
-            final_output
-        )
+# --- Post-processing cleanup ---
+final_output = re.sub(
+    r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$',
+    '',
+    final_output
+)
+final_output = re.sub(
+    r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$',
+    '',
+    final_output
+)
+final_output = re.sub(
+    r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+',
+    'Learning Objective\n\n',
+    final_output
+)
+
+except Exception as e:
+            st.error(f"⚠️ Lesson plan could not be generated: {e}")
+            return
 
         # Collapse excessive blank lines
         final_output = re.sub(r'\n{3,}', '\n\n', final_output)
