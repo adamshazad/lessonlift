@@ -228,8 +228,9 @@ def generate_html_preview(text: str) -> str:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
+            header_text = header_match.group(1)
             html_lines.append(
-                f"<div style='margin-top:12px; margin-bottom:12px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
+                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:bold; font-size:16px; line-height:1.3;'>{header_text}</div>"
             )
             continue
         if line.startswith("- "):
@@ -245,7 +246,6 @@ def generate_html_preview(text: str) -> str:
     if in_list:
         html_lines.append("</ul>")
     return "\n".join(html_lines)
-
 # -------------------------------
 # Generator
 # -------------------------------
