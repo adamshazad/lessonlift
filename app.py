@@ -307,12 +307,20 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted or ""
 
-            # --- Post-processing cleanup ---
-            final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
-            final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
-            final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
-            final_output = final_output.lstrip()
+           # --- Post-processing cleanup ---
+final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
+final_output = re.sub(
+    r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+',
+    'Learning Objective\n\n',
+    final_output
+)
+
+# Collapse excessive blank lines (max 1 blank line)
+final_output = re.sub(r'\n{3,}', '\n\n', final_output)
+
+# Remove blank space ONLY at the very start
+final_output = final_output.lstrip()
 
             # --- Prepare for export + preview ---
             final_output_clean = re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', final_output)
