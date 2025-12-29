@@ -226,6 +226,14 @@ def create_docx(text):
     return bio
 
 # -------------------------------
+# Helper: count words
+# -------------------------------
+def count_words(text: str) -> int:
+    if not text:
+        return 0
+    return len(text.split())
+
+# -------------------------------
 # Generator (STRONGER INSTRUCTIONS + CLEANUP)
 # -------------------------------
 
