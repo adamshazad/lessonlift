@@ -209,10 +209,12 @@ def create_docx(text):
 # -------------------------------
 # Helper: HTML preview
 # -------------------------------
+
 def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
+
     for line in lines:
         line = line.strip()
         if not line:
@@ -220,25 +222,36 @@ def generate_html_preview(text: str) -> str:
                 html_lines.append("</ul>")
                 in_list = False
             continue
+
+        # HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-            html_lines.append(f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.2;'>{header_match.group(1)}</div>")
+            # Add more space after header
+            html_lines.append(
+                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.4;'>{header_match.group(1)}</div>"
+            )
             continue
+
+        # BULLETS
         if line.startswith("- "):
             if not in_list:
-                html_lines.append("<ul style='margin-top:0; margin-bottom:0; padding-left:18px;'>")
+                html_lines.append("<ul style='margin-top:2px; margin-bottom:6px; padding-left:18px;'>")
                 in_list = True
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
+
+        # PARAGRAPH
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        html_lines.append(f"<div style='margin-top:2px; margin-bottom:2px;'>{line}</div>")
+        html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
+
     if in_list:
         html_lines.append("</ul>")
+
     return "\n".join(html_lines)
 
 # -------------------------------
