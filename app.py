@@ -109,16 +109,15 @@ def format_tight_output(text: str) -> str:
         "Direct Instruction",
         "Main Activity",
         "Group Discussion",
-        "Differentiation",
-        "Assessment",
         "Closure and Reflection",
         "Closing Activity",
+        "Differentiation",
+        "Assessment",
         "Resources",
-        "Conclusion",
-        "Learning Activities"
+        "Conclusion"
     ]
 
-    lines = [line.rstrip() for line in text.splitlines()]
+    lines = [l.rstrip() for l in text.splitlines()]
     output = []
     last_header = None
 
@@ -127,8 +126,10 @@ def format_tight_output(text: str) -> str:
         if not stripped:
             continue
 
-        # ---- HEADER DETECTION ----
+        # Normalize for header detection
         normalised = re.sub(r'^[-•*\s]+', '', stripped)
+
+        # HEADER
         header_match = None
         for h in HEADER_KEYWORDS:
             if normalised.lower().startswith(h.lower()):
@@ -144,27 +145,27 @@ def format_tight_output(text: str) -> str:
                 output.append("")
 
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")  # ONE LINE after header
+            output.append("")  # one line after header
             continue
 
-        # ---- TIMING LINES ----
-        if re.match(r'^\d{1,2}-\d{1,2} minutes:', stripped.lower()):
+        # TIMING line
+        if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
             output.append(stripped)
-            output.append("")  # spacing after timing
+            output.append("")  # blank line after timing
             continue
 
-        # ---- BULLETS ----
+        # BULLETS
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
-            output.append("")  # spacing after bullet
+            output.append("")  # blank line after bullet
             continue
 
-        # ---- PARAGRAPHS ----
+        # Paragraph
         output.append(stripped)
-        output.append("")  # spacing after paragraph
+        output.append("")
 
-    # ---- COLLAPSE MULTIPLE BLANK LINES ----
+    # collapse multiple blank lines
     final = []
     for ln in output:
         if ln == "" and final and final[-1] == "":
