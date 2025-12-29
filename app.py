@@ -319,25 +319,26 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     # Metadata + Preview
     # -------------------------------
     metadata_html = f"""
-        <div class='stCard'>
-            <div class='metadata-line' style='margin-bottom:4px;'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
-            <div class='metadata-line' style='margin-bottom:4px;'><b>Subject:</b> {lesson_data.get('subject','')}</div>
-            <div class='metadata-line' style='margin-bottom:4px;'><b>Topic:</b> {lesson_data.get('topic','')}</div>
-            <div class='metadata-line' style='margin-bottom:4px;'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
-            <div class='metadata-line' style='margin-bottom:4px;'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
-            <div class='metadata-line' style='margin-bottom:4px;'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
-            <div class='metadata-line' style='margin-bottom:4px;'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','')}</div>
-            <div class='metadata-line' style='margin-bottom:4px;'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
-            <br>
-            {final_output_html.strip()}
-        </div>
+    <div class='stCard'>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Lesson Title:</b> {lesson_data.get('topic','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Subject:</b> {lesson_data.get('subject','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Topic:</b> {lesson_data.get('topic','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Year Group:</b> {lesson_data.get('year_group','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Duration:</b> {lesson_data.get('lesson_duration','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Ability Level:</b> {lesson_data.get('ability_level','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>SEN/EAL Notes:</b> {lesson_data.get('sen_notes','')}</div>
+        <div class='metadata-line' style='margin-bottom:4px;'><b>Learning Objective:</b> {lesson_data.get('learning_objective','')}</div>
+        <br>
+        {final_output_html.strip()}
+    </div>
     """
     st.markdown(metadata_html, unsafe_allow_html=True)
-            # -------------------------------
-            # Exports
-            pdf_buffer = create_pdf(final_output_clean)
-            docx_buffer = create_docx(final_output_clean)
-            st.markdown(f"""
+
+    # -------------------------------
+    # Exports
+    pdf_buffer = create_pdf(final_output_clean)
+    docx_buffer = create_docx(final_output_clean)
+    st.markdown(f"""
 <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
     <a href="data:text/plain;base64,{base64.b64encode(final_output_clean.encode()).decode()}" download="lesson_plan.txt">
         <button style="padding:16px; background:#4CAF50; color:white; border:none; border-radius:8px;">⬇ TXT</button>
@@ -355,10 +356,10 @@ except Exception as e:
     st.error(f"⚠️ Lesson plan could not be generated: {e}")
     return
 
-        # Save history
-        st.session_state.lesson_history.append({"title": title, "content": final_output})
-        if regen_message:
-            st.info(f"🔄 {regen_message}")
+# Save to history
+st.session_state.lesson_history.append({"title": title, "content": final_output})
+if regen_message:
+    st.info(f"🔄 {regen_message}")
 
 # -------------------------------
 # Main page
