@@ -102,19 +102,32 @@ def clean_markdown(text) -> str:
 def format_tight_output(text: str) -> str:
     if not text:
         return ""
+
     HEADER_KEYWORDS = [
-        "Introduction", "Lesson Outline", "Main Activity",
-        "Shape Sorting Activity", "Creative Shape Art",
-        "Conclusion and Assessment", "Differentiation", "Assessment",
-        "Resources", "Objectives", "Activity", "Conclusion"
+        "Introduction",
+        "Lesson Outline",
+        "Main Activity",
+        "Shape Identification Activity",
+        "Shape Sorting Game",
+        "Reflection and Assessment",
+        "Conclusion",
+        "Differentiation",
+        "Assessment",
+        "Resources",
+        "Objectives",
+        "Activity"
     ]
+
     lines = [line.rstrip() for line in text.splitlines()]
     output = []
     last_header = None
+
     for raw in lines:
         stripped = raw.strip()
         if not stripped:
             continue
+
+        # Detect header
         header_match = next((h for h in HEADER_KEYWORDS if stripped.lower().startswith(h.lower())), None)
         if header_match:
             if last_header == header_match:
@@ -123,26 +136,32 @@ def format_tight_output(text: str) -> str:
             if output and output[-1] != "":
                 output.append("")  # blank line above header
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")  # blank line after header
             continue
-        # Timing
-        if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
-            output.append(stripped)
-            output.append("")
-            continue
-        # Bullet points (tight)
+
+        # Detect bullet points
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
             continue
-        # Paragraph
+
+        # Normal paragraph lines
         output.append(stripped)
-        output.append("")
+
+    # Collapse multiple blank lines to one, remove blank after header
     final = []
+    skip_next_blank = False
     for ln in output:
+        if ln.startswith("@@HEADER@@"):
+            skip_next_blank = True
+            final.append(ln)
+            continue
+        if ln == "" and skip_next_blank:
+            skip_next_blank = False
+            continue
         if ln == "" and final and final[-1] == "":
             continue
         final.append(ln)
+
     return "\n".join(final).strip()
 
 def count_words(text: str) -> int:
@@ -216,6 +235,7 @@ def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
+
     for line in lines:
         line = line.strip()
         if not line:
@@ -223,28 +243,35 @@ def generate_html_preview(text: str) -> str:
                 html_lines.append("</ul>")
                 in_list = False
             continue
+
+        # Header detection
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-            header_text = header_match.group(1)
             html_lines.append(
-                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:bold; font-size:16px; line-height:1.3;'>{header_text}</div>"
+                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:bold; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
             )
             continue
+
+        # Bullet points
         if line.startswith("- "):
             if not in_list:
                 html_lines.append("<ul style='margin-top:0; margin-bottom:0; padding-left:18px;'>")
                 in_list = True
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
+
+        # Normal paragraph
         if in_list:
             html_lines.append("</ul>")
             in_list = False
         html_lines.append(f"<div style='margin-top:2px; margin-bottom:2px;'>{line}</div>")
+
     if in_list:
         html_lines.append("</ul>")
+
     return "\n".join(html_lines)
 # -------------------------------
 # Generator
