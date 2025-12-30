@@ -304,7 +304,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             else:
                 prompt_with_req += "\n\nPlease expand the lesson plan with more detail, step-by-step examples, timings, differentiation, and assessment to reach the required word count."
 
-        # <-- MUST be inside try
         if final_output is None:
             final_output = formatted or ""
 
