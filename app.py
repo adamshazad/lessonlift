@@ -105,20 +105,21 @@ def format_tight_output(text: str) -> str:
 
     HEADER_KEYWORDS = [
     "Introduction",
-    "Lesson Outline",
+    "Warm-Up Activity",
+    "Introduction to Shapes",
     "Main Activity",
     "Shape Identification Activity",
+    "Shape Sorting Activity",
     "Shape Sorting Game",
-    "Reflection and Assessment",
-    "Closure and Reflection",
-    "Warm-Up Activity",
-    "Assessment",
     "Differentiation",
+    "Assessment",
+    "Reflection",
+    "Reflection and Assessment",
+    "Closure",
+    "Closure and Reflection",
     "Resources",
     "Follow-Up Activities",
-    "Conclusion",
-    "Objectives",
-    "Activity"
+    "Conclusion"
 ]
 
     lines = [line.rstrip() for line in text.splitlines()]
@@ -165,7 +166,9 @@ def format_tight_output(text: str) -> str:
             continue
         final.append(ln)
 
-    return "\n".join(final).strip()
+    text = "\n".join(final)
+text = re.sub(r'\n{2,}', '\n\n', text)
+return text.strip()
 
 def count_words(text: str) -> int:
     if not text:
@@ -253,9 +256,7 @@ def generate_html_preview(text: str) -> str:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-            html_lines.append(
-                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:bold; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
-            )
+html_lines.append(f"<b>{header_match.group(1)}</b>")
             continue
 
         # Bullet points
@@ -344,6 +345,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
             final_output = final_output.lstrip()
+            final_output = re.sub(r'\n\s*\n', '\n\n', final_output)
 
             # --- Prepare for export + preview ---
             final_output_clean = re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', final_output)
