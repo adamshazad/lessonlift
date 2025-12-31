@@ -222,13 +222,15 @@ def generate_html_preview(text: str) -> str:
     html_lines = []
     in_list = False
 
-    for line in lines:
-        line = line.strip()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
 
         if not line:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
+            i += 1
             continue
 
         # HEADER
@@ -241,15 +243,16 @@ def generate_html_preview(text: str) -> str:
             header_text = header_match.group(1)
 
             if header_text == "Introduction":
-                # ✅ Custom spacing for Introduction
+                # Custom spacing for Introduction only
                 html_lines.append(
                     f"<div style='margin-top:10px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>"
                 )
             else:
-                # Other headers remain unchanged
+                # Default spacing for other headers
                 html_lines.append(
                     f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
                 )
+            i += 1
             continue
 
         # BULLETS
@@ -258,6 +261,7 @@ def generate_html_preview(text: str) -> str:
                 html_lines.append("<ul style='margin-top:0; margin-bottom:0; padding-left:18px;'>")
                 in_list = True
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
+            i += 1
             continue
 
         # PARAGRAPH
@@ -266,6 +270,7 @@ def generate_html_preview(text: str) -> str:
             in_list = False
 
         html_lines.append(f"<div style='margin-top:2px; margin-bottom:2px;'>{line}</div>")
+        i += 1
 
     if in_list:
         html_lines.append("</ul>")
