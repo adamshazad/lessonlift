@@ -111,7 +111,7 @@ def format_tight_output(text: str) -> str:
         "Assessment", "Resources", "Conclusion", "closure", "Iteractive Activity",
         "Guided Practice", "Learning Activities", "Activity 1", "Activity 2",
         "Activity 3", "Activity 4", "Activity 5", "Timings and Activities",
-        "Reflection and Assessment"
+        "Reflection and Assessment", "Lesson Structure"
     ]
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
@@ -231,16 +231,22 @@ def generate_html_preview(text: str) -> str:
             continue
 
         # HEADER
-        header_match = re.match(r'@@HEADER@@(.+?)@@', line)
-        if header_match:
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
-            # Add more space after header
-            html_lines.append(
-    f"<div style='margin-top:16px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
-)
-            continue
+header_match = re.match(r'@@HEADER@@(.+?)@@', line)
+if header_match:
+    if in_list:
+        html_lines.append("</ul>")
+        in_list = False
+
+    header_text = header_match.group(1)
+
+    if header_text == "Introduction":
+        html_lines.append("<div style='margin-top:8px; margin-bottom:8px; font-weight:700; font-size:16px; line-height:1.4;'>"
+                          f"{header_text}</div>")
+    else:
+        html_lines.append(
+            f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
+        )
+    continue
 
         # BULLETS
         if line.startswith("- "):
