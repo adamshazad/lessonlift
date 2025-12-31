@@ -53,6 +53,10 @@ body {background-color: white; color: black;}
     margin-top: 2px;
     margin-bottom: 2px;
 }
+
+.metadata-line:last-child {
+    margin-bottom: 14px;
+}
 </style>
 """, unsafe_allow_html=True)
 
