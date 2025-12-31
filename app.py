@@ -232,26 +232,37 @@ def generate_html_preview(text: str) -> str:
             continue
 
         # HEADER
-        header_match = re.match(r'@@HEADER@@(.+?)@@', line)
-        if header_match:
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
+header_match = re.match(r'@@HEADER@@(.+?)@@', line)
+if header_match:
+    if in_list:
+        html_lines.append("</ul>")
+        in_list = False
 
-            header_text = header_match.group(1)
+    header_text = header_match.group(1)
 
-            if header_text == "Introduction":
-                html_lines.append("<br>")
-                html_lines.append(
-                    f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>"
-                )
-                html_lines.append("<br>")
-            else:
-                html_lines.append(
-                    f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
-                )
+    # Special spacing for Introduction
+    if header_text == "Introduction":
+        html_lines.append("<br>")  # 1 line above
+        html_lines.append(
+            f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>"
+        )
+        html_lines.append("<br>")  # 1 line below
 
-            continue
+    # Optional: treat activity headers like "Shape Hunt (10 minutes)" as normal headers
+    elif re.match(r'^[A-Z][A-Za-z\s]+?\s*\(\d+\s*minutes?\)', header_text):
+        html_lines.append("<br>")  # 1 line above activity header
+        html_lines.append(
+            f"<div style='font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
+        )
+        html_lines.append("<br>")  # 1 line below activity header
+
+    # All other headers
+    else:
+        html_lines.append(
+            f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
+        )
+
+    continue
 
         # BULLET
         if line.startswith("- "):
