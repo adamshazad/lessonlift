@@ -224,6 +224,7 @@ def generate_html_preview(text: str) -> str:
 
     for line in lines:
         line = line.strip()
+
         if not line:
             if in_list:
                 html_lines.append("</ul>")
@@ -231,27 +232,27 @@ def generate_html_preview(text: str) -> str:
             continue
 
         # HEADER
-header_match = re.match(r'@@HEADER@@(.+?)@@', line)
-if header_match:
-    if in_list:
-        html_lines.append("</ul>")
-        in_list = False
+        header_match = re.match(r'@@HEADER@@(.+?)@@', line)
+        if header_match:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
 
-    header_text = header_match.group(1)
+            header_text = header_match.group(1)
 
-    if header_text == "Introduction":
-        html_lines.append("<div style='margin-top:8px; margin-bottom:8px; font-weight:700; font-size:16px; line-height:1.4;'>"
-                          f"{header_text}</div>")
-    else:
-        html_lines.append(
-            f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
-        )
-    continue
+            if header_text == "Introduction":
+                html_lines.append("<div style='margin-top:8px; margin-bottom:8px; font-weight:700; font-size:16px; line-height:1.4;'>"
+                                  f"{header_text}</div>")
+            else:
+                html_lines.append(
+                    f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
+                )
+            continue
 
-        # BULLETS
+        # BULLET
         if line.startswith("- "):
             if not in_list:
-                html_lines.append("<ul style='margin-top:2px; margin-bottom:6px; padding-left:18px;'>")
+                html_lines.append("<ul style='margin-top:0; margin-bottom:0; padding-left:18px;'>")
                 in_list = True
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
@@ -260,7 +261,8 @@ if header_match:
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
+
+        html_lines.append(f"<div style='margin-top:2px; margin-bottom:2px;'>{line}</div>")
 
     if in_list:
         html_lines.append("</ul>")
