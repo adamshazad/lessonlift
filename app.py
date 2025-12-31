@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fixed)
+# App.py - LessonLift with OpenAI 1.0+ integration (Introduction spacing + no duplicate headers)
 # -------------------------------
 
 import os
@@ -53,7 +53,6 @@ body {background-color: white; color: black;}
     margin-top: 2px;
     margin-bottom: 2px;
 }
-
 .metadata-line:last-child {
     margin-bottom: 14px;
 }
@@ -108,7 +107,7 @@ def format_tight_output(text: str) -> str:
         "Introduction", "Warm-Up Activity", "Lesson Outline",
         "Direct Instruction", "Main Activity", "Group Discussion",
         "Closure and Reflection", "Closing Activity", "Differentiation",
-        "Assessment", "Resources", "Conclusion", "closure", "Iteractive Activity",
+        "Assessment", "Resources", "Conclusion", "closure", "Interactive Activity",
         "Guided Practice", "Learning Activities", "Activity 1", "Activity 2",
         "Activity 3", "Activity 4", "Activity 5", "Timings and Activities",
         "Reflection and Assessment"
@@ -128,8 +127,10 @@ def format_tight_output(text: str) -> str:
             last_header = header_match
             if output and output[-1] != "":
                 output.append("")
-            output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")
+            # Prevent consecutive duplicate headers
+            if not output or output[-1] != f"@@HEADER@@{header_match}@@":
+                output.append(f"@@HEADER@@{header_match}@@")
+                output.append("")
             continue
         if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
             output.append(stripped)
@@ -138,7 +139,7 @@ def format_tight_output(text: str) -> str:
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
-            continue  # tight bullets
+            continue
         output.append(stripped)
         output.append("")
     final = []
@@ -214,14 +215,12 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# Helper: HTML preview
+# HTML preview
 # -------------------------------
-
 def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
-
     for line in lines:
         line = line.strip()
         if not line:
@@ -229,28 +228,21 @@ def generate_html_preview(text: str) -> str:
                 html_lines.append("</ul>")
                 in_list = False
             continue
-
         # HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-
             header_text = header_match.group(1)
-
+            # Special spacing for Introduction
             if header_text == "Introduction":
-                # exactly 1 line above
-                html_lines.append("<div style='height:1em;'></div>")
+                html_lines.append("<br>")  # 1 line above
                 html_lines.append(f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>")
-                # exactly 1 line below
-                html_lines.append("<div style='height:1em;'></div>")
+                html_lines.append("<br>")  # 1 line below
             else:
-                html_lines.append(
-                    f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
-                )
+                html_lines.append(f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>")
             continue
-
         # BULLETS
         if line.startswith("- "):
             if not in_list:
@@ -258,16 +250,13 @@ def generate_html_preview(text: str) -> str:
                 in_list = True
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
-
         # PARAGRAPH
         if in_list:
             html_lines.append("</ul>")
             in_list = False
         html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
-
     if in_list:
         html_lines.append("</ul>")
-
     return "\n".join(html_lines)
 
 # -------------------------------
@@ -296,7 +285,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         "- Include timings, detailed activities, differentiation, assessment, and resources.\n"
     )
     prompt_with_req = prompt + generation_instructions
-
     with st.spinner("✨ Creating lesson plan..."):
         try:
             attempts = 0
@@ -321,13 +309,22 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted or ""
 
-            # Cleanup
+            # Cleanup duplicates & formatting
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
             final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
             final_output = final_output.lstrip()
+
+            # Remove consecutive duplicate headers
+            lines = final_output.splitlines()
+            clean_lines = []
+            for i, line in enumerate(lines):
+                if i > 0 and line == lines[i-1] and line.startswith("@@HEADER@@"):
+                    continue
+                clean_lines.append(line)
+            final_output = "\n".join(clean_lines)
 
             final_output_clean = re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', final_output)
             final_output_html = generate_html_preview(final_output)
@@ -371,7 +368,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
             return
 
-    # Save to history
     st.session_state.lesson_history.append({"title": title,"content": final_output})
     if regen_message:
         st.info(f"🔄 {regen_message}")
@@ -383,7 +379,6 @@ def lesson_generator_page():
     show_logo()
     title_and_tagline()
     lesson_data = {}
-
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
