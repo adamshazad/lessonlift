@@ -241,12 +241,13 @@ def generate_html_preview(text: str) -> str:
             header_text = header_match.group(1)
 
             if header_text == "Introduction":
-                html_lines.append("<div style='margin-top:8px; margin-bottom:8px; font-weight:700; font-size:16px; line-height:1.4;'>"
-                                  f"{header_text}</div>")
-            else:
-                html_lines.append(
-                    f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
-                )
+    html_lines.append(
+        f"<div style='margin-top:10px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>"
+    )
+else:
+    html_lines.append(
+        f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
+    )
             continue
 
         # BULLET
