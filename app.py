@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fixed Introduction spacing)
+# App.py - LessonLift with OpenAI 1.0+ integration (updated: intro spacing + mini-title bolding)
 # -------------------------------
 
 import os
@@ -107,10 +107,10 @@ def format_tight_output(text: str) -> str:
         "Introduction", "Warm-Up Activity", "Lesson Outline",
         "Direct Instruction", "Main Activity", "Group Discussion",
         "Closure and Reflection", "Closing Activity", "Differentiation",
-        "Assessment", "Resources", "Conclusion", "closure", "Iteractive Activity",
-        "Guided Practice", "Learning Activities", "Activity 1", "Activity 2",
-        "Activity 3", "Activity 4", "Activity 5", "Timings and Activities",
-        "Reflection and Assessment", "Hands-On Activity"
+        "Assessment", "Resources", "Conclusion", "Exploration of Shapes",
+        "Iteractive Activity", "Guided Practice", "Learning Activities",
+        "Activity 1", "Activity 2", "Activity 3", "Activity 4", "Activity 5",
+        "Timings and Activities", "Reflection and Assessment"
     ]
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
@@ -137,7 +137,7 @@ def format_tight_output(text: str) -> str:
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
-            continue  # tight bullets
+            continue
         output.append(stripped)
         output.append("")
     final = []
@@ -189,7 +189,9 @@ def create_pdf(text):
             story.append(Spacer(1,6))
         else:
             safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-            safe = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', safe)
+            # Make mini-titles bold
+            if re.match(r'^[A-Z][A-Za-z\s]{3,}$', line) and not line.startswith("- "):
+                safe = f"<b>{safe}</b>"
             story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
@@ -198,29 +200,34 @@ def create_pdf(text):
 def create_docx(text):
     doc = Document()
     for line in text.splitlines():
-        header_match = re.match(r'^\*\*(.+)\*\*$', line.strip())
+        stripped = line.strip()
+        # Major headers
+        header_match = re.match(r'^\*\*(.+)\*\*$', stripped)
         if header_match:
             p = doc.add_paragraph()
             run = p.add_run(header_match.group(1))
             run.bold = True
-        elif line.strip() == "":
+        # Mini-titles
+        elif re.match(r'^[A-Z][A-Za-z\s]{3,}$', stripped) and not stripped.startswith("- "):
+            p = doc.add_paragraph()
+            run = p.add_run(stripped)
+            run.bold = True
+        elif stripped == "":
             doc.add_paragraph()
         else:
-            doc.add_paragraph(line.rstrip())
+            doc.add_paragraph(stripped)
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
     return bio
 
 # -------------------------------
-# Helper: HTML preview (fixed Introduction duplicate)
+# HTML preview
 # -------------------------------
 def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
-    added_intro = False  # ✅ prevent duplicate
-
     for line in lines:
         line = line.strip()
         if not line:
@@ -228,48 +235,41 @@ def generate_html_preview(text: str) -> str:
                 html_lines.append("</ul>")
                 in_list = False
             continue
-
-        # HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-
             header_text = header_match.group(1)
-
             if header_text == "Introduction":
-                if not added_intro:
-                    html_lines.append("<br>")  # 1 line above
-                    html_lines.append(f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>")
-                    html_lines.append("<br>")  # 1 line below
-                    added_intro = True
-                continue
-
-            html_lines.append(f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>")
+                html_lines.append("<br>")  # 1 line above
+                html_lines.append(f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>")
+                html_lines.append("<br>")  # 1 line below
+            else:
+                html_lines.append(f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>")
             continue
-
-        # BULLETS
+        # Mini-titles
+        if re.match(r'^[A-Z][A-Za-z\s]{3,}$', line) and not line.startswith("- "):
+            html_lines.append(f"<div style='font-weight:700;'>{line}</div>")
+            continue
+        # Bullet points
         if line.startswith("- "):
             if not in_list:
                 html_lines.append("<ul style='margin-top:2px; margin-bottom:6px; padding-left:18px;'>")
                 in_list = True
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
-
-        # PARAGRAPH
+        # Paragraphs
         if in_list:
             html_lines.append("</ul>")
             in_list = False
         html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
-
     if in_list:
         html_lines.append("</ul>")
-
     return "\n".join(html_lines)
 
 # -------------------------------
-# Generator & display function
+# Generator
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -323,7 +323,6 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
-            final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
             final_output = final_output.lstrip()
 
@@ -380,6 +379,7 @@ def lesson_generator_page():
     show_logo()
     title_and_tagline()
     lesson_data = {}
+
     with st.form("lesson_form"):
         st.subheader("Lesson Details")
         lesson_data['year_group'] = st.selectbox("Year Group", ["Year 1","Year 2","Year 3","Year 4","Year 5","Year 6"])
