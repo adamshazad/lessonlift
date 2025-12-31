@@ -53,6 +53,10 @@ body {background-color: white; color: black;}
     margin-top: 2px;
     margin-bottom: 2px;
 }
+
+.metadata-line:last-child {
+    margin-bottom: 14px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -107,8 +111,7 @@ def format_tight_output(text: str) -> str:
         "Assessment", "Resources", "Conclusion", "closure", "Iteractive Activity",
         "Guided Practice", "Learning Activities", "Activity 1", "Activity 2",
         "Activity 3", "Activity 4", "Activity 5", "Timings and Activities",
-        "Reflection and Assessment","Follow-Up Activities","Extension Activities"
-        
+        "Reflection and Assessment"
     ]
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
@@ -235,8 +238,8 @@ def generate_html_preview(text: str) -> str:
                 in_list = False
             # Add more space after header
             html_lines.append(
-                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.4;'>{header_match.group(1)}</div>"
-            )
+    f"<div style='margin-top:16px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
+)
             continue
 
         # BULLETS
