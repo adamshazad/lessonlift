@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (fixed with subtitle & bold heading handling)
+# App.py - LessonLift with OpenAI 1.0+ integration (fixed)
 # -------------------------------
 
 import os
@@ -53,9 +53,6 @@ body {background-color: white; color: black;}
     margin-top: 2px;
     margin-bottom: 2px;
 }
-.metadata-line:last-child {
-    margin-bottom: 14px;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -107,42 +104,42 @@ def format_tight_output(text: str) -> str:
         "Introduction", "Warm-Up Activity", "Lesson Outline",
         "Direct Instruction", "Main Activity", "Group Discussion",
         "Closure and Reflection", "Closing Activity", "Differentiation",
-        "Assessment", "Resources", "Conclusion", "closure", "Iteractive Activity",
-        "Guided Practice", "Learning Activities", "Activity 1", "Activity 2",
-        "Activity 3", "Activity 4", "Activity 5", "Timings and Activities",
-        "Reflection and Assessment","Follow-Up Activities",
+        "Assessment", "Resources", "Conclusion"
     ]
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
-    seen_headers = set()
+    last_header = None
     for raw in lines:
         stripped = raw.strip()
         if not stripped:
             continue
-
-        stripped = re.sub(r'^[-•*\s]+', '', stripped)
-
-        # Main header
-        header_match = next((h for h in HEADER_KEYWORDS if stripped.lower().startswith(h.lower())), None)
-        if header_match and header_match not in seen_headers:
-            seen_headers.add(header_match)
+        normalised = re.sub(r'^[-•*\s]+', '', stripped)
+        header_match = next((h for h in HEADER_KEYWORDS if normalised.lower().startswith(h.lower())), None)
+        if header_match:
+            if last_header == header_match:
+                continue
+            last_header = header_match
+            if output and output[-1] != "":
+                output.append("")
             output.append(f"@@HEADER@@{header_match}@@")
+            output.append("")
             continue
-
-        # Mini subtitles with timing in brackets (e.g., Shape Hunt (10 minutes))
-        if re.match(r'^[A-Z][A-Za-z\s]+ \(\d+\s*minutes?\)$', stripped):
-            output.append(f"@@HEADER@@{stripped}@@")
-            continue
-
-        # Keep timing-only lines as normal paragraph
-        if re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()) or "Lesson Duration" in stripped:
+        if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
             output.append(stripped)
+            output.append("")
             continue
-
-        # Normal paragraph
+        if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
+            bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
+            output.append(f"- {bullet}")
+            continue  # tight bullets
         output.append(stripped)
-
-    return "\n".join(output)
+        output.append("")
+    final = []
+    for ln in output:
+        if ln == "" and final and final[-1] == "":
+            continue
+        final.append(ln)
+    return "\n".join(final).strip()
 
 def count_words(text: str) -> int:
     if not text:
@@ -210,13 +207,13 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# HTML Preview
+# Helper: HTML preview
 # -------------------------------
+
 def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
-    seen_headers = set()  # To prevent duplicate headers
 
     for line in lines:
         line = line.strip()
@@ -229,28 +226,13 @@ def generate_html_preview(text: str) -> str:
         # HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
-            header_text = header_match.group(1)
-            if header_text in seen_headers:
-                continue
-            seen_headers.add(header_text)
-
-            # Special spacing for Introduction only
-            if header_text == "Introduction":
-                html_lines.append("<br>")  # one line above
-                html_lines.append(
-                    f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>"
-                )
-                html_lines.append("<br>")  # one line below
-            # Main subtitles
-            elif header_text in ["Conclusion", "Differentiation", "Assessment", "Resources"]:
-                html_lines.append(
-                    f"<div style='font-weight:700; font-size:16px; margin-top:6px; margin-bottom:6px; line-height:1.3;'>{header_text}</div>"
-                )
-            # Minor subtitles (like "Shape Hunt (10 minutes)")
-            else:
-                html_lines.append(
-                    f"<div style='font-weight:700; font-size:15px; margin-top:6px; margin-bottom:6px; line-height:1.3;'>{header_text}</div>"
-                )
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            # Add more space after header
+            html_lines.append(
+                f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.4;'>{header_match.group(1)}</div>"
+            )
             continue
 
         # BULLETS
@@ -261,7 +243,7 @@ def generate_html_preview(text: str) -> str:
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
 
-        # PARAGRAPHS
+        # PARAGRAPH
         if in_list:
             html_lines.append("</ul>")
             in_list = False
@@ -271,6 +253,7 @@ def generate_html_preview(text: str) -> str:
         html_lines.append("</ul>")
 
     return "\n".join(html_lines)
+
 # -------------------------------
 # Generator
 # -------------------------------
@@ -322,10 +305,11 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted or ""
 
-            # Cleanup duplicates / unwanted text
+            # Cleanup
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
+            final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
             final_output = final_output.lstrip()
 
