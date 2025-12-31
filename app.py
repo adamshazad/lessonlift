@@ -110,7 +110,7 @@ def format_tight_output(text: str) -> str:
         "Assessment", "Resources", "Conclusion", "closure", "Iteractive Activity",
         "Guided Practice", "Learning Activities", "Activity 1", "Activity 2",
         "Activity 3", "Activity 4", "Activity 5", "Timings and Activities",
-        "Reflection and Assessment"
+        "Reflection and Assessment", "Hands-On Activity"
     ]
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
