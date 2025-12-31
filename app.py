@@ -209,11 +209,15 @@ def create_docx(text):
 def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
+    in_list = False
     seen_headers = set()
 
     for line in lines:
         line = line.strip()
         if not line:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
             continue
 
         # Headers / mini-subtitles
@@ -226,18 +230,34 @@ def generate_html_preview(text: str) -> str:
 
             # Main headers
             if header_text in ["Introduction", "Conclusion", "Differentiation", "Assessment", "Resources"]:
-                html_lines.append("<br>")
-                html_lines.append(f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>")
-                html_lines.append("<br>")
+                html_lines.append(
+                    f"<div style='font-weight:700; font-size:16px; margin-top:6px; margin-bottom:6px; line-height:1.3;'>{header_text}</div>"
+                )
             else:
-                # Mini-subtitles with timing
-                html_lines.append(f"<div style='font-weight:700; font-size:15px; margin-top:6px; margin-bottom:4px; line-height:1.3;'>{header_text}</div>")
+                # Mini-subtitles like "Shape Hunt (10 minutes)"
+                html_lines.append(
+                    f"<div style='font-weight:700; font-size:15px; margin-top:6px; margin-bottom:6px; line-height:1.3;'>{header_text}</div>"
+                )
             continue
 
-        html_lines.append(f"<div style='margin-top:2px; margin-bottom:6px;'>{line}</div>")
+        # BULLETS
+        if line.startswith("- "):
+            if not in_list:
+                html_lines.append("<ul style='margin-top:2px; margin-bottom:6px; padding-left:18px;'>")
+                in_list = True
+            html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
+            continue
+
+        # PARAGRAPH
+        if in_list:
+            html_lines.append("</ul>")
+            in_list = False
+        html_lines.append(f"<div style='margin-top:2px; margin-bottom:2px;'>{line}</div>")
+
+    if in_list:
+        html_lines.append("</ul>")
 
     return "\n".join(html_lines)
-
 # -------------------------------
 # Generator
 # -------------------------------
