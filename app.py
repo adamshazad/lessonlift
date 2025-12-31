@@ -1,3 +1,5 @@
+More near to finsh2 
+
 # -------------------------------
 # App.py - LessonLift with OpenAI 1.0+ integration (fixed)
 # -------------------------------
@@ -224,7 +226,6 @@ def generate_html_preview(text: str) -> str:
 
     for line in lines:
         line = line.strip()
-
         if not line:
             if in_list:
                 html_lines.append("</ul>")
@@ -237,26 +238,16 @@ def generate_html_preview(text: str) -> str:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-
-            header_text = header_match.group(1)
-
-            # Special spacing for Introduction
-            if header_text == "Introduction":
-                html_lines.append("<br>")  # 1 line above
-                html_lines.append(
-                    f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>"
-                )
-                html_lines.append("<br>")  # 1 line below
-            else:
-                html_lines.append(
-                    f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
-                )
+            # Add more space after header
+            html_lines.append(
+    f"<div style='margin-top:16px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
+)
             continue
 
-        # BULLET
+        # BULLETS
         if line.startswith("- "):
             if not in_list:
-                html_lines.append("<ul style='margin-top:0; margin-bottom:0; padding-left:18px;'>")
+                html_lines.append("<ul style='margin-top:2px; margin-bottom:6px; padding-left:18px;'>")
                 in_list = True
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
@@ -265,7 +256,7 @@ def generate_html_preview(text: str) -> str:
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        html_lines.append(f"<div style='margin-top:2px; margin-bottom:2px;'>{line}</div>")
+        html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
 
     if in_list:
         html_lines.append("</ul>")
