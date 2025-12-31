@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (Introduction spacing + no duplicate headers)
+# App.py - LessonLift with OpenAI 1.0+ integration (fixed Introduction spacing)
 # -------------------------------
 
 import os
@@ -107,7 +107,7 @@ def format_tight_output(text: str) -> str:
         "Introduction", "Warm-Up Activity", "Lesson Outline",
         "Direct Instruction", "Main Activity", "Group Discussion",
         "Closure and Reflection", "Closing Activity", "Differentiation",
-        "Assessment", "Resources", "Conclusion", "closure", "Interactive Activity",
+        "Assessment", "Resources", "Conclusion", "closure", "Iteractive Activity",
         "Guided Practice", "Learning Activities", "Activity 1", "Activity 2",
         "Activity 3", "Activity 4", "Activity 5", "Timings and Activities",
         "Reflection and Assessment"
@@ -127,10 +127,8 @@ def format_tight_output(text: str) -> str:
             last_header = header_match
             if output and output[-1] != "":
                 output.append("")
-            # Prevent consecutive duplicate headers
-            if not output or output[-1] != f"@@HEADER@@{header_match}@@":
-                output.append(f"@@HEADER@@{header_match}@@")
-                output.append("")
+            output.append(f"@@HEADER@@{header_match}@@")
+            output.append("")
             continue
         if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
             output.append(stripped)
@@ -139,7 +137,7 @@ def format_tight_output(text: str) -> str:
         if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
             bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
             output.append(f"- {bullet}")
-            continue
+            continue  # tight bullets
         output.append(stripped)
         output.append("")
     final = []
@@ -215,13 +213,13 @@ def create_docx(text):
     return bio
 
 # -------------------------------
-# HTML preview
+# Helper: HTML preview (fixed Introduction duplicate)
 # -------------------------------
 def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
-    added_intro = False  # ✅ track if Introduction header is already added
+    added_intro = False  # ✅ prevent duplicate
 
     for line in lines:
         line = line.strip()
@@ -240,16 +238,14 @@ def generate_html_preview(text: str) -> str:
 
             header_text = header_match.group(1)
 
-            # Special case: Introduction header
             if header_text == "Introduction":
                 if not added_intro:
                     html_lines.append("<br>")  # 1 line above
                     html_lines.append(f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>")
                     html_lines.append("<br>")  # 1 line below
                     added_intro = True
-                continue  # skip any duplicates
+                continue
 
-            # Other headers
             html_lines.append(f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>")
             continue
 
@@ -273,7 +269,7 @@ def generate_html_preview(text: str) -> str:
     return "\n".join(html_lines)
 
 # -------------------------------
-# Generator
+# Generator & display function
 # -------------------------------
 def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_data=None):
     if lesson_data is None:
@@ -298,6 +294,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
         "- Include timings, detailed activities, differentiation, assessment, and resources.\n"
     )
     prompt_with_req = prompt + generation_instructions
+
     with st.spinner("✨ Creating lesson plan..."):
         try:
             attempts = 0
@@ -322,22 +319,13 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted or ""
 
-            # Cleanup duplicates & formatting
+            # Cleanup
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
             final_output = re.sub(r'(?im)^\s*(Introduction\s*)\n\s*\1', r'Introduction', final_output)
             final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
             final_output = final_output.lstrip()
-
-            # Remove consecutive duplicate headers
-            lines = final_output.splitlines()
-            clean_lines = []
-            for i, line in enumerate(lines):
-                if i > 0 and line == lines[i-1] and line.startswith("@@HEADER@@"):
-                    continue
-                clean_lines.append(line)
-            final_output = "\n".join(clean_lines)
 
             final_output_clean = re.sub(r'@@HEADER@@(.+?)@@', r'**\1**', final_output)
             final_output_html = generate_html_preview(final_output)
