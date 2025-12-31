@@ -224,13 +224,14 @@ def generate_html_preview(text: str) -> str:
 
     for line in lines:
         line = line.strip()
+
         if not line:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
             continue
 
-# HEADER
+        # HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             if in_list:
@@ -252,10 +253,10 @@ def generate_html_preview(text: str) -> str:
 
             continue
 
-        # BULLETS
+        # BULLET
         if line.startswith("- "):
             if not in_list:
-                html_lines.append("<ul style='margin-top:2px; margin-bottom:6px; padding-left:18px;'>")
+                html_lines.append("<ul style='margin-top:0; margin-bottom:0; padding-left:18px;'>")
                 in_list = True
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
@@ -264,7 +265,8 @@ def generate_html_preview(text: str) -> str:
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
+
+        html_lines.append(f"<div style='margin-top:2px; margin-bottom:2px;'>{line}</div>")
 
     if in_list:
         html_lines.append("</ul>")
