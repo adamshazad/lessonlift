@@ -1,5 +1,3 @@
-More near to finsh2 
-
 # -------------------------------
 # App.py - LessonLift with OpenAI 1.0+ integration (fixed)
 # -------------------------------
