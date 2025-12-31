@@ -1,5 +1,5 @@
 # -------------------------------
-# App.py - LessonLift with OpenAI 1.0+ integration (updated: intro spacing + mini-title bolding)
+# App.py - LessonLift with OpenAI 1.0+ integration (fixed with subtitle & bold heading handling)
 # -------------------------------
 
 import os
@@ -104,48 +104,39 @@ def format_tight_output(text: str) -> str:
     if not text:
         return ""
     HEADER_KEYWORDS = [
-        "Introduction", "Warm-Up Activity", "Lesson Outline",
-        "Direct Instruction", "Main Activity", "Group Discussion",
-        "Closure and Reflection", "Closing Activity", "Differentiation",
-        "Assessment", "Resources", "Conclusion", "Exploration of Shapes",
-        "Iteractive Activity", "Guided Practice", "Learning Activities",
-        "Activity 1", "Activity 2", "Activity 3", "Activity 4", "Activity 5",
-        "Timings and Activities", "Reflection and Assessment"
+        "Introduction", "Conclusion", "Differentiation", "Assessment", "Resources"
     ]
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
-    last_header = None
+    seen_headers = set()
     for raw in lines:
         stripped = raw.strip()
         if not stripped:
             continue
-        normalised = re.sub(r'^[-•*\s]+', '', stripped)
-        header_match = next((h for h in HEADER_KEYWORDS if normalised.lower().startswith(h.lower())), None)
-        if header_match:
-            if last_header == header_match:
-                continue
-            last_header = header_match
-            if output and output[-1] != "":
-                output.append("")
+
+        stripped = re.sub(r'^[-•*\s]+', '', stripped)
+
+        # Main header
+        header_match = next((h for h in HEADER_KEYWORDS if stripped.lower().startswith(h.lower())), None)
+        if header_match and header_match not in seen_headers:
+            seen_headers.add(header_match)
             output.append(f"@@HEADER@@{header_match}@@")
-            output.append("")
             continue
-        if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
+
+        # Mini subtitles with timing in brackets (e.g., Shape Hunt (10 minutes))
+        if re.match(r'^[A-Z][A-Za-z\s]+ \(\d+\s*minutes?\)$', stripped):
+            output.append(f"@@HEADER@@{stripped}@@")
+            continue
+
+        # Keep timing-only lines as normal paragraph
+        if re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()) or "Lesson Duration" in stripped:
             output.append(stripped)
-            output.append("")
             continue
-        if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
-            bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
-            output.append(f"- {bullet}")
-            continue
+
+        # Normal paragraph
         output.append(stripped)
-        output.append("")
-    final = []
-    for ln in output:
-        if ln == "" and final and final[-1] == "":
-            continue
-        final.append(ln)
-    return "\n".join(final).strip()
+
+    return "\n".join(output)
 
 def count_words(text: str) -> int:
     if not text:
@@ -189,9 +180,7 @@ def create_pdf(text):
             story.append(Spacer(1,6))
         else:
             safe = line.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-            # Make mini-titles bold
-            if re.match(r'^[A-Z][A-Za-z\s]{3,}$', line) and not line.startswith("- "):
-                safe = f"<b>{safe}</b>"
+            safe = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', safe)
             story.append(Paragraph(safe, normal))
     doc.build(story)
     buffer.seek(0)
@@ -200,87 +189,52 @@ def create_pdf(text):
 def create_docx(text):
     doc = Document()
     for line in text.splitlines():
-        stripped = line.strip()
-        # Major headers
-        header_match = re.match(r'^\*\*(.+)\*\*$', stripped)
+        header_match = re.match(r'^\*\*(.+)\*\*$', line.strip())
         if header_match:
             p = doc.add_paragraph()
             run = p.add_run(header_match.group(1))
             run.bold = True
-        # Mini-titles
-        elif re.match(r'^[A-Z][A-Za-z\s]{3,}$', stripped) and not stripped.startswith("- "):
-            p = doc.add_paragraph()
-            run = p.add_run(stripped)
-            run.bold = True
-        elif stripped == "":
+        elif line.strip() == "":
             doc.add_paragraph()
         else:
-            doc.add_paragraph(stripped)
+            doc.add_paragraph(line.rstrip())
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
     return bio
 
 # -------------------------------
-# HTML preview
+# HTML Preview
 # -------------------------------
-
 def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
-    in_list = False
-    seen_headers = set()  # avoid duplicates
+    seen_headers = set()
 
     for line in lines:
         line = line.strip()
         if not line:
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
             continue
 
-        # MAIN HEADER
+        # Headers / mini-subtitles
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             header_text = header_match.group(1)
             if header_text in seen_headers:
-                continue  # skip duplicate
+                continue
             seen_headers.add(header_text)
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
 
-            if header_text == "Introduction" or header_text == "Conclusion":
-                # Main header spacing
-                html_lines.append("<br>")  # 1 line above
+            # Main headers
+            if header_text in ["Introduction", "Conclusion", "Differentiation", "Assessment", "Resources"]:
+                html_lines.append("<br>")
                 html_lines.append(f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>")
-                html_lines.append("<br>")  # 1 line below
+                html_lines.append("<br>")
             else:
-                # Mini-titles spacing
-                html_lines.append(f"<div style='font-weight:700; font-size:15px; margin-top:8px; margin-bottom:6px; line-height:1.3;'>{header_text}</div>")
+                # Mini-subtitles with timing
+                html_lines.append(f"<div style='font-weight:700; font-size:15px; margin-top:6px; margin-bottom:4px; line-height:1.3;'>{header_text}</div>")
             continue
 
-        # BULLETS
-        if line.startswith("- "):
-            if not in_list:
-                html_lines.append("<ul style='margin-top:2px; margin-bottom:6px; padding-left:18px;'>")
-                in_list = True
-            html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
-            continue
-
-        # MINI-TITLE (lines that look like a subtitle but are not bullets)
-        if re.match(r'^[A-Z][A-Za-z0-9\s\(\):,-]+$', line) and not line.startswith("- "):
-            html_lines.append(f"<div style='font-weight:700; font-size:15px; margin-top:6px; margin-bottom:4px;'>{line}</div>")
-            continue
-
-        # PARAGRAPHS
-        if in_list:
-            html_lines.append("</ul>")
-            in_list = False
         html_lines.append(f"<div style='margin-top:2px; margin-bottom:6px;'>{line}</div>")
-
-    if in_list:
-        html_lines.append("</ul>")
 
     return "\n".join(html_lines)
 
@@ -335,7 +289,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             if final_output is None:
                 final_output = formatted or ""
 
-            # Cleanup
+            # Cleanup duplicates / unwanted text
             final_output = re.sub(r'(?im)^\s*(lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)^\s*(year\s*\d+\s*.*lesson\s*plan[:\-]?.*)\s*$', '', final_output)
             final_output = re.sub(r'(?im)(^\s*Learning\s*Objective\s*\n\s*)+', 'Learning Objective\n\n', final_output)
@@ -384,6 +338,7 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             st.error(f"⚠️ Lesson plan could not be generated: {e}")
             return
 
+    # Save to history
     st.session_state.lesson_history.append({"title": title,"content": final_output})
     if regen_message:
         st.info(f"🔄 {regen_message}")
