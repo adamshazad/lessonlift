@@ -224,10 +224,12 @@ def create_docx(text):
 # -------------------------------
 # HTML preview
 # -------------------------------
+
 def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
+
     for line in lines:
         line = line.strip()
         if not line:
@@ -235,6 +237,8 @@ def generate_html_preview(text: str) -> str:
                 html_lines.append("</ul>")
                 in_list = False
             continue
+
+        # MAIN HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             if in_list:
@@ -248,24 +252,29 @@ def generate_html_preview(text: str) -> str:
             else:
                 html_lines.append(f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>")
             continue
-        # Mini-titles
-        if re.match(r'^[A-Z][A-Za-z\s]{3,}$', line) and not line.startswith("- "):
-            html_lines.append(f"<div style='font-weight:700;'>{line}</div>")
-            continue
-        # Bullet points
+
+        # BULLETS
         if line.startswith("- "):
             if not in_list:
                 html_lines.append("<ul style='margin-top:2px; margin-bottom:6px; padding-left:18px;'>")
                 in_list = True
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
-        # Paragraphs
+
+        # MINI-TITLES (anything starting with capital letter, maybe with colon or parentheses, not bullet)
+        if re.match(r'^[A-Z][A-Za-z\s0-9\(\):]+$', line) and not line.startswith("- "):
+            html_lines.append(f"<div style='font-weight:700; margin-top:6px; margin-bottom:4px;'>{line}</div>")
+            continue
+
+        # PARAGRAPHS
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
+        html_lines.append(f"<div style='margin-top:2px; margin-bottom:6px;'>{line}</div>")
+
     if in_list:
         html_lines.append("</ul>")
+
     return "\n".join(html_lines)
 
 # -------------------------------
