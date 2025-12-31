@@ -230,17 +230,27 @@ def generate_html_preview(text: str) -> str:
                 in_list = False
             continue
 
-        # HEADER
-        header_match = re.match(r'@@HEADER@@(.+?)@@', line)
-        if header_match:
-            if in_list:
-                html_lines.append("</ul>")
-                in_list = False
-            # Add more space after header
-            html_lines.append(
-    f"<div style='margin-top:16px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
-)
-            continue
+# HEADER
+header_match = re.match(r'@@HEADER@@(.+?)@@', line)
+if header_match:
+    if in_list:
+        html_lines.append("</ul>")
+        in_list = False
+
+    header_text = header_match.group(1)
+
+    if header_text == "Introduction":
+        html_lines.append("<br>")  # 1 full line ABOVE
+        html_lines.append(
+            f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>"
+        )
+        html_lines.append("<br>")  # 1 full line BELOW
+    else:
+        html_lines.append(
+            f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
+        )
+
+    continue
 
         # BULLETS
         if line.startswith("- "):
