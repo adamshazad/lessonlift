@@ -229,6 +229,7 @@ def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
+    seen_headers = set()  # avoid duplicates
 
     for line in lines:
         line = line.strip()
@@ -241,16 +242,22 @@ def generate_html_preview(text: str) -> str:
         # MAIN HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
+            header_text = header_match.group(1)
+            if header_text in seen_headers:
+                continue  # skip duplicate
+            seen_headers.add(header_text)
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-            header_text = header_match.group(1)
-            if header_text == "Introduction":
+
+            if header_text == "Introduction" or header_text == "Conclusion":
+                # Main header spacing
                 html_lines.append("<br>")  # 1 line above
                 html_lines.append(f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>")
                 html_lines.append("<br>")  # 1 line below
             else:
-                html_lines.append(f"<div style='margin-top:12px; margin-bottom:6px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>")
+                # Mini-titles spacing
+                html_lines.append(f"<div style='font-weight:700; font-size:15px; margin-top:8px; margin-bottom:6px; line-height:1.3;'>{header_text}</div>")
             continue
 
         # BULLETS
@@ -261,9 +268,9 @@ def generate_html_preview(text: str) -> str:
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
 
-        # MINI-TITLES (anything starting with capital letter, maybe with colon or parentheses, not bullet)
-        if re.match(r'^[A-Z][A-Za-z\s0-9\(\):]+$', line) and not line.startswith("- "):
-            html_lines.append(f"<div style='font-weight:700; margin-top:6px; margin-bottom:4px;'>{line}</div>")
+        # MINI-TITLE (lines that look like a subtitle but are not bullets)
+        if re.match(r'^[A-Z][A-Za-z0-9\s\(\):,-]+$', line) and not line.startswith("- "):
+            html_lines.append(f"<div style='font-weight:700; font-size:15px; margin-top:6px; margin-bottom:4px;'>{line}</div>")
             continue
 
         # PARAGRAPHS
