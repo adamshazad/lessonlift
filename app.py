@@ -210,7 +210,7 @@ def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
-    seen_headers = set()
+    seen_headers = set()  # To prevent duplicate headers
 
     for line in lines:
         line = line.strip()
@@ -220,7 +220,7 @@ def generate_html_preview(text: str) -> str:
                 in_list = False
             continue
 
-        # Headers / mini-subtitles
+        # HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             header_text = header_match.group(1)
@@ -228,13 +228,20 @@ def generate_html_preview(text: str) -> str:
                 continue
             seen_headers.add(header_text)
 
-            # Main headers
-            if header_text in ["Introduction", "Conclusion", "Differentiation", "Assessment", "Resources"]:
+            # Special spacing for Introduction only
+            if header_text == "Introduction":
+                html_lines.append("<br>")  # one line above
+                html_lines.append(
+                    f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>"
+                )
+                html_lines.append("<br>")  # one line below
+            # Main subtitles
+            elif header_text in ["Conclusion", "Differentiation", "Assessment", "Resources"]:
                 html_lines.append(
                     f"<div style='font-weight:700; font-size:16px; margin-top:6px; margin-bottom:6px; line-height:1.3;'>{header_text}</div>"
                 )
+            # Minor subtitles (like "Shape Hunt (10 minutes)")
             else:
-                # Mini-subtitles like "Shape Hunt (10 minutes)"
                 html_lines.append(
                     f"<div style='font-weight:700; font-size:15px; margin-top:6px; margin-bottom:6px; line-height:1.3;'>{header_text}</div>"
                 )
@@ -248,11 +255,11 @@ def generate_html_preview(text: str) -> str:
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
 
-        # PARAGRAPH
+        # PARAGRAPHS
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        html_lines.append(f"<div style='margin-top:2px; margin-bottom:2px;'>{line}</div>")
+        html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
 
     if in_list:
         html_lines.append("</ul>")
