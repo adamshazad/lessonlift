@@ -321,16 +321,17 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
     min_words = duration_map.get(lesson_data.get('lesson_duration','30 min'),750)
     st.info(f"📊 {st.session_state.lesson_count}/{daily_limit} used — {daily_limit - st.session_state.lesson_count} left")
     generation_instructions = (
-        "\n\nImportant instructions for generation (must follow exactly):\n"
-        "- Use British English only.\n"
-        "- Do NOT include emojis.\n"
-        "- Do NOT output internal lesson titles or metadata fields.\n"
-        "- Start the content with the first section header.\n"
-        "- Format headings as a single line header, followed by one blank line, then '-' bullet points or tight paragraph lines.\n"
-        "- Collapse extra blank lines so there is at most one blank line between sections.\n"
-        f"- Minimum length: {min_words} words. Maximum length: 1000 words.\n"
-        "- Include timings, detailed activities, differentiation, assessment, and resources.\n"
-    )
+    "\n\nImportant instructions for generation (must follow exactly):\n"
+    "- Use British English only.\n"
+    "- Do NOT include emojis.\n"
+    "- Do NOT output internal lesson titles or metadata fields.\n"
+    "- Start the content with the first section header.\n"
+    "- Format headings as a single line header, followed by one blank line, then '-' bullet points or tight paragraph lines.\n"
+    "- Collapse extra blank lines so there is at most one blank line between sections.\n"
+    "- Each section must include 4–6 bullet points, each bullet written as a complete sentence with clear instructional detail.\n"
+    f"- Minimum length: {min_words} words. Maximum length: 1000 words.\n"
+    "- Include timings, detailed activities, differentiation, assessment, and resources.\n"
+)
     prompt_with_req = prompt + generation_instructions
 
     with st.spinner("✨ Creating lesson plan..."):
