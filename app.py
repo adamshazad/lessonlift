@@ -233,13 +233,30 @@ def generate_html_preview(text: str) -> str:
         # HEADER
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
+            header_text = header_match.group(1)
+
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-            # Add more space after header
-            html_lines.append(
-    f"<div style='margin-top:26px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
-)
+
+            # Rename first Introduction and Conclusion
+            if header_text == "Introduction":
+                header_text = "Introduction to the Lesson"
+                html_lines.append("<br>")  # Keep existing spacing above
+                html_lines.append(
+                    f"<div style='font-weight:700; font-size:16px; line-height:1.4;'>{header_text}</div>"
+                )
+                html_lines.append("<br>")  # Keep existing spacing below
+            elif header_text == "Conclusion":
+                header_text = "Conclusion to the Session"
+                html_lines.append(
+                    f"<div style='margin-top:26px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
+                )
+            else:
+                html_lines.append(
+                    f"<div style='margin-top:26px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_text}</div>"
+                )
+
             continue
 
         # BULLETS
@@ -250,7 +267,7 @@ def generate_html_preview(text: str) -> str:
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
 
-        # PARAGRAPH
+        # PARAGRAPHS
         if in_list:
             html_lines.append("</ul>")
             in_list = False
