@@ -106,8 +106,8 @@ def format_tight_output(text: str) -> str:
         return ""
     HEADER_KEYWORDS = [
     "Introduction", "Warm-Up Activity", "Starter Activity", "Hook", "Engagement Activity",
-    "Lesson Outline", "Lesson Plan", "Lesson Structure", "Lesson Flow", "Timing",
-    "Time Allocation", "Direct Instruction", "Main Activity", "Guided Practice",
+    "Lesson Outline", "Lesson Plan", "Lesson Structure", "Lesson Flow", 
+    "Direct Instruction", "Main Activity", "Guided Practice",
     "Independent Work", "Pair Work", "Collaborative Task", "Group Work", "Group Discussion",
     "Practical Activity", "Hands-On Activity", "Interactive Session", "Interactive Activity",
     "Activity 1", "Activity 2", "Activity 3", "Activity 4", "Activity 5", "Step-by-Step Activity",
@@ -156,7 +156,7 @@ def format_tight_output(text: str) -> str:
     "Lesson Plan Overview", "Session Overview", "Activity Overview", "Lesson Brief",
     "Session Brief", "Learning Brief", "Teaching Brief", "Instruction Brief", "Notes for Teacher",
     "Teacher Guidance", "Student Instructions", "Student Guidance", "Lesson Notes Summary",
-    "Activity Notes", "Learning Notes Summary"
+    "Activity Notes", "Learning Notes Summary", "Conclusion and Reflection"
 ]
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
