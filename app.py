@@ -267,7 +267,7 @@ def generate_html_preview(text: str) -> str:
             html_lines.append(f"<li style='margin-bottom:2px;'>{line[2:]}</li>")
             continue
 
-        # PARAGRAPHS
+        # PARAGRAPH
         if in_list:
             html_lines.append("</ul>")
             in_list = False
