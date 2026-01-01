@@ -238,7 +238,7 @@ def generate_html_preview(text: str) -> str:
                 in_list = False
             # Add more space after header
             html_lines.append(
-    f"<div style='margin-top:16px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
+    f"<div style='margin-top:26px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
 )
             continue
 
