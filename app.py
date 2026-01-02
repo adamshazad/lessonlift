@@ -262,15 +262,20 @@ def create_docx(text):
 import re
 
 # -------------------------------
-# Helper: HTML preview (updated)
+# Helper: HTML preview & download
 # -------------------------------
 
-def generate_html_preview(text: str) -> str:
+def generate_html(text: str) -> str:
+    """
+    Converts raw text into HTML suitable for both preview and download.
+    Section titles like 'Introduction', 'Learning Objective', 'Evaluation', and 'Conclusion'
+    are automatically bolded using <strong> to ensure bold appears everywhere.
+    """
     lines = text.splitlines()
     html_lines = []
     in_list = False
 
-    # Define section titles that should always be bold
+    # Section titles to bold
     section_titles = ["introduction", "learning objective", "evaluation", "conclusion"]
 
     for line in lines:
@@ -288,7 +293,7 @@ def generate_html_preview(text: str) -> str:
                 html_lines.append("</ul>")
                 in_list = False
             html_lines.append(
-                f"<div style='margin-top:26px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
+                f"<div style='margin-top:26px; margin-bottom:10px; font-size:16px; line-height:1.3;'><strong>{header_match.group(1)}</strong></div>"
             )
             continue
 
@@ -305,9 +310,9 @@ def generate_html_preview(text: str) -> str:
             html_lines.append("</ul>")
             in_list = False
 
-        # Automatically bold section titles
+        # Bold section titles
         if line.lower() in section_titles:
-            html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px; font-weight:700;'>{line}</div>")
+            html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'><strong>{line}</strong></div>")
         else:
             html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
 
