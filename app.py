@@ -157,6 +157,7 @@ def format_tight_output(text: str) -> str:
     "Session Brief", "Learning Brief", "Teaching Brief", "Instruction Brief", "Notes for Teacher",
     "Teacher Guidance", "Student Instructions", "Student Guidance", "Lesson Notes Summary",
     "Activity Notes", "Learning Notes Summary", "Conclusion and Reflection", "Timings and Activities"
+    "Conclusion"
 ]
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
