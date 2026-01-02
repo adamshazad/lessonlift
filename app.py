@@ -157,7 +157,6 @@ def format_tight_output(text: str) -> str:
     "Session Brief", "Learning Brief", "Teaching Brief", "Instruction Brief", "Notes for Teacher",
     "Teacher Guidance", "Student Instructions", "Student Guidance", "Lesson Notes Summary",
     "Activity Notes", "Learning Notes Summary", "Conclusion and Reflection", "Timings and Activities"
-    "Conclusion"
 ]
     lines = [l.rstrip() for l in text.splitlines()]
     output = []
@@ -167,11 +166,7 @@ def format_tight_output(text: str) -> str:
         if not stripped:
             continue
         normalised = re.sub(r'^[-•*\s]+', '', stripped)
-        header_match = next(
-    (h for h in HEADER_KEYWORDS
-     if re.match(rf'^{re.escape(h.lower())}[\s:\-–—]*$', normalised.lower())),
-    None
-)
+        header_match = next((h for h in HEADER_KEYWORDS if normalised.lower().startswith(h.lower())), None)
         if header_match:
             if last_header == header_match:
                 continue
