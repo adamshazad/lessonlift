@@ -175,7 +175,7 @@ def create_docx(text):
 # HTML generator (replaces generate_html_preview)
 # -------------------------------
 
-def generate_html_preview(text: str) -> str:
+def generate_html(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
