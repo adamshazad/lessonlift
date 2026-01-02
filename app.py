@@ -262,13 +262,13 @@ def create_docx(text):
 import re
 
 # -------------------------------
-# Helper: HTML preview & download
+# Helper: HTML generator for preview & download
 # -------------------------------
 
 def generate_html(text: str) -> str:
     """
-    Converts raw text into HTML suitable for both preview and download.
-    Section titles like 'Introduction', 'Learning Objective', 'Evaluation', and 'Conclusion'
+    Converts raw lesson plan text into HTML for preview and download.
+    Section titles like 'Introduction', 'Learning Objective', 'Evaluation', 'Conclusion'
     are automatically bolded using <strong> to ensure bold appears everywhere.
     """
     lines = text.splitlines()
