@@ -264,7 +264,6 @@ import re
 # -------------------------------
 # Helper: HTML generator for preview & download
 # -------------------------------
-
 def generate_html(text: str) -> str:
     """
     Converts raw lesson plan text into HTML for preview and download.
@@ -320,6 +319,29 @@ def generate_html(text: str) -> str:
         html_lines.append("</ul>")
 
     return "\n".join(html_lines)
+
+
+# -------------------------------
+# Example usage for preview & download
+# -------------------------------
+generated_text = """
+Introduction
+- Students will learn about shapes
+Learning Objective
+- Identify squares and triangles
+Conclusion
+- Students can recognize shapes in the environment
+"""
+
+# Preview HTML
+preview_html = generate_html(generated_text)
+print("=== Preview HTML ===")
+print(preview_html)
+
+# Download HTML
+download_html = generate_html(generated_text)
+print("=== Download HTML ===")
+print(download_html)
 
 # -------------------------------
 # Generator
