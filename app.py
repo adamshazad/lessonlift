@@ -174,11 +174,12 @@ def create_docx(text):
 # -------------------------------
 # HTML generator (replaces generate_html_preview)
 # -------------------------------
+
 def generate_html(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
-    section_titles = ["introduction", "learning objective", "evaluation", "conclusion"]
+    section_keywords = ["introduction", "learning objective", "evaluation", "conclusion"]
 
     for line in lines:
         line = line.strip()
@@ -188,7 +189,7 @@ def generate_html(text: str) -> str:
                 in_list = False
             continue
 
-        # HEADER
+        # HEADER (existing @@HEADER@@ system)
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             if in_list:
@@ -211,8 +212,9 @@ def generate_html(text: str) -> str:
             html_lines.append("</ul>")
             in_list = False
 
-        # Bold section titles
-        if line.lower() in section_titles:
+        # Bold lines that START with a section keyword
+        lower_line = line.lower()
+        if any(lower_line.startswith(k) for k in section_keywords):
             html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'><strong>{line}</strong></div>")
         else:
             html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
