@@ -259,14 +259,19 @@ def create_docx(text):
     bio.seek(0)
     return bio
 
+import re
+
 # -------------------------------
-# Helper: HTML preview
+# Helper: HTML preview (updated)
 # -------------------------------
 
 def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
+
+    # Define section titles that should always be bold
+    section_titles = ["introduction", "learning objective", "evaluation", "conclusion"]
 
     for line in lines:
         line = line.strip()
@@ -276,16 +281,15 @@ def generate_html_preview(text: str) -> str:
                 in_list = False
             continue
 
-        # HEADER
+        # HEADER (existing @@HEADER@@ system)
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
-            # Add more space after header
             html_lines.append(
-    f"<div style='margin-top:26px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
-)
+                f"<div style='margin-top:26px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
+            )
             continue
 
         # BULLETS
@@ -300,7 +304,12 @@ def generate_html_preview(text: str) -> str:
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
+
+        # Automatically bold section titles
+        if line.lower() in section_titles:
+            html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px; font-weight:700;'>{line}</div>")
+        else:
+            html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
 
     if in_list:
         html_lines.append("</ul>")
