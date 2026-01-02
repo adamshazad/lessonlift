@@ -102,8 +102,97 @@ def clean_markdown(text) -> str:
     return "\n".join([line.rstrip() for line in text.splitlines()]).strip()
 
 def format_tight_output(text: str) -> str:
-    # Same as your existing format_tight_output function
-    # (kept as is for tight formatting)
+     if not text:
+        return ""
+    HEADER_KEYWORDS = [
+    "Introduction", "Warm-Up Activity", "Starter Activity", "Hook", "Engagement Activity",
+    "Lesson Outline", "Lesson Plan", "Lesson Structure", "Lesson Flow", 
+    "Direct Instruction", "Main Activity", "Guided Practice",
+    "Independent Work", "Pair Work", "Collaborative Task", "Group Work", "Group Discussion",
+    "Practical Activity", "Hands-On Activity", "Interactive Session", "Interactive Activity",
+    "Activity 1", "Activity 2", "Activity 3", "Activity 4", "Activity 5", "Step-by-Step Activity",
+    "Task Instructions", "Learning Activities", "Activities", "Activity Overview",
+    "Lesson Goals", "Learning Objective", "Learning Objectives", "Objectives",
+    "Success Criteria", "Key Points", "Main Points", "Learning Points", "Notes",
+    "Check Understanding", "Question and Answer", "Q&A", "Discussion", "Feedback",
+    "Peer Assessment", "Self-Assessment", "Assessment", "Assessment Task",
+    "Reflection and Assessment", "Consolidation and Assessment", "Closure", 
+    "Closure and Reflection", "Closing Activity", "Closing Remarks", "Plenary", "Recap",
+    "Review", "Summary", "Lesson Summary", "Exit Ticket", "Next Steps",
+    "Differentiation", "Extension Activity", "Extra Challenge", "Follow-Up Activity",
+    "Homework", "Resources", "Materials Needed", "Equipment", "Instructions",
+    "Practice", "Skill Practice", "Guided Activities", "Independent Activities",
+    "Pair Activities", "Group Activities", "Collaborative Activities",
+    "Interactive Learning", "Engagement Task", "Starter Task", "Introduction Task",
+    "Lesson Introduction", "Activity Instructions", "Learning Task", "Task Overview",
+    "Learning Session", "Instructional Activity", "Teaching Points", "Lesson Points",
+    "Lesson Notes", "Learning Notes", "Lesson Content", "Content Overview",
+    "Content Summary", "Lesson Recap", "Activity Recap", "Session Recap",
+    "Session Summary", "Learning Recap", "Learning Reflection", "Reflection",
+    "Student Reflection", "Teacher Reflection", "Guided Session", "Structured Activity",
+    "Independent Session", "Group Session", "Collaborative Session", "Practical Session",
+    "Interactive Practice", "Interactive Task", "Task Practice", "Skill Task",
+    "Learning Practice", "Review Activity", "Lesson Review", "Activity Review",
+    "Formative Assessment", "Summative Assessment", "Evaluation", "Assessment Overview",
+    "Assessment Notes", "Lesson Evaluation", "Task Evaluation", "Student Evaluation",
+    "Observation Notes", "Observation Activity", "Learning Evidence", "Learning Outcomes",
+    "Lesson Outcomes", "Activity Outcomes", "Achievement Criteria", "Success Indicators",
+    "Starter Discussion", "Engagement Discussion", "Introduction Discussion",
+    "Closing Discussion", "Main Discussion", "Group Reflection", "Class Discussion",
+    "Exit Reflection", "Session Closure", "Session Conclusion", "Lesson Closure",
+    "Interactive Exercise", "Exercise 1", "Exercise 2", "Exercise 3", "Exercise 4",
+    "Exercise 5", "Hands-On Exercise", "Practical Exercise", "Task Exercise", "Learning Exercise",
+    "Guided Exercise", "Independent Exercise", "Collaborative Exercise", "Pair Exercise",
+    "Assessment Exercise", "Follow-Up Exercise", "Extension Exercise", "Extra Exercise",
+    "Starter Exercise", "Closure Exercise", "Engagement Exercise", "Recap Exercise",
+    "Review Exercise", "Reflection Exercise", "Plenary Exercise", "Exit Exercise",
+    "Lesson Activity", "Lesson Task", "Activity Task", "Teaching Activity", "Learning Activity",
+    "Instruction Activity", "Interactive Lesson", "Session Activity", "Lesson Interaction",
+    "Teaching Session", "Learning Session", "Student Activity", "Student Task", "Student Exercise",
+    "Pair Activity", "Pair Task", "Group Task", "Group Exercise", "Collaborative Task",
+    "Collaborative Exercise", "Independent Task", "Independent Exercise", "Practice Task",
+    "Skill Development", "Skill Building", "Knowledge Check", "Understanding Check",
+    "Comprehension Activity", "Skill Assessment", "Knowledge Assessment", "Learning Assessment",
+    "Lesson Plan Overview", "Session Overview", "Activity Overview", "Lesson Brief",
+    "Session Brief", "Learning Brief", "Teaching Brief", "Instruction Brief", "Notes for Teacher",
+    "Teacher Guidance", "Student Instructions", "Student Guidance", "Lesson Notes Summary",
+    "Activity Notes", "Learning Notes Summary", "Conclusion and Reflection", "Timings and Activities"
+]
+    lines = [l.rstrip() for l in text.splitlines()]
+    output = []
+    last_header = None
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        normalised = re.sub(r'^[-•*\s]+', '', stripped)
+        header_match = next((h for h in HEADER_KEYWORDS if normalised.lower().startswith(h.lower())), None)
+        if header_match:
+            if last_header == header_match:
+                continue
+            last_header = header_match
+            if output and output[-1] != "":
+                output.append("")
+            output.append(f"@@HEADER@@{header_match}@@")
+            output.append("")
+            continue
+        if stripped.lower().startswith("timing") or re.match(r'^\d{1,2}-\d{1,2}\s*minutes?:', stripped.lower()):
+            output.append(stripped)
+            output.append("")
+            continue
+        if stripped.startswith(("-", "•", "*")) or re.match(r'^\d+[\.\)]', stripped):
+            bullet = re.sub(r'^[-•*\d\.\)\s]+', '', stripped)
+            output.append(f"- {bullet}")
+            continue  # tight bullets
+        output.append(stripped)
+        output.append("")
+    final = []
+    for ln in output:
+        if ln == "" and final and final[-1] == "":
+            continue
+        final.append(ln)
+    return "\n".join(final).strip()
+
     return text
 
 def count_words(text: str) -> int:
