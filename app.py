@@ -175,11 +175,13 @@ def create_docx(text):
 # HTML generator (replaces generate_html_preview)
 # -------------------------------
 
-def generate_html(text: str) -> str:
+def generate_html_preview(text: str) -> str:
     lines = text.splitlines()
     html_lines = []
     in_list = False
-    section_keywords = ["introduction", "learning objective", "evaluation", "conclusion"]
+
+    # Keywords to auto-bold even if not @@HEADER@@
+    AUTO_BOLD_KEYWORDS = ["Introduction", "Learning Objective", "Evaluation", "Conclusion"]
 
     for line in lines:
         line = line.strip()
@@ -189,14 +191,14 @@ def generate_html(text: str) -> str:
                 in_list = False
             continue
 
-        # HEADER (existing @@HEADER@@ system)
+        # HEADER from @@HEADER@@
         header_match = re.match(r'@@HEADER@@(.+?)@@', line)
         if header_match:
             if in_list:
                 html_lines.append("</ul>")
                 in_list = False
             html_lines.append(
-                f"<div style='margin-top:26px; margin-bottom:10px; font-size:16px; line-height:1.3;'><strong>{header_match.group(1)}</strong></div>"
+                f"<div style='margin-top:26px; margin-bottom:10px; font-weight:700; font-size:16px; line-height:1.3;'>{header_match.group(1)}</div>"
             )
             continue
 
@@ -212,10 +214,9 @@ def generate_html(text: str) -> str:
             html_lines.append("</ul>")
             in_list = False
 
-        # Bold lines that START with a section keyword
-        lower_line = line.lower()
-        if any(lower_line.startswith(k) for k in section_keywords):
-            html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'><strong>{line}</strong></div>")
+        # AUTO-BOLD certain keywords at start of line
+        if any(line.lower().startswith(k.lower()) for k in AUTO_BOLD_KEYWORDS):
+            html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px; font-weight:700;'>{line}</div>")
         else:
             html_lines.append(f"<div style='margin-top:4px; margin-bottom:6px;'>{line}</div>")
 
