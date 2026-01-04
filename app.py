@@ -2,20 +2,55 @@
 # App.py - LessonLift with OpenAI 1.0+ integration (fixed)
 # -------------------------------
 
-import streamlit as st
-st.write(st.session_state)
 import os
-import streamlit as st
 import re
 import base64
+import datetime
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
-import datetime
 import openai
+import streamlit as st
+
+# -------------------------------
+# Session state setup
+# -------------------------------
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+
+if 'current_page' not in st.session_state:
+    st.session_state['current_page'] = 'login'
+
+# -------------------------------
+# Page control
+# -------------------------------
+def show_login_page():
+    st.title("Login")
+    # Your login form here
+    # Example: login button sets logged_in True
+    if st.button("Login via Bolt"):
+        st.session_state['logged_in'] = True
+        st.session_state['current_page'] = 'generator'
+
+def show_generator_page():
+    st.title("LessonLift Generator")
+    st.write("Welcome to LessonLift!")
+
+# -------------------------------
+# Main page logic
+# -------------------------------
+if st.session_state['logged_in']:
+    st.session_state['current_page'] = 'generator'
+
+page = st.session_state.get('current_page', 'login')
+
+if page == 'login':
+    show_login_page()
+elif page == 'generator':
+    show_generator_page()
 
 # -------------------------------
 # Page config
