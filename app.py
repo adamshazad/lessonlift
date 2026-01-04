@@ -2,6 +2,8 @@
 # App.py - LessonLift with OpenAI 1.0+ integration (fixed)
 # -------------------------------
 
+import streamlit as st
+st.write(st.session_state)
 import os
 import streamlit as st
 import re
