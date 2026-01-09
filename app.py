@@ -163,7 +163,7 @@ def format_tight_output(text: str) -> str:
     "Lesson Plan Overview", "Session Overview", "Activity Overview", "Lesson Brief",
     "Session Brief", "Learning Brief", "Teaching Brief", "Instruction Brief", "Notes for Teacher",
     "Teacher Guidance", "Student Instructions", "Student Guidance", "Lesson Notes Summary",
-    "Activity Notes", "Learning Notes Summary", "Conclusion and Reflection", "Timings and Activities"
+    "Activity Notes", "Learning Notes Summary", "Conclusion and Reflection", "Timings and Activities",
     "Conclusion"
 ]
     lines = [l.rstrip() for l in text.splitlines()]
@@ -360,12 +360,14 @@ def generate_and_display_plan(prompt, title="Latest", regen_message="", lesson_d
             while attempts < 3:
                 attempts += 1
 
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt_with_req}],
-                    temperature=0.25,
-                    max_tokens=2200,
-                )
+                response = client.responses.create(
+    model="gpt-4o-mini",
+    input=prompt_with_req,
+    max_output_tokens=2200,
+    temperature=0.25,
+)
+
+raw = response.output_text
 
                 raw = response.choices[0].message.content
                 cleaned = clean_markdown(raw)
